@@ -105,15 +105,17 @@ export default function AccountDetailPage() {
         // Get portfolio average (all Top 25 accounts)
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          // Get Top 25 portfolio
-          const { data: portfolio } = await supabase
+          // Get both EDGE and SiteLink portfolios
+          const { data: portfolios } = await supabase
             .from('portfolios')
             .select('account_ids')
             .eq('user_id', user.id)
-            .eq('name', 'Top 25 by MRR')
-            .single();
+            .in('portfolio_type', ['top_25_edge', 'top_25_sitelink']);
 
-          if (portfolio && portfolio.account_ids) {
+          if (portfolios && portfolios.length > 0) {
+            // Combine account IDs from both portfolios
+            const allAccountIds = portfolios.flatMap(p => p.account_ids || []);
+            const portfolio = { account_ids: Array.from(new Set(allAccountIds)) };
             // Get recent snapshots for all Top 25 accounts
             const { data: portfolioSnapshots } = await supabase
               .from('account_snapshots')
