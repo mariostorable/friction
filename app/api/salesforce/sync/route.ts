@@ -72,20 +72,31 @@ export async function POST(request: NextRequest) {
     const accountsToUpsert = accountsData.records.map((sfAccount: any) => {
       const products = [];
 
-      // Product detection based on specific ID fields
+      // Product detection based on specific ID fields (most reliable)
       if (sfAccount.Corp_Code__c) products.push('Software (SiteLink)');
       if (sfAccount.SE_Company_UUID__c) products.push('Software (EDGE)');
       if (sfAccount.SpareFoot_Client_Key__c) products.push('Marketplace (SpareFoot)');
       if (sfAccount.Insurance_ZCRM_ID__c) products.push('Insurance');
 
-      // Fallback to legacy fields if no ID fields are present
-      if (products.length === 0) {
-        if (sfAccount.Current_FMS__c) products.push(`Software (${sfAccount.Current_FMS__c})`);
-        if (sfAccount.Online_Listing_Service__c) products.push(`Marketplace (${sfAccount.Online_Listing_Service__c})`);
-        if (sfAccount.Current_Website_Provider__c) products.push(`Website (${sfAccount.Current_Website_Provider__c})`);
-        if (sfAccount.Current_Payment_Provider__c) products.push(`Payments (${sfAccount.Current_Payment_Provider__c})`);
-        if (sfAccount.Insurance_Company__c) products.push(`Insurance (${sfAccount.Insurance_Company__c})`);
-        if (sfAccount.Gate_System__c) products.push(`Gate (${sfAccount.Gate_System__c})`);
+      // Also check legacy fields to catch additional products
+      // (Don't skip if ID fields already found - accounts can have multiple products)
+      if (sfAccount.Current_FMS__c && !products.some(p => p.includes(sfAccount.Current_FMS__c))) {
+        products.push(`Software (${sfAccount.Current_FMS__c})`);
+      }
+      if (sfAccount.Online_Listing_Service__c && !products.some(p => p.includes('Marketplace'))) {
+        products.push(`Marketplace (${sfAccount.Online_Listing_Service__c})`);
+      }
+      if (sfAccount.Current_Website_Provider__c) {
+        products.push(`Website (${sfAccount.Current_Website_Provider__c})`);
+      }
+      if (sfAccount.Current_Payment_Provider__c) {
+        products.push(`Payments (${sfAccount.Current_Payment_Provider__c})`);
+      }
+      if (sfAccount.Insurance_Company__c && !products.includes('Insurance')) {
+        products.push(`Insurance (${sfAccount.Insurance_Company__c})`);
+      }
+      if (sfAccount.Gate_System__c) {
+        products.push(`Gate (${sfAccount.Gate_System__c})`);
       }
 
       return {
