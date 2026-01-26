@@ -125,20 +125,28 @@ export default function AccountDetailPage() {
               ? portfolioSnapshots.reduce((sum, s) => sum + (s.case_volume || 0), 0) / portfolioSnapshots.length
               : 0;
 
-            // Get cases from last 7 days with full details
-            const { data: recentCases } = await supabase
+            // Get all cases and filter by Salesforce creation date (last 7 days)
+            const { data: allCases } = await supabase
               .from('raw_inputs')
               .select('id, metadata, source_url, created_at')
               .eq('account_id', accountId)
               .eq('user_id', user.id)
-              .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
               .order('created_at', { ascending: false });
 
-            const last7DaysCount = recentCases?.length || 0;
+            // Filter by actual Salesforce case creation date, not DB sync date
+            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+            const recentCases = allCases?.filter(caseItem => {
+              const sfCreatedDate = caseItem.metadata?.created_date;
+              if (!sfCreatedDate) return false;
+              const caseDate = new Date(sfCreatedDate);
+              return caseDate >= sevenDaysAgo;
+            }) || [];
+
+            const last7DaysCount = recentCases.length;
 
             // Group cases by origin for smart alerts
             const originGroups: Record<string, any[]> = {};
-            recentCases?.forEach(caseItem => {
+            recentCases.forEach(caseItem => {
               const origin = caseItem.metadata?.origin || 'Unknown';
               if (!originGroups[origin]) {
                 originGroups[origin] = [];
