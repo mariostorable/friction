@@ -115,12 +115,12 @@ export default function CaseVolumeCard({
           </div>
           <div className="flex items-baseline gap-2">
             <div className="text-2xl font-bold text-gray-900">
-              {(last7Days / 7).toFixed(1)}
+              {last7Days}
             </div>
-            <div className="text-xs text-gray-500">avg cases/day</div>
+            <div className="text-xs text-gray-500">cases</div>
           </div>
           <div className="text-xs text-gray-500 mt-0.5">
-            {last7Days} total cases over last week
+            {(last7Days / 7).toFixed(1)} avg cases/day
           </div>
           <div className={`text-xs font-medium mt-1 ${
             vs7DayExpected > 20 ? 'text-red-600' :
