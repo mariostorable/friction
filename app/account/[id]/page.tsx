@@ -390,7 +390,17 @@ export default function AccountDetailPage() {
       
     } catch (error) {
       console.error('Analysis error:', error);
-      alert(`❌ Analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      let errorMessage = 'Unknown error';
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null) {
+        errorMessage = JSON.stringify(error);
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+
+      alert(`❌ Analysis failed: ${errorMessage}`);
     } finally {
       setAnalyzing(false);
     }
