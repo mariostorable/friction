@@ -276,6 +276,10 @@ export default function Dashboard() {
           aVal = a.current_snapshot?.ofi_score || 0;
           bVal = b.current_snapshot?.ofi_score || 0;
           break;
+        case 'case_volume':
+          aVal = a.current_snapshot?.case_volume || 0;
+          bVal = b.current_snapshot?.case_volume || 0;
+          break;
         default:
           return 0;
       }
@@ -479,7 +483,9 @@ export default function Dashboard() {
                       <th onClick={() => handleSort('ofi')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
                         OFI Score {getSortIcon('ofi')}
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cases (90d)</th>
+                      <th onClick={() => handleSort('case_volume')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
+                        Cases (90d) {getSortIcon('case_volume')}
+                      </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trend</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Analyzed</th>
                     </tr>
