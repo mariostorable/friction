@@ -534,7 +534,7 @@ export default function Dashboard() {
             )}
 
             <section className="mt-12">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Top 25 by ARR</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Software Accounts (EDGE & SiteLink)</h2>
               <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
@@ -545,6 +545,7 @@ export default function Dashboard() {
                       <th onClick={() => handleSort('arr')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
                         ARR {getSortIcon('arr')}
                       </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Software</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Products</th>
                       <th onClick={() => handleSort('ofi')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
                         OFI Score {getSortIcon('ofi')}
@@ -569,6 +570,15 @@ export default function Dashboard() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           ${(account.arr || 0).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {(() => {
+                            const vertical = account.vertical || '';
+                            const providers = [];
+                            if (vertical.includes('EDGE') || vertical.includes('Storable Edge')) providers.push('EDGE');
+                            if (vertical.includes('SiteLink')) providers.push('SiteLink');
+                            return providers.length > 0 ? providers.join(' + ') : 'N/A';
+                          })()}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-500">
                           {account.vertical || 'N/A'}
