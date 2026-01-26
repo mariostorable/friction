@@ -1,0 +1,1 @@
+{"version":1,"functions":{"/api/analyze-all":{"maxDuration":300},"/api/cron/analyze-portfolio":{"maxDuration":300}}}

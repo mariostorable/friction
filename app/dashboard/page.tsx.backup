@@ -1,0 +1,298 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { AccountWithMetrics, Alert } from '@/types';
+import AccountCard from '@/components/AccountCard';
+import PortfolioSummary from '@/components/PortfolioSummary';
+import AlertBanner from '@/components/AlertBanner';
+import SalesforceConnector from '@/components/SalesforceConnector';
+import { TrendingUp, TrendingDown, Minus, RefreshCw, Settings } from 'lucide-react';
+
+export default function DashboardPage() {
+  const [top25, setTop25] = useState<AccountWithMetrics[]>([]);
+  const [randomSample, setRandomSample] = useState<AccountWithMetrics[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [sortBy, setSortBy] = useState<'ofi' | 'arr'>('ofi');
+  
+  const supabase = createClientComponentClient();
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
+
+  async function loadDashboard() {
+    try {
+      setLoading(true);
+      
+      // Get user's portfolios
+      const { data: portfolios } = await supabase
+        .from('portfolios')
+        .select('*')
+        .eq('is_active', true);
+
+      if (!portfolios) return;
+
+      // Load Top 25
+      const top25Portfolio = portfolios.find(p => p.portfolio_type === 'top_25');
+      if (top25Portfolio) {
+        await loadPortfolioAccounts(top25Portfolio.account_ids, setTop25);
+      }
+
+      // Load Random Sample
+      const randomPortfolio = portfolios.find(p => p.portfolio_type === 'random_sample');
+      if (randomPortfolio) {
+        await loadPortfolioAccounts(randomPortfolio.account_ids, setRandomSample);
+      }
+
+      // Load alerts
+      const { data: alertsData } = await supabase
+        .from('alerts')
+        .select('*')
+        .eq('is_read', false)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (alertsData) setAlerts(alertsData);
+
+    } catch (error) {
+      console.error('Error loading dashboard:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadPortfolioAccounts(accountIds: string[], setter: Function) {
+    if (!accountIds || accountIds.length === 0) return;
+
+    // Get accounts with their latest snapshots
+    const { data: accounts } = await supabase
+      .from('accounts')
+      .select(`
+        *,
+        current_snapshot:account_snapshots(*)
+      `)
+      .in('id', accountIds)
+      .order('created_at', { ascending: false });
+
+    if (!accounts) return;
+
+    // Enhance with latest snapshot data
+    const enrichedAccounts = await Promise.all(
+      accounts.map(async (account) => {
+        // Get latest snapshot
+        const { data: snapshot } = await supabase
+          .from('account_snapshots')
+          .select('*')
+          .eq('account_id', account.id)
+          .order('snapshot_date', { ascending: false })
+          .limit(1)
+          .single();
+
+        // Get recent friction cards
+        const { data: recentCards } = await supabase
+          .from('friction_cards')
+          .select('*')
+          .eq('account_id', account.id)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        // Get alert count
+        const { count: alertCount } = await supabase
+          .from('alerts')
+          .select('*', { count: 'exact', head: true })
+          .eq('account_id', account.id)
+          .eq('is_read', false);
+
+        return {
+          ...account,
+          current_snapshot: snapshot,
+          recent_friction_cards: recentCards || [],
+          alert_count: alertCount || 0,
+        };
+      })
+    );
+
+    setter(enrichedAccounts);
+  }
+
+  async function refreshPortfolio(type: 'top_25' | 'random_sample') {
+    try {
+      setRefreshing(true);
+      
+      // Call edge function to regenerate portfolio
+      const { data, error } = await supabase.functions.invoke('refresh-portfolio', {
+        body: { portfolio_type: type }
+      });
+
+      if (error) throw error;
+
+      // Reload dashboard
+      await loadDashboard();
+      
+    } catch (error) {
+      console.error('Error refreshing portfolio:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  const sortAccounts = (accounts: AccountWithMetrics[]) => {
+    return [...accounts].sort((a, b) => {
+      if (sortBy === 'arr') {
+        return (b.arr || 0) - (a.arr || 0);
+      } else {
+        const aScore = a.current_snapshot?.ofi_score || 0;
+        const bScore = b.current_snapshot?.ofi_score || 0;
+        return bScore - aScore; // Higher score = more friction = show first
+      }
+    });
+  };
+
+  const getTrendIcon = (direction?: string) => {
+    if (direction === 'worsening') return <TrendingUp className="w-4 h-4 text-red-500" />;
+    if (direction === 'improving') return <TrendingDown className="w-4 h-4 text-green-500" />;
+    return <Minus className="w-4 h-4 text-gray-400" />;
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading your portfolio...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Friction Intelligence</h1>
+              <p className="mt-1 text-sm text-gray-500">
+                Early warning system for customer friction
+              </p>
+            </div>
+            <button className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+              <Settings className="w-4 h-4" />
+              Settings
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Alerts */}
+      {alerts.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="space-y-2">
+            {alerts.slice(0, 3).map((alert) => (
+              <AlertBanner key={alert.id} alert={alert} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        {/* Salesforce Connection */}
+        {top25.length === 0 && randomSample.length === 0 && (
+          <div className="mb-8">
+            <SalesforceConnector />
+          </div>
+        )}
+        
+        {/* Portfolio Summary Stats */}
+        {(top25.length > 0 || randomSample.length > 0) && (
+          <PortfolioSummary 
+            top25={top25} 
+            randomSample={randomSample}
+          />
+        )}
+
+        {/* Top 25 Accounts */}
+        <section className="mt-8">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Top 25 Accounts</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Your highest ARR customers, auto-updated monthly
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as 'ofi' | 'arr')}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="ofi">Sort by Friction</option>
+                <option value="arr">Sort by ARR</option>
+              </select>
+              <button
+                onClick={() => refreshPortfolio('top_25')}
+                disabled={refreshing}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {sortAccounts(top25).map((account) => (
+              <AccountCard key={account.id} account={account} />
+            ))}
+          </div>
+
+          {top25.length === 0 && (
+            <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
+              <p className="text-gray-500">No accounts found. Connect Salesforce to get started.</p>
+            </div>
+          )}
+        </section>
+
+        {/* Random Sample */}
+        <section className="mt-12">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Random Sample</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                50 randomly selected smaller accounts, refreshed weekly
+              </p>
+            </div>
+            <button
+              onClick={() => refreshPortfolio('random_sample')}
+              disabled={refreshing}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              New Sample
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {randomSample.slice(0, 10).map((account) => (
+              <AccountCard key={account.id} account={account} compact />
+            ))}
+          </div>
+
+          {randomSample.length > 10 && (
+            <div className="mt-4 text-center">
+              <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                Show all {randomSample.length} accounts →
+              </button>
+            </div>
+          )}
+        </section>
+      </main>
+    </div>
+  );
+}

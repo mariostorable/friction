@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(set -a)",
+      "Bash(source:*)",
+      "Bash(set:*)",
+      "Bash(node check-dates.mjs:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(vercel --prod:*)",
+      "Bash(node clear-data.mjs:*)",
+      "Bash(node check-accounts.mjs:*)",
+      "Bash(node verify-fix.mjs:*)",
+      "Bash(node:*)",
+      "Bash(npx tsx:*)"
+    ]
+  }
+}

@@ -1,0 +1,747 @@
+Label,QualifiedApiName
+Account ID,Id
+Deleted,IsDeleted
+Account,MasterRecordId
+Account Name,Name
+Type,Type
+Account Record Type,RecordTypeId
+Parent Account,ParentId
+Billing Address,BillingAddress
+Property Address,ShippingAddress
+Phone,Phone
+Fax,Fax
+Account Number,AccountNumber
+Website,Website
+Photo URL,PhotoUrl
+SIC Code,Sic
+Industry,Industry
+Projected Annual Revenue,AnnualRevenue
+Employees,NumberOfEmployees
+Ownership,Ownership
+Ticker Symbol,TickerSymbol
+Description,Description
+Rating,Rating
+Account Site,Site
+Account Currency,CurrencyIsoCode
+Account Owner,OwnerId
+Created Date,CreatedDate
+Created By,CreatedById
+Last Modified Date,LastModifiedDate
+Last Modified By,LastModifiedById
+System Modstamp,SystemModstamp
+Last Activity,LastActivityDate
+Last Viewed Date,LastViewedDate
+Last Referenced Date,LastReferencedDate
+Object Access Level,UserRecordAccessId
+Source System ID,SourceSystemIdentifier
+Data.com Key,Jigsaw
+Jigsaw Company Id,JigsawCompanyId
+Account Source,AccountSource
+SIC Description,SicDesc
+Operating Hours,OperatingHoursId
+Received Connection Name,ConnectionReceivedId
+Sent Connection Name,ConnectionSentId
+Important,IsPriorityRecord
+Total Won Opportunities,Total_Won_Opportunities__c
+Activity Age (Days),Days_Since_Activity__c
+Annual Molo Revenue,AnnualMoloRevenue__c
+Notes,Notes__c
+Google Maps Link,Google_Maps_Link__c
+Billing Currency,Billing_Currency__c
+Account Classification,Account_Classification__c
+Other Industry,Other_Industry__c
+Storage Auctions,Has_Storage_Auctions__c
+NB Company ID,IM_CompanyId__c
+Billing Entity,Billing_Entity__c
+NB Property ID,IM_InstanceId__c
+New Owner (Mass Transfer),NewOwnerMassTransferTool__c
+Frontend Link Date,FrontendLinkDate__c
+NB Region,IM_Region__c
+Service Level,LevelOfService__c
+Outlook Create Date,Outlook_Create_Date__c
+No Longer Customer,No_Longer_Customer__c
+Returned SiteLink,Returned_SiteLink__c
+Treatment,AccountTreatment__c
+SLPC Last Payment Date,SLPC_Last_Payment_Date__c
+SLPC Last Payment Check #,SLPC_Last_Payment_Check__c
+SLPC Last Payment Amount,SLPC_Last_Payment_Amount__c
+SLPC Last Purchased Feature,SLPC_Last_Purchased_Feature__c
+Outlook Category,Outlook_Category__c
+Insurance Project Number,Insurance_Project_Number__c
+Current Insurance Provider,Insurance_Company__c
+Vitally Health Evaluation,CSM_Health_Evaluation_Icon__c
+SL Location Code,Location_Code__c
+Marine Product Interest,Marine_Product_Interest__c
+Update Account Hierarchy,Update_Account_Hierarchy__c
+Tag Color,Tag_Color__c
+SL Corp Code,Corp_Code__c
+Icons,Icons__c
+Last Contact Date,Last_Contact_Date__c
+SMD Account ID,SMD_Account_ID__c
+Parent Street,Parent_Street__c
+Parent City,Parent_City__c
+Special Tech Support Price,Tech_Support_Price__c
+Special Tech Support Date,Tech_Support_Date__c
+CC Provider,CC_Provider__c
+Storage Type,Storage_Type__c
+Comments,Comments__c
+Current Marketplace Provider,Online_Listing_Service__c
+Tradeshows,Tradeshows__c
+Current Gate Provider,Gate_System__c
+CSM Strategy,CSM_Strategy__c
+SLPC Last Payment Auth#,SLPC_Last_Payment_Auth__c
+Tech Support End Date,Tech_Support_End_Date__c
+Form Source,FormSource__c
+Previous Software,Previous_Software__c
+ESS Company ID,ESS_Company_ID__c
+Account Note,Account_Note__c
+Upgrade Needed,Upgrade_Needed__c
+SLPC Send to Corp Office,SLPC_Send_to_Corp_Office__c
+Last Upgrade,Last_Upgrade__c
+ESS Facility ID,ESS_Facility_ID__c
+Discontinued Reason,Discontinued_Reason__c
+New Software Choice,New_Software_Choice__c
+Trial Expiration,Trial_Expiration__c
+Previous Sales Owner,Previous_Sales_Owner__c
+Previous Sales Rep,Previous_Sales_Rep__c
+Lead Source Email,Lead_Source_Email__c
+Converted To Customer Date,Converted_To_Customer_Date__c
+Parent Account Note,Parent_Account_Note__c
+Tech Note,Tech_Note__c
+Territory,Territory__c
+# Locations,Locations__c
+# Units (old),Units__c
+Access Anywhere?,Access_Anywhere__c
+Accounting Software,Accounting_Software__c
+Billing Cycle,Billing_Cycle__c
+Parent State,Parent_State__c
+Current Software Provider,Current_FMS__c
+Quoting Notes,Quoting_Notes__c
+Account Domain,Account_Domain__c
+Account URL,Account_URL__c
+Account Name Dupe Check,Account_Name_Dupe_Check__c
+Season Go Live Date,Season_Go_Live_Date__c
+Season Start Date,Season_Start_Date__c
+#ofOnboarding Molo Service & Integration,ofOnboarding_Molo_Service_Integration__c
+Invoicing,Invoicing__c
+Last Rate Change,Last_Rate_Change__c
+Needs,Needs__c
+Occupancy,Occupancy__c
+Migration Id,MigrationId__c
+Storage Product Interest,Product_Interest__c
+Timeframe,Timeframe__c
+Source URL,Source_URL__c
+Last Opportunity Close,Last_Opportunity_Close__c
+Contract Term,Contract_Terms__c
+Enterprise Traction Score,Enterprise_Traction_Score__c
+Sales Activity > 10/1/2013,Sales_Activity_10_1_2013__c
+Territory Txt,Territory_Txt__c
+dL CRM Avg Rev Per Month,dL_CRM_Avg_Rev_Per_Month__c
+Contract Renewal Date,Contract_Renewal_Date__c
+Migration Type,Migration_Type__c
+Newbook Review Date,Newbook_Review_Date__c
+Owner Department,Owner_Department__c
+Ultimate Parent ID (18 Digit),UltimateParentID_18__c
+Parent Locations,Parent_Locations__c
+Parent Account Owner,Parent_Account_Owner__c
+Parent Account Owner Match,Parent_Account_Owner_Match__c
+Conversion?,Conversion__c
+First Sign Date,First_Sign_Date__c
+#ofOnboarding RentalUnits ConvenienceFee,ofOnboarding_RentalUnits_ConvenienceFee__c
+#ofPendCancel RentalUnits ConvenienceFee,ofPendCancel_RentalUnits_ConvenienceFee__c
+#ofPendingCancel MoloService&Integration,ofPendingCancel_MoloService_Integration__c
+Parent Zip,Parent_Zip__c
+Last Date,Last_Date__c
+Moved to Lead,Moved_to_Lead__c
+Data Load By,Data_Load_By__c
+Vitally Tracking Override,Vitally_Tracking_Override__c
+RedNova,RedNova__c
+dL Collections Avg Rev Per Month,dL_Collections_Avg_Rev_Per_Month__c
+National?,National__c
+Child National?,Parent_National__c
+# of Locations - Service,of_Locations_Service__c
+New Support Start,New_Support_Start__c
+#ofPendingCancel Molo Service Management,ofPendingCancel_Molo_Service_Management__c
+New Support End,New_Support_End__c
+Sales Territory,Sales_TerritoryFormula__c
+Corp/Location,Corp_Location__c
+Facebook URL,Facebook_URL__c
+Open Oppty,Open_Oppty__c
+Open Activities ?,Open_Activities__c
+#ofPendingCancel Rental Units LicenseFee,ofPendingCancel_Rental_Units_LicenseFee__c
+Archive?,Archive__c
+Collection Id,IGD__Collection_Id__c
+Cirrus Files Folder Name,Cirrus_Files_Folder_Name__c
+# of Churned Club Units (License Fee),of_Churned_Club_Units_License_Fee__c
+National Check,National_Check__c
+# of Churned Marina Units (License Fee),of_Churned_Marina_Units_License_Fee__c
+X - Merchant ID (Old),Merchant_ID__c
+Opportunities,Opportunities__c
+Merchant Service Rep,Merchant_Service_Rep__c
+# of Churned Marine DMS,of_Churned_Marine_DMS__c
+# of Churned Marine Website,of_Churned_Marine_Website__c
+Converted To Customer Onboarding Date,Converted_To_Customer_Onboarding_Date__c
+Record Type Check,Record_Type_Check__c
+Current Payment Provider,Current_Payment_Provider__c
+# of Churned Molo Service & Integration,of_Churned_Molo_Service_Integration__c
+Corp/Loc2,Corp_Loc2__c
+Merchant Services Account Status,Merchant_Services_Account_Status__c
+# of Churned Molo Service Management,of_Churned_Molo_Service_Management__c
+# of Locations - Boat Club,of_Locations_Boat_Club__c
+# of Churned RentalUnits Convenience Fee,of_Churned_RentalUnits_Convenience_Fee__c
+# of Churned Rental Units (License Fee),of_Churned_Rental_Units_License_Fee__c
+# of Live Club Units (License Fee),of_Live_Club_Units_License_Fee__c
+# of Live Marina Units (License Fee),of_Live_Marina_Units_License_Fee__c
+# of Live Marine DMS,of_Live_Marine_DMS__c
+# of Live Marine Website,of_Live_Marine_Website__c
+# of Live Molo Service & Integration,of_Live_Molo_Service_Integration__c
+SS Names,SS_Names__c
+# of Live Molo Service Management,of_Live_Molo_Service_Management__c
+# of Live Rental Units Convenience Fee,of_Live_Rental_Units_Convenience_Fee__c
+# of Live Rental Units (License Fee),of_Live_Rental_Units_License_Fee__c
+Case Safe Account Id,Case_Safe_Account_Id__c
+Parent Account ID (18 Digit),Case_Safe_Parent_Account_Id__c
+Ship Store,Ship_Store__c
+Property Contact,Site_Contact__c
+Insurance Tax,Insurance_Tax__c
+Merchandise Tax,Merchandise_Tax__c
+Unit Rent Tax Rate,Unit_Rent_Tax_Rate__c
+# Units Rented,Units_Rented__c
+Billing Address,Billing_Address__c
+Property Address,Shipping_Address__c
+Parent Account Name,Parent_Account_Name__c
+Merchant Notes,MerchantServicesNotes__c
+Molo YayPay Statement Link,Molo_YayPay_Statement_Link__c
+Account(s) Have SLMS,Accounts_Have_SLMS__c
+Sales Territory Owner,Territory_Owner__c
+Merchant Services - DBA Name,Merchant_Services_DBA_Name__c
+Headquartered Number,Headquartered_Number__c
+Buyer Account,Buyer_Account__c
+# of Techs across all Locations,of_Techs_across_all_Locations__c
+Marine Blockers,Marine_Blockers__c
+Annual Ship Store Revenue,Annual_Ship_Store_Revenue__c
+NDA Signed,NDA_Signed__c
+Sales Territory,SalesTerritory__c
+# House Boats : Club,House_Boats_Club__c
+Account-CSM/PM,Child_Account_CSM_PM__c
+Account Director of CS,Child_Account_Director_of_CS__c
+dL CallPotential Avg Rev Per Month,dL_CallPotential_Avg_Rev_Per_Month__c
+IMS Club Locations,IMS_Club_Locations__c
+Marketplace Category,Marketplace_Category__c
+Headquarter Type,Headquarter_Type__c
+Discontinued Date,Discontinued_Date__c
+# of Locations - Sales,of_Locations_Sales__c
+Sales Territory Owner,SalesTerritoryOwnerFormula__c
+IMS Rentals Locations,IMS_Rentals_Locations__c
+Configuration,Configuration__c
+Subscriptions,Product_Families__c
+URL,account_url_ms__c
+Has Merchant Opportunity,Has_Merchant_Opportunity__c
+Account Roll up summary,Account_Roll_up_summary__c
+# Lodging : Club,Lodging_Club__c
+Open MS Opportunities on this Account Re,OpenMSOpportunities__c
+MMS Locations,MMS_Locations__c
+# of Open SF Demand Opportunities,of_SF_Open_Demand_Opportunities__c
+Open Software/MS Opportunities on this A,ofOpenMSSoftwareOpptys__c
+Open Software/MS Opportunities in Child,OpenMSSoftwareOpptysonParent__c
+Open MS Opportunities in Child Hierarchy,OpenMSOpportunitiesonparent__c
+2019 Rate increase Notification sent?,X2019RateincreaseNotificationsent__c
+# Dedicated Space Indoor/Outdoor Storage,Num_Dedicated_Space_IndoorOutdoorStorage__c
+# Linear Dockage/Moorage,Num_Linear_Dockage_Moorage__c
+storEDGE Salesforce ID,storEDGE_Salesforce_ID__c
+Original Salesforce Instance,Original_Salesforce_Instance__c
+x -- Segment,sfcloud__Segment__c
+Account ID (18 Digit),X18digitAccountId__c
+Ultimate Parent Account,UltimateParentName__c
+Ultimate Parent ID (15 Digit),UltimateParentId__c
+Ultimate Parent,UltimateParent__c
+Segment,Segment__c
+Ultimate Parent Name,Ultimate_Parent_Name_Plain_Text__c
+Non-Solicit for SLMS,Potentially_SMS__c
+ChargeOver ID,ChargeOver_ID__c
+# of Units,ofUnits__c
+Pricing Notes,Special_Payment_Terms__c
+Count of Child Accounts,CountofChildAccounts__c
+Parent,ParentAccountcheckbox__c
+License Transferred From,LicenseTransferredFrom__c
+X-# of Professional services- Child Acct,ofProfessionalservicesChildAcct__c
+X# of Properties - Professional Services,ofFacilitiesProfessionalServices__c
+# Non-Powered : Club,Num_Non_Powered_Club__c
+dL Cross-sell Opportunity Monthly Rev,dL_CrossSell_Opportunity_Monthly_Revenue__c
+# of Onboarding Club Units (License Fee),of_Onboarding_Club_Units_License_Fee__c
+# of Onboarding Marina Units License Fee,of_Onboarding_Marina_Units_License_Fee__c
+# of Onboarding Marine DMS,of_Onboarding_Marine_DMS__c
+# of Onboarding Marine Website,of_Onboarding_Marine_Website__c
+# of Onboarding Molo Service Management,of_Onboarding_Molo_Service_Management__c
+X -# of Custom Insurance - Child Account,ofCustomInsurancechildacct__c
+# of Onboarding RentalUnits License Fee,of_Onboarding_RentalUnits_License_Fee__c
+# of Pending Cancel Marina Units License,of_Pending_Cancel_Marina_Units_License__c
+# Pending Cancel Club Units License Fee,of_Pending_Cancellation_Club_Units_Li__c
+# of Pending Cancellation Marine DMS,of_Pending_Cancellation_Marine_DMS__c
+Account Status,Account_Status_Icon__c
+# of Pending Cancellation Marine Website,of_Pending_Cancellation_Marine_Website__c
+Live SE FMS Assets,ofSEFMSChildAcct__c
+Live SE FMS Properties,ofSEFMSParent__c
+Support Special Handling Instructions,Support_Special_Handling_Instructions__c
+Seasonality,Seasonality__c
+DLAR,DLAR__c
+HubSpot Data Push,HubSpot_Data_Push__c
+Live SE Web Assets,ofSEWebsiteProChildAcct__c
+Live SE Web Properties,ofSEWebsiteProParent__c
+# Open Space Indoor/Outdoor Storage,Num_Open_Space_Indoor_Outdoor_Storage__c
+Live SLWE Assets,ofSLWebchildAcct__c
+Live SLWE Properties,ofSLFMSParent__c
+Live SLMS Assets,ofSLMSChildaccount__c
+Live SLMS Properties,ofSLMSParent__c
+Marine HubSpot Last Sync,HubSpot_Last_Sync__c
+Vitally Health Score,VitallyHealthScore__c
+Live SMS Assets,ofSMSChildAccount__c
+Live SMS Properties,ofSMSParent__c
+Live SF Assets,ofSpareFootChildAcct__c
+Live SF Properties,ofSpareFootParent__c
+Auctions Customer,Auctions_Customer__c
+Gong Count,Gong__Gong_Count__c
+Uplid ID,Uplid_ID__c
+Billing Uplid ID,Billing_Uplid_ID__c
+SF Company ID,SpareFoot_Client_Key__c
+Ultimate Parent # Locations,Ultimate_Parent_Number_Locations__c
+Retention Case#,RetentionCase__c
+# Live Assets,LiveAssets__c
+SF Facility ID,SpareFoot_Facility_Key__c
+MS Named Account Owner,MS_Named_Account_Owner__c
+# of Total Assets,ofTotalAssets__c
+# of Cancelled Assets,ofCancelledAssets__c
+ChargeOver Parent ID,ChargeoverParentID__c
+SE Facility ID,SEFMSID__c
+Current Website Provider,Current_Website_Provider__c
+zSL Corp Code,zSLCorpCode__c
+zSL Location Code,zSLLocationCode__c
+zSF Client Key,zSFClientKey__c
+zSF Property Key,zSFFacilityKey__c
+Merchant ID (New),MerchantIDnew__c
+# In Progress Assets,InProgressAssets__c
+# of Transferred Assets,TransferredAssets__c
+SF BE ID,SFBEID__c
+# PWC / Jet Ski Single Space,Num_PWC_Jet_Ski_Single_Space__c
+# Powered Boats : Club,Num_Powered_Boats_Club__c
+Quick Reports,Dynamic_Reports__c
+ACH ID,ACHID__c
+HQMerchantID,HQMerchantID__c
+X - Live SLMS Assets,ofSLMSLiveChildacct__c
+X - # of Custom SLMS Live - Child acct,ofCustomSLMSLiveChildacct__c
+Has SLMS?,HasSLMS__c
+X - # of Custom Stopay Live- Child acct,ofCustomSLMSStopayLiveChildacct__c
+# of Child Accounts,Number_of_Child_Accounts__c
+Billing,ID_Summary_Billing__c
+# of Accounts,Number_of_Accounts__c
+Payments,ID_Summary_Payments__c
+Software,ID_Summary_Software__c
+dL Cross-sell Opp Monthly Access Rev,dL_CrossSell_Opp_Access__c
+Uses API,Uses_API__c
+Uses Store Local,Uses_Store_Local__c
+Disable Deduplicate,dupcheck__dc3DisableDuplicateCheck__c
+Deduplicate Index,dupcheck__dc3Index__c
+Account Owner,Account_Owner_Full_Name__c
+# of Deebooked Assets,ofDeebookedAssets__c
+Dissatisfied CSATs (90 Days),Number_of_Dissatisfied_CSATs_90_Days__c
+Health Override,Health_Override__c
+Health (α),Health__c
+Hibernate / Do Not Call,Hibernate_Do_Not_Call__c
+Customer Age,Customer_Age_Friendly__c
+Customer Age (Days),Customer_Age_Days__c
+Last Activity Date,Last_Activity_Date__c
+Activity Age,Activity_Age_Friendly__c
+Engagement Score,Health_Engagement_Score__c
+Sentiment Score,Health_Sentiment_Score__c
+Satisfied CSATs (90 Days),Number_of_Satisfied_CSATs_90_Days__c
+Total CSATs (90 Days),Total_Number_of_CSATs_90_Days_c__c
+NPS Detractors (90 Days),Number_of_NPS_Detractors_90_Days__c
+NPS Promoters (90 Days),Number_of_NPS_Promoters_90_Days__c
+NPS Passives (90 Days),Number_of_NPS_Passives_90_Days__c
+Total NPS (90 Days),Total_NPS_90_Days__c
+Advocacy Score,Health_Advocacy_Score__c
+Account CSM/PM,Client_Success_Manager__c
+Has Property with Live Asset(s),Has_Facility_with_Live_Asset_s__c
+Live Asset MRR,MRR__c
+Live Asset MVR,MVR__c
+Total MR,MRR_MVR__c
+Spend Score,Health_Spend_Score__c
+Product Score,Health_Product_Score__c
+Health Score,Health_Score__c
+# RV Sites : Rental,Num_RV_Sites_Rental__c
+Live SP Assets,ofSPChildAcct__c
+Live PMS Assets,ofPMSChildAcct_c__c
+Live SBOA Assets,ofSBOAChildAcct_c__c
+Live Payment Assets,ofPaymentChildAcct_c__c
+Live PMS Properties,ofPMSParent__c
+Live SBOA Properties,ofSBOAParent__c
+Live SP Properties,ofSPParent_c__c
+Live Payment Properties,ofPaymentParent__c
+Websites,ID_Summary_Website__c
+Marketplace,ID_Summary_Marketplace__c
+Merchant Services Corporate Pricing,Uniform_Payment_Pricing__c
+Insurance Corporate ID,Zoho_Corporate_ID__c
+Internal Use,Internal_Use__c
+Reference for Sales - Stellar,Reference_for_Sales_Stellar__c
+NSA,NSA__c
+CAB,CAB__c
+Health Evaluation,CSM_Health_Evaluation__c
+# Recreational Vehicles : Rental,Num_Recreational_Vehicles_Rental__c
+No Longer in the Industry,No_Longer_in_the_Industry__c
+Risk Drivers,Risk_Drivers__c
+Risk Driver Details,Risk_Driver_Details__c
+Path to Green,Path_to_Green__c
+My CSM Accounts,My_CSM_Accounts__c
+CSM Notes / Account Health History,CSM_Notes__c
+Health Asks,Health_Asks__c
+Executive Sponsor,Executive_Sponsor__c
+Live Property MVR,MVR_Facilities__c
+MVR (Avg. Actual),MVR_Avg_Actual__c
+Live Properties MRR,MRR_Facilities__c
+MRR (Core Products),MRR_Core_Products__c
+# of Open Opportunities (CORP),ofOpenOpportunitiesCORP__c
+# of Open Opportunities,ofOpenOpportunities__c
+Account Alert Message,AlertMessage__c
+Account Alert,Alert__c
+Number EMV Asset Covered by Storable,Number_EMV_Asset_Covered_by_Storable__c
+Customer Discontinued Date,Customer_Discontinued_Date__c
+Property,Property__c
+Operator Maturity Model Segment,Operator_Maturity_Model_Segment__c
+Operator Maturity Model Sub-Segment,Operator_Maturity_Model_Sub_Segment__c
+Exclude Rollup Helper,Exclude_Rollup_Helper__c
+New AC Assets,of_New_AC__c
+AC Expected Launch Date,AC_Expected_Launch_Date__c
+Total Add to Shipping Cases,Total_Add_to_Shipping_Cases__c
+Total Closed Add to Shipping Cases,Total_Closed_Add_to_Shipping_Cases__c
+SE Company UUID,SE_Company_UUID__c
+# of AC Hardware,of_AC_Hardware__c
+AC Launchable?,AC_Launchable__c
+Total Launchable AC Properties,Count_of_AC_Launchable_Facilities__c
+# of New or Cross-sell Oppty,of_New_or_Cross_sell_Oppty__c
+# of New or Cross-sell Oppty to Parent,of_New_or_Cross_sell_Oppty_to_Parent__c
+# of New or Cross-sell Oppty in Hierarch,of_New_or_Cross_sell_Oppty_in_Hierarch__c
+SE Facility UUID,SE_Facility_UUID__c
+Cancelled AC Assets,Cancelled_AC_Assets__c
+Cancelled AC Properties,Cancelled_AC_Facilities__c
+Cancelled ESS CA Assets,Cancelled_ESS_CA_Assets__c
+Cancelled ESS CA Properties,Cancelled_ESS_CA_Facilities__c
+Cancelled ESS FMS Assets,Cancelled_ESS_FMS_Assets__c
+Cancelled ESS FMS Properties,Cancelled_ESS_FMS_Facilities__c
+Cancelled ESS SEO Assets,Cancelled_ESS_SEO_Assets__c
+Cancelled ESS SEO Properties,Cancelled_ESS_SEO_Facilities__c
+Cancelled PMS Properties,Cancelled_PMS_Facilities__c
+Cancelled SBOA Assets,Cancelled_SBOA_Assets__c
+Cancelled SBOA Properties,Cancelled_SBOA_Facilities__c
+Cancelled SE FMS Assets,Cancelled_SE_FMS_Assets__c
+Cancelled SE FMS Properties,Cancelled_SE_FMS_Facilities__c
+Cancelled SE Web Properties,Cancelled_SE_Web_Facilities__c
+Lead Source,LeadSource__c
+Special Contract,Special_Contract__c
+Inferred Contract?,Inferred_Contract__c
+Managed Account?,Managed_Account__c
+Currency Test,rh2__testCurrency__c
+White Glove : WebWorks,White_Glove__c
+Live AC Assets,Live_AC_Assets__c
+Live AC Properties,Live_AC_Facilities__c
+# of In Progress SE FMS Assets,of_In_Progress_SE_FMS_Assets__c
+ESS Pendo Record,ESS_Pendo_Record__c
+SE Pendo Record,SE_Pendo_Record__c
+SF Pendo Record,SF_Pendo_Record__c
+dL Access Avg Rev Per Month,dL_Access_Avg_Rev_Per_Month__c
+# Side-to-Dockage (per foot),Num_Side_to_Dockage__c
+# Slips : Rental,Num_Slips_Rental__c
+# PWC / Jet Ski : Club,PWC_Jet_Ski_Club__c
+# RV Sites : Club,RV_Sites_Club__c
+# Recreational Vehicles : Club,Recreational_Vehicles_Club__c
+SMS Locations,SMS_Locations__c
+# Slips : Club,Slips_Club__c
+# Snowmobiles : Club,Snowmobiles_Club__c
+Fuel,Fuel__c
+dL Count of Live ESS FMS SFDC Assets,dL_Count_of_Live_ESS_FMS_SFDC_Assets__c
+New Boats,Sells_New_Boats__c
+dL Count of Live FMS SFDC Assets,dL_Count_of_Live_FMS_SFDC_Assets__c
+Used Boats,Sells_Used_Boats__c
+Top 24 Parent,Top_24_Parent__c
+Top 24 Member,Top_24_Member__c
+dL Count of Live SE FMS SFDC Assets,dL_Count_of_Live_SE_FMS_SFDC_Assets__c
+dL Count of Live SFDC Assets,dL_Count_of_Live_SFDC_Assets__c
+dL Count of Live SL AC SFDC Assets,dL_Count_of_Live_SL_AC_SFDC_Assets__c
+dL Count of Live SL FMS SFDC Assets,dL_Count_of_Live_SL_FMS_SFDC_Assets__c
+dL Count of SFDC Children,dL_Count_of_SFDC_Children__c
+dL Count of Units,dL_Count_of_Units__c
+dL Insurance Avg Rev Per Month,dL_Insurance_Avg_Rev_Per_Month__c
+dL Marketplace Avg Rev Per Month,dL_Marketplace_Avg_Rev_Per_Month__c
+dL Payments Avg Rev Per Month,dL_Payments_Avg_Rev_Per_Month__c
+dL Software Avg Rev Per Month,dL_Software_Avg_Rev_Per_Month__c
+dL Websites Avg Rev Per Month,dL_Websites_Avg_Rev_Per_Month__c
+NetSuite Billing Address Update,NetSuite_Billing_Address_Update__c
+NetSuite Non-Address Update,NetSuite_Non_Address_Update__c
+NetSuite Shipping Address Update,NetSuite_Shipping_Address_Update__c
+IsCreatedFromDialpad,Dialpad__IsCreatedFromDialpad__c
+Powerdialer Assigned List,Dialpad__Powerdialer_Assigned_List__c
+Powerdialer Dialed List,Dialpad__Powerdialer_Dialed_List__c
+Powerdialer Last Dialed via,Dialpad__Powerdialer_Last_Dialed_via__c
+Account Timezone,Dialpad__Timezone__c
+Total Number Of Times Dialed,Dialpad__TotalNumberOfTimesDialed__c
+Dual Tokenization Merchant ID,Dual_Tokenization_Merchant_ID__c
+FormFill,FormFill__c
+# of New Assets,of_New_Assets__c
+Exempt from Netsuite Automation,Exempt_from_Netsuite_Automation__c
+Live P&C Assets,Live_P_C_Assets__c
+Live P&C Properties,Live_P_C_Facilities__c
+Live TI Assets,Live_TI_Assets__c
+Live TI Properties,Live_TI_Facilities__c
+P&C Policy Expiration Date,P_C_Policy_Expiration_Date__c
+Epic Location Code,Epic_Location_Code__c
+Epic Lookup Code,Epic_Lookup_Code__c
+Next Run Date,Next_Run_Date__c
+Trigger Flow,Trigger_Flow__c
+CP Company ID,CP_Company_ID__c
+CP Location ID,CP_Location_ID__c
+Hierarchy has NonPayment Cancelled Asset,Hierarchy_has_NonPayment_Cancelled_Asset__c
+Hierarchy has Suspended Asset,Hierarchy_has_Suspended_Asset__c
+Training Account,Training_Account__c
+Live CP Assets,Live_CP_Assets__c
+Live CP Properties,Live_CP_Facilities__c
+Status Reason,Status_Reason__c
+Status,Status__c
+API Partner Type,API_Partner_Type__c
+API Servicing Account,API_Servicing_Account__c
+FMS API Key Access,FMS_API_Key_Access__c
+Monthly Call Limit,Monthly_Call_Limit__c
+Approved API Key Application(s),Approved_API_Key_Applications__c
+API Contract Revenue,API_Contract_Revenue__c
+API Billing Frequency,API_Billing_Frequency__c
+API Contract Effective Date,API_Contract_Effective_Date__c
+API Contract Renewal Date,API_Contract_Renewal_Date__c
+API Contract Renewal Notes,API_Contract_Renewal_Notes__c
+SF Partner Type,SF_Partner_Type__c
+SF Partner Website,SF_Partner_Website__c
+SF Flat Rate Commission Amount,SF_Flat_Rate_Commission_Amount__c
+SF Commission Percentage,SF_Commission_Percentage__c
+SF Tenant Discount Amount,SF_Tenant_Discount_Amount__c
+PITA SF Partner Link,PITA_SF_Partner_Link__c
+API Partner Contract,API_Partner_Contract__c
+dL Total Avg Rev Per Month,dL_total_avg_rev_per_month__c
+CP A2P Complete?,CP_A2P_Complete__c
+CP A2P In Progress?,CP_A2P_In_Progress__c
+CP Twilio ID,CP_Twilio_ID__c
+Corp CP A2P Complete?,Corp_CP_A2P_Complete__c
+Corp CP A2P In Progress?,Corp_CP_A2P_In_Progress__c
+Contract,Contract__c
+Has Custom Pricing,Has_Custom_Pricing__c
+Account-Account Relationship,Account_Account_Relationship__c
+Marketing Campaign Target,Push_to_CSP__c
+SLWE IP,SLWE_IP__c
+FMS Asset,FMS_Asset__c
+ESS Live,ESS_Live__c
+ESS In Progress,ESS_In_Progress__c
+SLWE International Live,SLWE_International_Live__c
+SLWE International IP,SLWE_International_IP__c
+SLWE Portable Live,SLWE_Portable_Live__c
+SLWE Portable IP,SLWE_Portable_IP__c
+SE FMS Live,SE_FMS_Live__c
+SEFMS In Progress,SEFMS_In_Progress__c
+TI Product,TI_Product__c
+AIG (Storsmart),AIG_Storsmart__c
+SiteLink Tenant Protection Program,SiteLink_Tenant_Protection_Program__c
+storEDGE Tenant Protection Program,storEDGE_Tenant_Protection_Program__c
+Autogrow,Autogrow__c
+PMA (Bader),PMA_Bader__c
+Sitelink FMS In Progress,Sitelink_FMS_In_Progress__c
+VitallyParentAccountTrigger,VitallyParentAccountTrigger__c
+Vitally Health Asks,Vitally_Health_Asks__c
+Vitally Health Evaluation,Vitally_Health_Evaluation__c
+Vitally Health Override,Vitally_Health_Override__c
+Vitally Risk Driver Details,Vitally_Risk_Driver_Details__c
+Vitally Risk Drivers,Vitally_Risk_Drivers__c
+Has Entitlement?,Has_Entitlement__c
+# of Active Entitlements,of_Active_Entitlements__c
+# of Inactive Entitlements,of_Inactive_Entitlements__c
+LLC / Legal Entity,LLC_Legal_Entity__c
+Account Flow VR Bypass,Account_Flow_VR_Bypass__c
+Client Success Segment,VitallyClient_Success_Tier__c
+Annual Boat Club Revenue,Annual_Boat_Club_Revenue__c
+Annual Boat Sales Revenue,Annual_Boat_Sales_Revenue__c
+Annual Marine Rentals Revenue,Annual_Marine_Rentals_Revenue__c
+Annual Marine Service Revenue,Annual_Marine_Service_Revenue__c
+Annual Marine Storage Revenue,Annual_Marine_Storage_Revenue__c
+Company Domain Name,Company_Domain_Name__c
+DockWa URL,DockWa_URL__c
+Enterprise Action Items,Enterprise_Action_Items__c
+Enterprise Notes,Enterprise_Notes__c
+dL Cross-sell Opp Monthly CRM Rev,dL_CrossSell_Opp_CRM__c
+dL Cross-sell Opp Mo Collections Rev,dL_CrossSell_Opp_Collections__c
+Google Review,Google_Review__c
+IMS Frontend Login,IMS_Frontend_Login__c
+IMS Login,IMS_Login__c
+Integrated GPS?,Integrated_GPS__c
+Interested in QBO Integration,Interested_in_QBO_Integration__c
+Interested in Renter's Insurance?,Interested_in_Renter_s_Insurance__c
+Lead Score,Lead_Score__c
+MMS Qualification,MMS_Qualification__c
+Marina URL,Marina_URL__c
+Marine Demo Date,Marine_Demo_Date__c
+Marine HubSpot ID,Marine_HubSpot_ID__c
+Marine Zoho ID,Marine_Zoho_ID__c
+Molo Company ID,Molo_ID__c
+Molo Online Booking,Molo_Online_Booking__c
+Molo Other Integrations,Molo_Other_Integrations__c
+Molo Property ID,Molo_Site_ID__c
+Next Action Date,Next_Action_Date__c
+# Powered Boats : Rental,Num_Boats__c
+# House Boats : Rental,Num_Houseboats__c
+# PWC / Jet Ski : Rental,Num_Jet_Skis__c
+# Lodging : Rental,Num_Lodging_Cabins__c
+# Non-Powered : Rental,Num_Non_Powered__c
+# Rack Storage,Num_Rack_Storage_Valet__c
+# Snowmobiles : Rental,Num_Snowmobiles__c
+# Technicians,Num_Technicians__c
+# Slips,Num_Wet_Slips__c
+# Work Orders,Num_Work_Orders__c
+Partner Call Cadence,Partner_Call_Cadence__c
+Qualified,Qualified__c
+Reference Type?,Reference_Type__c
+Reference for Sales - Molo,Reference_for_Sales_Molo__c
+Referral Partner Type,Referral_Partner_Type__c
+dL Cross-sell Opp Monthly DMS Rev,dL_CrossSell_Opp_DMS__c
+Service App,Service_App__c
+dL Crosssell Opp Monthly Marketplace Rev,dL_CrossSell_Opp_Marketplace__c
+Software Usage (Marine Boat Club),Software_Usage_Marine_Boat_Club__c
+Software Usage (Marine Boat Sales),Software_Usage_Marine_Boat_Sales__c
+Software Usage (Marine Rentals),Software_Usage_Marine_Rentals__c
+Software Usage (Marine Service),Software_Usage_Marine_Service__c
+Software Usage (Marine Storage),Software_Usage_Marine_Storage__c
+X - Software Usage (RV/Campsite),Software_Usage_RV_Campsite__c
+dL Cross-sell Opp Monthly Payments Rev,dL_CrossSell_Opp_Payments__c
+dL Cross-sell Opp Mo Performance Rev,dL_CrossSell_Opp_Performance__c
+dL Cross-sell Opp Monthly Software,dL_CrossSell_Opp_Software__c
+Video Testimonial Candidate?,Video_Testimonial_Candidate__c
+XeroID,XeroID__c
+# of Google Reviews,of_Google_Reviews__c
+# of Locations - Rentals,of_Locations_Rentals__c
+# of Locations - Slips,of_Locations_Slips__c
+# of Powerboats across all Locations,of_Powerboats_across_all_Locations__c
+# of Slips across all Locations,of_Slips_across_all_Locations__c
+Marine Current Vendors,Marine_Current_Vendors__c
+# of Boats,of_Boats__c
+# of Spaces,of_Spaces__c
+Annual Fuel Sales Revenue,Annual_Fuel_Sales_Revenue__c
+Marine Hubspot Parent ID,Marine_Hubspot_Parent_ID__c
+Stellar Property ID,Marine_Tenant_ID__c
+Stellar Company ID,Marine_Tenant__c
+Marine ZCRM ID,Marine_ZCRM_ID__c
+Marine Zoho Parent ID,Marine_Zoho_Parent_ID__c
+Software Usage (Marine - POS),Software_Usage_Marine_POS__c
+Municipality,Municipality__c
+HubSpot,Marine_Hubspot_Link__c
+Transient Reservation,Transient_Reservation__c
+PCI Parent ID,PCI_Parent_ID__c
+YayPay Statement Link,YayPay_Statement_Link__c
+dl Count of Live ESS Tenant Protection S,dl_Count_of_Live_ESS_Tenant_Protection_S__c
+X - dL Count of Live Leads SFDC Assets,dl_Count_of_Live_Leads_SFDC_Assets__c
+Marine Zipcode Group,Marine_Zipcode_Group__c
+Sitelink YayPay Statement Link,Sitelink_YayPay_Statement_Link__c
+Stellar YayPay Statement Link,Stellar_YayPay_Statement_Link__c
+StorEDGE Yaypay Statement Link,StorEdge_Yaypay_Statement_Link__c
+dL Cross-sell Opp Mo TenantInsurance Rev,dL_CrossSell_Opp_TenantInsurance__c
+dL Cross-sell Opp Monthly Websites,dL_CrossSell_Opp_Websites__c
+dL DMS Avg Rev Per Month,dL_DMS_Avg_Rev_Per_Month__c
+dL Performance Avg Rev Per Month,dL_Performance_Avg_Rev_Per_Month__c
+# of Units (CORP),of_Units_CORP__c
+Cancelled PMS Assets,Cancelled_PMS_Assets__c
+Cancelled SE Web Assets,Cancelled_SE_Web_Assets__c
+Director of CS,Client_Account_Director__c
+Access,ID_Summary_Access__c
+Total Live Properties,Total_Live_Facilities__c
+Account Category,Account_Category__c
+Property Street,ShippingStreet__c
+Property City,ShippingCity__c
+Property Region,ShippingRegion__c
+Property Postal Code,ShippingPostalCode__c
+Property Country,ShippingCountry__c
+Billing Verification Used,smartystreets__BillingVerificationUsed__c
+Billing Address Status,smartystreets__Billing_Address_Status__c
+Billing Clean Street,smartystreets__Billing_Clean_Street__c
+Billing Do Not Verify,smartystreets__Billing_Do_Not_Verify__c
+Billing Footnotes,smartystreets__Billing_Footnotes__c
+Billing Last Verified,smartystreets__Billing_Last_Verified__c
+Billing Address Latitude,smartystreets__Billing_Latitude__c
+Billing Address Longitude,smartystreets__Billing_Longitude__c
+Billing Return Code,smartystreets__Billing_Return_Code__c
+Billing Verified,smartystreets__Billing_Verified__c
+In Batch,smartystreets__In_Batch__c
+Shipping Verification Used,smartystreets__ShippingVerificationUsed__c
+Shipping Address Status,smartystreets__Shipping_Address_Status__c
+Shipping Clean Street,smartystreets__Shipping_Clean_Street__c
+Shipping Do Not Verify,smartystreets__Shipping_Do_Not_Verify__c
+Shipping Footnotes,smartystreets__Shipping_Footnotes__c
+Shipping Last Verified,smartystreets__Shipping_Last_Verified__c
+Shipping Address Latitude,smartystreets__Shipping_Latitude__c
+Shipping Address Longitude,smartystreets__Shipping_Longitude__c
+Shipping Return Code,smartystreets__Shipping_Return_Code__c
+Shipping Verified,smartystreets__Shipping_Verified__c
+Active Job Id,Active_Job_Id__c
+Storable Paid EMV,Storable_Paid_EMV__c
+Live ESS FMS Assets,Live_ESS_FMS_Assets__c
+Live ESS FMS Properties,Live_ESS_FMS_Facilities__c
+Account Shared Key,Account_Shared_Key__c
+ESS Account Comments,ESS_Account_Comments__c
+ESS Account Notes,ESS_Account_Notes__c
+Date/Time Last Data Lake Sync,DataLakeSyncDate__c
+Account Digital Marketing Owner,Account_Digital_Marketing_Owner__c
+Cancelled SF Assets,Cancelled_SF_Assets__c
+Cancelled SF Properties,Cancelled_SF_Facilities__c
+Cancelled SLMS Assets,Cancelled_SLMS_Assets__c
+Cancelled SLMS Properties,Cancelled_SLMS_Facilities__c
+Cancelled SLWE Assets,Cancelled_SLWE_Assets__c
+Cancelled SLWE Properties,Cancelled_SLWE_Facilities__c
+Cancelled SMS Assets,Cancelled_SMS_Assets__c
+Cancelled SMS Properties,Cancelled_SMS_Facilities__c
+Cancelled SP Assets,Cancelled_SP_Assets__c
+Cancelled SP Properties,Cancelled_SP_Facilities__c
+Cancelled TPP Assets,Cancelled_TPP_Assets__c
+Cancelled TPP Properties,Cancelled_TPP_Facilities__c
+Live ESS CA Assets,Live_ESS_CA_Assets__c
+Live ESS CA Properties,Live_ESS_CA_Facilities__c
+Live ESS SEO Assets,Live_ESS_SEO_Assets__c
+Live ESS SEO Properties,Live_ESS_SEO_Facilities__c
+Live TPP Assets,Live_TPP_Assets__c
+Live TPP Properties,Live_TPP_Facilities__c
+Live PMS Properties,of_Accounts_with_FMS_CORP__c
+Storable HubSpot ID,HubSpot_Company_ID__c
+ACH Transaction Fee,ACHTransactionFee__c
+Amex Discount Rate,AMEXDiscountRate__c
+Amex Transaction Fee,AMEXTransactionFee__c
+Annual Fee,AnnualFee__c
+Discount Rate,DiscountRate__c
+Monthly Fee,MonthlyFee__c
+Payment Family,Payment_Family__c
+Pricing Type,Pricing_Type__c
+CC Transaction Fee,TransactionFee__c
+PDK RMA Rollup Count,PDKRMARollupCount__c
+Ultimate Parent,dupcheck__dc3UltimateParent__c
+# of RMA Automation Emails Sent,of_RMA_Automation_Emails_Sent__c
+Admin Address Override,Admin_Address_Override__c
+Confluence Documentation,Confluence_Documentation__c
+Quick Links,Account_Links__c
+Initial Sitelink Order,Initial_Sitelink_Order__c
+Initial Sparefoot Order,Initial_Sparefoot_Order__c
+Initial StorEDGE Order,Initial_StorEDGE_Order__c
+NetSuite ID,NetSuite_ID__c
+NetSuite Sync Time,NetSuite_Sync_Time__c
+Property Address Verification Status,Site_Address_Verification_Status__c
+Unmanned Property?,Unmanned_Location__c
+PCI Annual Fee,PCI_Annual_Fee__c
+Hierarchy Level,Hierarchy_Level__c
+Describe,rh2__Describe__c
+Insurance Corporate URL,Zoho_Corporate_URL__c
+Insurance Account ID,Zoho_ID__c
+Insurance Account URL,Zoho_URL__c
+Insurance,Insurance__c
+Details,Type_and_Owner__c
+Merchant Services Rate Lock,Merchant_Services_Rate_Lock__c
+SE Company ID,SE_Company_ID__c
+Insurance ZCRM ID,Insurance_ZCRM_ID__c
+Property Address & Phone,Site_Address_Phone__c
+Workato Validation Bypass,Workato_Validation_Bypass__c

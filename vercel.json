@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/analyze-portfolio",
+      "schedule": "0 2 * * *"
+    }
+  ]
+}
