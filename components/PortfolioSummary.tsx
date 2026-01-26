@@ -94,9 +94,9 @@ export default function PortfolioSummary({ top25, singleOperator }: PortfolioSum
                 <div className={`flex-shrink-0 ${stat.bg} rounded-md p-3`}>
                   <Icon className={`h-6 w-6 ${stat.color}`} aria-hidden="true" />
                 </div>
-                <div className="ml-5 w-0 flex-1">
+                <div className="ml-5 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">{stat.name}</dt>
+                    <dt className="text-sm font-medium text-gray-500">{stat.name}</dt>
                     <dd className="flex items-baseline">
                       <div className={`text-2xl font-semibold ${stat.color}`}>
                         {stat.value}
