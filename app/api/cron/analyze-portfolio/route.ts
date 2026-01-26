@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 900; // 15 minutes for full portfolio analysis
+export const maxDuration = 300; // 5 minutes (Vercel Hobby plan limit)
 
 export async function GET(request: NextRequest) {
   console.log('=== Analyze Portfolio Endpoint Called ===');
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
 
     const results = [];
     let accountsAnalyzed = 0;
-    const MAX_ANALYSES_PER_RUN = 25; // Process all Top 25 accounts in one run
+    const MAX_ANALYSES_PER_RUN = 3; // Process 3 accounts per run (5-min Vercel limit)
 
     for (const portfolio of portfolios) {
       for (const accountId of portfolio.account_ids) {
