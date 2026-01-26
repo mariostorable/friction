@@ -1,6 +1,7 @@
 'use client';
 
-import { AlertCircle, Phone, Mail, Globe, MessageSquare, ExternalLink } from 'lucide-react';
+import { useState } from 'react';
+import { AlertCircle, Phone, Mail, Globe, MessageSquare, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface CaseOriginData {
   origin: string;
@@ -22,7 +23,19 @@ interface CaseOriginsAlertProps {
 }
 
 export default function CaseOriginsAlert({ origins, accountName, totalCases }: CaseOriginsAlertProps) {
+  const [expandedOrigins, setExpandedOrigins] = useState<Set<string>>(new Set());
+
   if (origins.length === 0) return null;
+
+  const toggleOrigin = (origin: string) => {
+    const newExpanded = new Set(expandedOrigins);
+    if (newExpanded.has(origin)) {
+      newExpanded.delete(origin);
+    } else {
+      newExpanded.add(origin);
+    }
+    setExpandedOrigins(newExpanded);
+  };
 
   const getOriginIcon = (origin: string) => {
     const lowerOrigin = origin.toLowerCase();
@@ -108,7 +121,7 @@ export default function CaseOriginsAlert({ origins, accountName, totalCases }: C
                   <p className="text-xs font-medium opacity-70 uppercase tracking-wide">
                     Recent Cases:
                   </p>
-                  {originData.cases.slice(0, 3).map((caseItem) => (
+                  {(expandedOrigins.has(originData.origin) ? originData.cases : originData.cases.slice(0, 3)).map((caseItem) => (
                     <div
                       key={caseItem.id}
                       className="flex items-center justify-between text-xs bg-white/50 rounded px-2 py-1"
@@ -134,10 +147,23 @@ export default function CaseOriginsAlert({ origins, accountName, totalCases }: C
                       )}
                     </div>
                   ))}
-                  {originData.cases.length > 3 && (
-                    <p className="text-xs opacity-70 italic">
-                      + {originData.cases.length - 3} more cases
-                    </p>
+                  {originData.count > 3 && (
+                    <button
+                      onClick={() => toggleOrigin(originData.origin)}
+                      className="text-xs opacity-70 hover:opacity-100 italic flex items-center gap-1 hover:underline"
+                    >
+                      {expandedOrigins.has(originData.origin) ? (
+                        <>
+                          <ChevronUp className="w-3 h-3" />
+                          Show less
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="w-3 h-3" />
+                          + {originData.count - 3} more cases
+                        </>
+                      )}
+                    </button>
                   )}
                 </div>
               )}

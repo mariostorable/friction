@@ -159,7 +159,7 @@ export default function AccountDetailPage() {
               origin,
               count: cases.length,
               percentage: ((cases.length / last7DaysCount) * 100).toFixed(1),
-              cases: cases.slice(0, 5), // Top 5 cases per origin
+              cases: cases, // Pass all cases so they can be expanded
               priority: cases.filter(c => c.metadata?.priority === 'High').length
             })).sort((a, b) => b.count - a.count);
 
