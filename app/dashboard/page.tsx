@@ -137,6 +137,9 @@ export default function Dashboard() {
     setSyncing(true);
     setSyncProgress('Step 1/2: Syncing account data from Salesforce...');
 
+    // Store initial snapshot count to detect changes
+    const initialSnapshotCount = accountsAnalyzedToday;
+
     try {
       const response = await fetch('/api/salesforce/sync', {
         method: 'POST',
@@ -193,7 +196,17 @@ export default function Dashboard() {
 
         if (totalCases > 0) {
           const percentComplete = totalCases > 0 ? Math.round((cardsCount / totalCases) * 100) : 0;
-          setSyncProgress(`Analyzing: ${cardsCount}/${totalCases} cases analyzed (${percentComplete}%) • ${accountsAnalyzed} accounts complete`);
+
+          // Get the account name being analyzed
+          const { data: recentInputs } = await supabase
+            .from('raw_inputs')
+            .select('account_id, accounts(name)')
+            .gte('created_at', recentTime)
+            .limit(1);
+
+          const accountName = (recentInputs?.[0]?.accounts as any)?.name || 'account';
+
+          setSyncProgress(`Analyzing ${accountName}: ${cardsCount}/${totalCases} cases analyzed (${percentComplete}%) • ${accountsAnalyzed} accounts complete`);
 
           // Check if card count is stable (not increasing)
           if (cardsCount === previousCardCount) {
@@ -222,10 +235,52 @@ export default function Dashboard() {
             return;
           }
         } else if (attempts > 5) {
-          // After 10 seconds of polling with no cases, assume it's complete (incremental sync with nothing new)
+          // After 10 seconds of polling with no cases, check if snapshots were created
           setSyncProgress('Refreshing dashboard...');
-          await loadDashboard();
-          setSyncProgress('✓ No new cases to sync. Already up to date!');
+
+          // Get fresh snapshot count directly from database
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+
+          const { data: portfolios } = await supabase
+            .from('portfolios')
+            .select('account_ids')
+            .eq('user_id', user.id)
+            .eq('name', 'Top 25 by MRR')
+            .single();
+
+          if (portfolios) {
+            const today = new Date().toISOString().split('T')[0];
+            const { data: todaySnapshots } = await supabase
+              .from('account_snapshots')
+              .select('account_id')
+              .in('account_id', portfolios.account_ids)
+              .eq('snapshot_date', today);
+
+            const newSnapshotCount = todaySnapshots?.length || 0;
+            const accountsAnalyzedThisRun = newSnapshotCount - initialSnapshotCount;
+
+            await loadDashboard();
+
+            if (accountsAnalyzedThisRun > 0) {
+              // Get the account name that was just analyzed
+              const { data: latestSnapshot } = await supabase
+                .from('account_snapshots')
+                .select('account_id, accounts(name)')
+                .eq('snapshot_date', today)
+                .in('account_id', portfolios.account_ids)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+
+              const accountName = (latestSnapshot?.accounts as any)?.name || 'Account';
+              const remaining = totalPortfolioAccounts - newSnapshotCount;
+              setSyncProgress(`✓ ${accountName} analyzed (0 cases found). ${remaining} accounts still need analysis.`);
+            } else {
+              setSyncProgress('✓ No new cases to sync. Already up to date!');
+            }
+          }
+
           setSyncing(false);
           setTimeout(() => setSyncProgress(''), 10000);
           return;
