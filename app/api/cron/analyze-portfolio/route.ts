@@ -25,11 +25,11 @@ export async function GET(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // Get all users with portfolios
+    // Get all users with portfolios (EDGE and SiteLink)
     const { data: portfolios } = await supabase
       .from('portfolios')
       .select('user_id, account_ids, portfolio_type')
-      .eq('portfolio_type', 'top_25');
+      .in('portfolio_type', ['top_25_edge', 'top_25_sitelink']);
 
     if (!portfolios || portfolios.length === 0) {
       return NextResponse.json({ message: 'No portfolios found' });

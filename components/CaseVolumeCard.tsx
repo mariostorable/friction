@@ -81,18 +81,12 @@ export default function CaseVolumeCard({
 
   return (
     <div className={`rounded-lg border p-6 ${getStatusColor()}`}>
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            {getStatusIcon()}
-            Support Volume Analysis
-          </h3>
-          <p className="text-sm text-gray-600 mt-1">{getStatusText()}</p>
-        </div>
-        <div className="text-right">
-          <div className="text-3xl font-bold text-gray-900">{accountWeeklyAvg.toFixed(0)}</div>
-          <div className="text-xs text-gray-600 uppercase tracking-wide">Avg cases/week</div>
-        </div>
+      <div className="mb-4">
+        <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          {getStatusIcon()}
+          Support Volume Analysis
+        </h3>
+        <p className="text-sm text-gray-600 mt-1">{getStatusText()}</p>
       </div>
 
       <p className="text-sm text-gray-700 mb-4">
@@ -121,9 +115,12 @@ export default function CaseVolumeCard({
           </div>
           <div className="flex items-baseline gap-2">
             <div className="text-2xl font-bold text-gray-900">
-              {last7Days}
+              {(last7Days / 7).toFixed(1)}
             </div>
-            <div className="text-xs text-gray-500">cases</div>
+            <div className="text-xs text-gray-500">avg cases/day</div>
+          </div>
+          <div className="text-xs text-gray-500 mt-0.5">
+            {last7Days} total cases over last week
           </div>
           <div className={`text-xs font-medium mt-1 ${
             vs7DayExpected > 20 ? 'text-red-600' :
@@ -131,8 +128,8 @@ export default function CaseVolumeCard({
             'text-gray-600'
           }`}>
             {Math.abs(vs7DayExpected) < 10 ? 'Normal week' :
-             vs7DayExpected > 0 ? `${vs7DayExpected.toFixed(0)}% above usual` :
-             `${Math.abs(vs7DayExpected).toFixed(0)}% below usual`}
+             vs7DayExpected > 0 ? `${vs7DayExpected.toFixed(0)}% above baseline` :
+             `${Math.abs(vs7DayExpected).toFixed(0)}% below baseline`}
           </div>
         </div>
       </div>

@@ -47,10 +47,19 @@ export default function Dashboard() {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      const top25Portfolio = portfolios?.find(p => p.name === 'Top 25 by MRR');
+      // Load both EDGE and SiteLink portfolios
+      const edgePortfolio = portfolios?.find(p => p.portfolio_type === 'top_25_edge');
+      const sitelinkPortfolio = portfolios?.find(p => p.portfolio_type === 'top_25_sitelink');
 
-      if (top25Portfolio) {
-        const accountIds = top25Portfolio.account_ids || [];
+      // Combine account IDs from both portfolios (remove duplicates)
+      const allAccountIds = [
+        ...(edgePortfolio?.account_ids || []),
+        ...(sitelinkPortfolio?.account_ids || [])
+      ];
+      const uniqueAccountIds = Array.from(new Set(allAccountIds));
+
+      if (uniqueAccountIds.length > 0) {
+        const accountIds = uniqueAccountIds;
         const { data: accounts } = await supabase
           .from('accounts')
           .select(`
@@ -246,15 +255,17 @@ export default function Dashboard() {
             .from('portfolios')
             .select('account_ids')
             .eq('user_id', user.id)
-            .eq('name', 'Top 25 by MRR')
-            .single();
+            .in('portfolio_type', ['top_25_edge', 'top_25_sitelink']);
 
-          if (portfolios) {
+          if (portfolios && portfolios.length > 0) {
+            // Combine account IDs from all portfolios
+            const allAccountIds = portfolios.flatMap(p => p.account_ids || []);
+            const uniqueAccountIds = Array.from(new Set(allAccountIds));
             const today = new Date().toISOString().split('T')[0];
             const { data: todaySnapshots } = await supabase
               .from('account_snapshots')
               .select('account_id')
-              .in('account_id', portfolios.account_ids)
+              .in('account_id', uniqueAccountIds)
               .eq('snapshot_date', today);
 
             const newSnapshotCount = todaySnapshots?.length || 0;
@@ -268,7 +279,7 @@ export default function Dashboard() {
                 .from('account_snapshots')
                 .select('account_id, accounts(name)')
                 .eq('snapshot_date', today)
-                .in('account_id', portfolios.account_ids)
+                .in('account_id', uniqueAccountIds)
                 .order('created_at', { ascending: false })
                 .limit(1)
                 .single();

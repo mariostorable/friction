@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     const accountsResponse = await fetch(
-      `${integration.instance_url}/services/data/v59.0/query?q=SELECT+Id,Name,MRR_MVR__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,(SELECT+Id+FROM+Assets)+FROM+Account+WHERE+ParentId=null+AND+MRR_MVR__c!=null+ORDER+BY+MRR_MVR__c+DESC+LIMIT+200`,
+      `${integration.instance_url}/services/data/v59.0/query?q=SELECT+Id,Name,MRR_MVR__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,(SELECT+Id+FROM+Assets)+FROM+Account+WHERE+ParentId=null+AND+MRR_MVR__c>0+ORDER+BY+MRR_MVR__c+DESC+LIMIT+200`,
       {
         headers: {
           'Authorization': `Bearer ${tokens.access_token}`,
@@ -130,40 +130,41 @@ export async function POST(request: NextRequest) {
 
     await supabase.from('portfolios').delete().eq('user_id', user.id);
 
-    const { data: top25Accounts } = await supabase
+    // Get all accounts with vertical field to filter by product
+    const { data: allAccounts } = await supabase
       .from('accounts')
-      .select('id')
+      .select('id, vertical, arr')
       .eq('user_id', user.id)
       .not('arr', 'is', null)
-      .order('arr', { ascending: false })
-      .limit(25);
+      .order('arr', { ascending: false });
 
-    if (top25Accounts && top25Accounts.length > 0) {
+    // Top 25 EDGE Accounts (must have EDGE software)
+    const edgeAccounts = allAccounts?.filter(a =>
+      a.vertical && a.vertical.includes('EDGE')
+    ).slice(0, 25);
+
+    if (edgeAccounts && edgeAccounts.length > 0) {
       await supabase.from('portfolios').insert({
         user_id: user.id,
-        name: 'Top 25 by MRR',
-        portfolio_type: 'top_25',
-        criteria: { type: 'top_mrr', limit: 25 },
-        account_ids: top25Accounts.map(a => a.id),
+        name: 'Top 25 EDGE Accounts',
+        portfolio_type: 'top_25_edge',
+        criteria: { type: 'top_mrr_edge', limit: 25, product: 'EDGE' },
+        account_ids: edgeAccounts.map(a => a.id),
       });
     }
 
-    const { data: singleOpAccounts } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('facility_count', 1)
-      .not('arr', 'is', null)
-      .order('arr', { ascending: false })
-      .limit(50);
+    // Top 25 SiteLink Accounts (must have SiteLink software)
+    const sitelinkAccounts = allAccounts?.filter(a =>
+      a.vertical && a.vertical.includes('SiteLink')
+    ).slice(0, 25);
 
-    if (singleOpAccounts && singleOpAccounts.length > 0) {
+    if (sitelinkAccounts && sitelinkAccounts.length > 0) {
       await supabase.from('portfolios').insert({
         user_id: user.id,
-        name: 'Single Operator Index',
-        portfolio_type: 'single_operator',
-        criteria: { type: 'single_facility', limit: 50 },
-        account_ids: singleOpAccounts.map(a => a.id),
+        name: 'Top 25 SiteLink Accounts',
+        portfolio_type: 'top_25_sitelink',
+        criteria: { type: 'top_mrr_sitelink', limit: 25, product: 'SiteLink' },
+        account_ids: sitelinkAccounts.map(a => a.id),
       });
     }
 
@@ -194,8 +195,8 @@ export async function POST(request: NextRequest) {
       success: true,
       synced: upsertedAccounts?.length || 0,
       portfolios: {
-        top25: top25Accounts?.length || 0,
-        singleOperator: singleOpAccounts?.length || 0,
+        edge: edgeAccounts?.length || 0,
+        sitelink: sitelinkAccounts?.length || 0,
       },
       message
     });

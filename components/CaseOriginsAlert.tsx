@@ -121,32 +121,52 @@ export default function CaseOriginsAlert({ origins, accountName, totalCases }: C
                   <p className="text-xs font-medium opacity-70 uppercase tracking-wide">
                     Recent Cases:
                   </p>
-                  {(expandedOrigins.has(originData.origin) ? originData.cases : originData.cases.slice(0, 3)).map((caseItem) => (
-                    <div
-                      key={caseItem.id}
-                      className="flex items-center justify-between text-xs bg-white/50 rounded px-2 py-1"
-                    >
-                      <span className="font-mono">
-                        Case #{caseItem.metadata?.case_number || 'Unknown'}
-                        {caseItem.metadata?.priority && (
-                          <span className="ml-2 font-medium">
-                            {caseItem.metadata.priority}
+                  {(expandedOrigins.has(originData.origin) ? originData.cases : originData.cases.slice(0, 3)).map((caseItem) => {
+                    // Format date as "MMM DD"
+                    const formatDate = (dateString: string) => {
+                      const date = new Date(dateString);
+                      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    };
+
+                    return (
+                      <div
+                        key={caseItem.id}
+                        className="flex items-center justify-between text-xs bg-white/50 rounded px-2 py-1"
+                      >
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <span className="font-mono whitespace-nowrap">
+                            Case #{caseItem.metadata?.case_number || 'Unknown'}
+                            {caseItem.metadata?.priority && (
+                              <span className="ml-2 font-medium">
+                                {caseItem.metadata.priority}
+                              </span>
+                            )}
                           </span>
+                          {caseItem.metadata?.subject && (
+                            <span className="text-gray-600 truncate">
+                              • {caseItem.metadata.subject}
+                            </span>
+                          )}
+                          {caseItem.metadata?.created_date && (
+                            <span className="text-gray-500 whitespace-nowrap">
+                              • {formatDate(caseItem.metadata.created_date)}
+                            </span>
+                          )}
+                        </div>
+                        {caseItem.source_url && (
+                          <a
+                            href={caseItem.source_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 hover:underline ml-2 whitespace-nowrap"
+                          >
+                            View
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
                         )}
-                      </span>
-                      {caseItem.source_url && (
-                        <a
-                          href={caseItem.source_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 hover:underline"
-                        >
-                          View
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
-                    </div>
-                  ))}
+                      </div>
+                    );
+                  })}
                   {originData.count > 3 && (
                     <button
                       onClick={() => toggleOrigin(originData.origin)}
