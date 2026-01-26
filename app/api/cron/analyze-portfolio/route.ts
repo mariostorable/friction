@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
 
     const results = [];
     let accountsAnalyzed = 0;
-    const MAX_ANALYSES_PER_RUN = 3; // Process 3 accounts per run (5-min Vercel limit)
+    const MAX_ANALYSES_PER_RUN = 1; // Process 1 account per run to avoid 5-min timeout
 
     for (const portfolio of portfolios) {
       for (const accountId of portfolio.account_ids) {
