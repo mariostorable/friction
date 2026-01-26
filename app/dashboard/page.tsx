@@ -145,13 +145,13 @@ export default function Dashboard() {
       if (!response.ok) throw new Error('Sync failed');
 
       const result = await response.json();
-      setSyncProgress(`Step 2/2: Analyzing 1 account deeply (100 cases from last 90 days)...`);
+      setSyncProgress(`Step 2/2: Analyzing up to 3 accounts (100 cases each from last 90 days)...`);
 
       // Poll for progress
       let attempts = 0;
       let previousCardCount = 0;
       let stableCount = 0;
-      const maxAttempts = 60; // 2 minutes max
+      const maxAttempts = 150; // 5 minutes max (3 accounts take longer)
 
       const pollProgress = async () => {
         // Only count recent inputs/cards (last 10 minutes) to show current sync progress
