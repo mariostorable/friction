@@ -77,7 +77,7 @@ export default function Dashboard() {
           })).filter(a => a.name !== 'Test');
 
           setTop25(accountsWithSnapshot);
-          setTotalPortfolioAccounts(accountIds.length);
+          setTotalPortfolioAccounts(accountsWithSnapshot.length); // Use filtered count, not raw count
 
           // Count how many accounts have snapshots from today
           const today = new Date().toISOString().split('T')[0];
