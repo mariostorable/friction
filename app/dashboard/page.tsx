@@ -25,6 +25,7 @@ export default function Dashboard() {
   const [showSyncTooltip, setShowSyncTooltip] = useState(false);
   const [sortField, setSortField] = useState<string>('arr');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [softwareFilter, setSoftwareFilter] = useState<'all' | 'edge' | 'sitelink'>('all');
   const supabase = createClientComponentClient();
   const router = useRouter();
 
@@ -362,6 +363,42 @@ export default function Dashboard() {
     return <Minus className="w-4 h-4 text-gray-400" />;
   };
 
+  // Determine primary software provider for an account
+  const getPrimarySoftware = (account: AccountWithMetrics): 'EDGE' | 'SiteLink' | 'N/A' => {
+    const vertical = account.vertical || '';
+
+    const hasEDGE = vertical.includes('EDGE') || vertical.includes('Storable Edge');
+    const hasSiteLink = vertical.includes('SiteLink');
+
+    // If both are in the vertical string, prioritize EDGE (Storable's newer platform)
+    if (hasEDGE && hasSiteLink) {
+      return 'EDGE';
+    }
+
+    if (hasEDGE) return 'EDGE';
+    if (hasSiteLink) return 'SiteLink';
+
+    return 'N/A';
+  };
+
+  // Filter accounts by software provider
+  const filterAccountsBySoftware = (accounts: AccountWithMetrics[]) => {
+    if (softwareFilter === 'all') {
+      return accounts;
+    }
+
+    return accounts.filter(account => {
+      const primarySoftware = getPrimarySoftware(account);
+      if (softwareFilter === 'edge') {
+        return primarySoftware === 'EDGE';
+      }
+      if (softwareFilter === 'sitelink') {
+        return primarySoftware === 'SiteLink';
+      }
+      return false;
+    });
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -534,7 +571,27 @@ export default function Dashboard() {
             )}
 
             <section className="mt-12">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Software Accounts (EDGE & SiteLink)</h2>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Software Accounts (EDGE & SiteLink)</h2>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="software-filter" className="text-sm font-medium text-gray-700">
+                    Filter by:
+                  </label>
+                  <select
+                    id="software-filter"
+                    value={softwareFilter}
+                    onChange={(e) => setSoftwareFilter(e.target.value as 'all' | 'edge' | 'sitelink')}
+                    className="block w-40 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="all">All Software</option>
+                    <option value="edge">EDGE Only</option>
+                    <option value="sitelink">SiteLink Only</option>
+                  </select>
+                  <span className="text-sm text-gray-600">
+                    Showing {filterAccountsBySoftware(top25).length} of {top25.length} accounts
+                  </span>
+                </div>
+              </div>
               <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
@@ -558,7 +615,7 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {sortAccounts(top25).map((account) => (
+                    {sortAccounts(filterAccountsBySoftware(top25)).map((account) => (
                       <tr
                         key={account.id}
                         onClick={() => router.push(`/account/${account.id}`)}
@@ -572,13 +629,7 @@ export default function Dashboard() {
                           ${(account.arr || 0).toLocaleString()}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-900">
-                          {(() => {
-                            const vertical = account.vertical || '';
-                            const providers = [];
-                            if (vertical.includes('EDGE') || vertical.includes('Storable Edge')) providers.push('EDGE');
-                            if (vertical.includes('SiteLink')) providers.push('SiteLink');
-                            return providers.length > 0 ? providers.join(' + ') : 'N/A';
-                          })()}
+                          {getPrimarySoftware(account)}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-500">
                           {account.vertical || 'N/A'}
