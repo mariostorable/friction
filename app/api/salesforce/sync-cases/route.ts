@@ -92,7 +92,8 @@ export async function POST(request: NextRequest) {
       console.log('Incremental sync - fetching cases since', lastSyncDate);
     }
 
-    const query = `SELECT Id,CaseNumber,Subject,Description,Status,Priority,CreatedDate,ClosedDate,Origin FROM Case WHERE AccountId='${account.salesforce_id}' AND ${dateFilter} ORDER BY CreatedDate DESC LIMIT 100`;
+    // Fetch ALL cases (explicit LIMIT 2000) - Salesforce defaults to 100 records without explicit limit
+    const query = `SELECT Id,CaseNumber,Subject,Description,Status,Priority,CreatedDate,ClosedDate,Origin FROM Case WHERE AccountId='${account.salesforce_id}' AND ${dateFilter} ORDER BY CreatedDate DESC LIMIT 2000`;
     const queryUrl = `${integration.instance_url}/services/data/v59.0/query?q=${encodeURIComponent(query)}`;
 
     console.log('Salesforce Query:', query);

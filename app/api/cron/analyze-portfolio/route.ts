@@ -4,6 +4,32 @@ import { createClient } from '@supabase/supabase-js';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 minutes (Vercel Hobby plan limit)
 
+// Helper function: sleep for rate limiting
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Helper function: retry with exponential backoff for API 529 errors
+async function callAnthropicWithRetry(url: string, options: RequestInit, maxRetries = 3) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+
+      // If 529 (overloaded), retry with exponential backoff
+      if (response.status === 529) {
+        const waitTime = Math.min(1000 * Math.pow(2, attempt), 30000); // Max 30 seconds
+        console.log(`API overloaded (529), retrying in ${waitTime}ms... (attempt ${attempt + 1}/${maxRetries})`);
+        await sleep(waitTime);
+        continue;
+      }
+
+      return response;
+    } catch (error) {
+      if (attempt === maxRetries - 1) throw error;
+      await sleep(1000 * Math.pow(2, attempt));
+    }
+  }
+  throw new Error('Max retries exceeded');
+}
+
 export async function GET(request: NextRequest) {
   console.log('=== Analyze Portfolio Endpoint Called ===');
 
@@ -42,14 +68,26 @@ export async function GET(request: NextRequest) {
     for (const portfolio of portfolios) {
       for (const accountId of portfolio.account_ids) {
         try {
-          // Get account details
+          // Get account details (skip cancelled accounts)
           const { data: account } = await supabase
             .from('accounts')
-            .select('salesforce_id, name')
+            .select('salesforce_id, name, status')
             .eq('id', accountId)
             .single();
 
           if (!account) continue;
+
+          // Skip cancelled accounts
+          if (account.status === 'cancelled' || account.status === 'churned') {
+            console.log(`Skipping ${account.name} - account is ${account.status}`);
+            results.push({
+              accountId,
+              account: account.name,
+              status: 'skipped',
+              reason: `Account is ${account.status}`
+            });
+            continue;
+          }
 
           // Check if account already has a snapshot from today
           const today = new Date().toISOString().split('T')[0];
@@ -97,8 +135,8 @@ export async function GET(request: NextRequest) {
 
           if (!tokens) continue;
 
-          // Fetch cases from Salesforce (looking back 90 days, most recent first)
-          const query = `SELECT Id,CaseNumber,Subject,Description,Status,Priority,CreatedDate FROM Case WHERE AccountId='${account.salesforce_id}' AND CreatedDate=LAST_N_DAYS:90 ORDER BY CreatedDate DESC LIMIT 100`;
+          // Fetch ALL cases from Salesforce (looking back 90 days, most recent first) - Explicit LIMIT 2000 (Salesforce defaults to 100 without explicit limit)
+          const query = `SELECT Id,CaseNumber,Subject,Description,Status,Priority,CreatedDate FROM Case WHERE AccountId='${account.salesforce_id}' AND CreatedDate=LAST_N_DAYS:90 ORDER BY CreatedDate DESC LIMIT 2000`;
           console.log(`Fetching cases for account: ${account.name} (${account.salesforce_id})`);
 
           const casesResponse = await fetch(
@@ -190,11 +228,17 @@ export async function GET(request: NextRequest) {
 
           if (!insertedInputs || insertedInputs.length === 0) continue;
 
-          // Analyze with Claude (up to 100 cases per account)
-          const limitedInputs = insertedInputs.slice(0, 100);
+          // Analyze ALL cases with Claude (no limit)
           const frictionCards = [];
+          console.log(`Analyzing ${insertedInputs.length} cases for ${account.name}...`);
 
-          for (const input of limitedInputs) {
+          for (let i = 0; i < insertedInputs.length; i++) {
+            const input = insertedInputs[i];
+
+            // Log progress every 20 cases
+            if (i % 20 === 0 && i > 0) {
+              console.log(`Progress: ${i}/${insertedInputs.length} cases analyzed for ${account.name}`);
+            }
             const prompt = `Analyze this customer support case and return ONLY valid JSON with no other text, explanation, or markdown formatting.
 
 Required JSON structure:
@@ -212,7 +256,8 @@ ${input.text_content}
 Return ONLY the JSON object, nothing else.`;
 
             try {
-              const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
+              // Use retry logic for API calls with 529 handling
+              const anthropicResponse = await callAnthropicWithRetry('https://api.anthropic.com/v1/messages', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -245,6 +290,9 @@ Return ONLY the JSON object, nothing else.`;
                   reasoning: 'Cron analysis',
                 });
               }
+
+              // Small delay between API calls to avoid rate limiting (200ms)
+              await sleep(200);
             } catch (e) {
               console.error('Analysis error:', e);
             }
@@ -253,7 +301,7 @@ Return ONLY the JSON object, nothing else.`;
           if (frictionCards.length > 0) {
             await supabase.from('friction_cards').insert(frictionCards);
 
-            const inputIds = limitedInputs.map((i: any) => i.id);
+            const inputIds = insertedInputs.map((i: any) => i.id);
             console.log(`Marking ${inputIds.length} inputs as processed:`, inputIds);
 
             const { error: updateError } = await supabase
@@ -267,10 +315,39 @@ Return ONLY the JSON object, nothing else.`;
               console.log(`Successfully marked ${inputIds.length} inputs as processed`);
             }
 
-            // Calculate OFI
-            const severityWeights: any = { 1: 0.5, 2: 1, 3: 2, 4: 5, 5: 10 };
+            // Calculate OFI with improved algorithm (matches /api/calculate-ofi)
+            const highSeverityCount = frictionCards.filter(c => c.severity >= 4).length;
+            const severityWeights: any = { 1: 1, 2: 2, 3: 4, 4: 8, 5: 16 };
             const weightedScore = frictionCards.reduce((sum, card) => sum + (severityWeights[card.severity] || 1), 0);
-            const ofiScore = Math.min(100, Math.round(weightedScore * 2));
+
+            // Normalize by case volume to get friction density
+            const totalCases = casesData.records.length || 1;
+            const frictionDensity = (frictionCards.length / totalCases) * 100;
+
+            // Base score from weighted severity (logarithmic scale)
+            const baseScore = Math.log10(weightedScore + 1) * 20;
+
+            // Friction density multiplier (0.5x to 2x)
+            const densityMultiplier = Math.min(2, Math.max(0.5, frictionDensity / 5));
+
+            // High severity boost
+            const highSeverityBoost = Math.min(20, highSeverityCount * 2);
+
+            // Final OFI Score
+            let ofiScore = Math.round(baseScore * densityMultiplier + highSeverityBoost);
+            ofiScore = Math.min(100, Math.max(0, ofiScore));
+
+            console.log(`OFI Calculation for ${account.name}:`, {
+              frictionCards: frictionCards.length,
+              highSeverityCount,
+              totalCases,
+              weightedScore,
+              baseScore: baseScore.toFixed(1),
+              frictionDensity: frictionDensity.toFixed(2) + '%',
+              densityMultiplier: densityMultiplier.toFixed(2),
+              highSeverityBoost,
+              finalOfiScore: ofiScore
+            });
 
             console.log(`Creating snapshot for ${account.name}: OFI ${ofiScore}, ${frictionCards.length} cards`);
 
