@@ -79,13 +79,17 @@ Return a single JSON object with these fields:
           'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
+          model: 'claude-3-5-sonnet-20241022',
           max_tokens: 500,
           messages: [{ role: 'user', content: prompt }],
         }),
       });
 
-      if (!anthropicResponse.ok) continue;
+      if (!anthropicResponse.ok) {
+        const errorData = await anthropicResponse.json().catch(() => ({}));
+        console.error('Anthropic API error:', anthropicResponse.status, errorData);
+        continue;
+      }
 
       const anthropicData = await anthropicResponse.json();
       let responseText = anthropicData.content[0].text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
