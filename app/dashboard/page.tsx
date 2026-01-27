@@ -74,6 +74,7 @@ export default function Dashboard() {
             )
           `)
           .in('id', accountIds)
+          .eq('status', 'active')
           .order('arr', { ascending: false });
 
         if (accounts) {
@@ -453,7 +454,7 @@ export default function Dashboard() {
               onClick={() => setActiveTab('portfolios')}
               className={`px-4 py-2 rounded-lg font-medium ${
                 activeTab === 'portfolios'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-purple-600 text-white'
                   : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
               }`}
             >
@@ -463,7 +464,7 @@ export default function Dashboard() {
               onClick={() => setActiveTab('favorites')}
               className={`px-4 py-2 rounded-lg font-medium ${
                 activeTab === 'favorites'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-purple-600 text-white'
                   : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
               }`}
             >
@@ -473,7 +474,7 @@ export default function Dashboard() {
               onClick={() => setActiveTab('reports')}
               className={`px-4 py-2 rounded-lg font-medium ${
                 activeTab === 'reports'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-purple-600 text-white'
                   : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
               }`}
             >
@@ -483,7 +484,7 @@ export default function Dashboard() {
               onClick={() => setActiveTab('themes')}
               className={`px-4 py-2 rounded-lg font-medium ${
                 activeTab === 'themes'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-purple-600 text-white'
                   : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
               }`}
             >
@@ -501,7 +502,7 @@ export default function Dashboard() {
                 syncing
                   ? 'bg-gray-400 text-white cursor-not-allowed'
                   : accountsAnalyzedToday < totalPortfolioAccounts
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  ? 'bg-purple-600 text-white hover:bg-purple-700'
                   : 'bg-green-600 text-white hover:bg-green-700'
               }`}
             >
