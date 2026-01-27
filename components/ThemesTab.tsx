@@ -140,7 +140,7 @@ export default function ThemesTab({ accounts }: ThemesTabProps) {
                         {theme.affected_accounts.map(account => (
                           <button
                             key={account.id}
-                            onClick={() => router.push(`/account/${account.id}`)}
+                            onClick={() => router.push(`/account/${account.id}?theme=${theme.theme_key}`)}
                             className="w-full text-left px-3 py-2 bg-white rounded border border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-colors"
                           >
                             <div className="flex items-center justify-between">
@@ -152,6 +152,7 @@ export default function ThemesTab({ accounts }: ThemesTabProps) {
                                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getSeverityColor(account.avg_severity)}`}>
                                   {account.avg_severity.toFixed(1)}
                                 </span>
+                                <span className="text-xs text-blue-600 font-medium">View →</span>
                               </div>
                             </div>
                           </button>

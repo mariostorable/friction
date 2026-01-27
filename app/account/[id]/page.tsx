@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Account, AccountSnapshot, FrictionCard, Theme } from '@/types';
 import {
@@ -13,7 +13,8 @@ import {
   ExternalLink,
   Info,
   AlertCircle,
-  ArrowLeft
+  ArrowLeft,
+  X
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import VisitBriefing from '@/components/VisitBriefing';
@@ -26,6 +27,8 @@ export default function AccountDetailPage() {
   const params = useParams();
   const accountId = params.id as string;
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const themeFilter = searchParams.get('theme');
 
   const [account, setAccount] = useState<Account | null>(null);
   const [snapshots, setSnapshots] = useState<AccountSnapshot[]>([]);
@@ -705,7 +708,32 @@ export default function AccountDetailPage() {
         </div>
 
         {/* Friction Signals with Smart Clustering */}
-        <FrictionClusters frictionCards={frictionCards} themes={themes} />
+        {themeFilter && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Info className="w-5 h-5 text-blue-600" />
+              <div>
+                <p className="text-sm font-medium text-blue-900">
+                  Filtered by theme: {themeFilter.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                </p>
+                <p className="text-xs text-blue-700">
+                  Showing {frictionCards.filter(card => card.theme_key === themeFilter).length} of {frictionCards.length} friction cards
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => router.push(`/account/${accountId}`)}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-700 bg-white rounded-lg hover:bg-blue-100 border border-blue-300"
+            >
+              <X className="w-4 h-4" />
+              Clear Filter
+            </button>
+          </div>
+        )}
+        <FrictionClusters
+          frictionCards={themeFilter ? frictionCards.filter(card => card.theme_key === themeFilter) : frictionCards}
+          themes={themes}
+        />
       </main>
     </div>
   );
