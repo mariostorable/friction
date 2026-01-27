@@ -13,7 +13,8 @@
       "Bash(node check-accounts.mjs:*)",
       "Bash(node verify-fix.mjs:*)",
       "Bash(node:*)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(npm run build:*)"
     ]
   }
 }

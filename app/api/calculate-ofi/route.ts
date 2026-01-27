@@ -39,13 +39,44 @@ export async function POST(request: NextRequest) {
       .eq('account_id', accountId)
       .eq('user_id', user.id);
 
-    const severityWeights = { 1: 0.5, 2: 1, 3: 2, 4: 5, 5: 10 };
+    // Count high-severity issues (severity 4 or 5)
+    const highSeverityCount = recentCards.filter(c => c.severity >= 4).length;
+
+    // Calculate OFI Score with improved algorithm
+    // Severity weights: reduced from exponential to prevent easy maxing out
+    // Old: 1, 2, 4, 8, 16 -> New: 1, 2, 3, 5, 8 (still emphasizes high severity but more gradual)
+    const severityWeights = { 1: 1, 2: 2, 3: 3, 4: 5, 5: 8 };
+
+    // Calculate weighted friction score
     const weightedScore = recentCards.reduce((sum, card) => {
       return sum + (severityWeights[card.severity as keyof typeof severityWeights] || 1);
     }, 0);
 
-    const ofiScore = Math.min(100, Math.round(weightedScore * 2));
-    const highSeverityCount = recentCards.filter(c => c.severity >= 4).length;
+    // Normalize by case volume to get friction density
+    // Accounts with more cases should be judged on friction per case, not total friction
+    const totalCases = caseVolume || 1;
+    const frictionDensity = (recentCards.length / totalCases) * 100; // What % of cases had friction?
+
+    // Base score from weighted severity (use logarithmic scale to prevent easy cap-out)
+    // Reduced coefficient from 20 to 15 for better distribution
+    // New scaling: 10 -> 17, 50 -> 30, 100 -> 35, 200 -> 41, 400 -> 48
+    const baseScore = Math.log10(weightedScore + 1) * 15;
+
+    // Friction density multiplier (0.5x to 1.5x based on % of cases with friction)
+    // Reduced max from 2x to 1.5x to prevent excessive inflation
+    // If 5% of cases have friction = normal (1x)
+    // If 1% = healthy (0.5x), if 10%+ = concerning (1.5x)
+    const densityMultiplier = Math.min(1.5, Math.max(0.5, frictionDensity / 5));
+
+    // High severity count boost (each high-severity issue adds 1.5 points, capped at +15)
+    // Reduced from 2 points/+20 cap to 1.5 points/+15 cap
+    const highSeverityBoost = Math.min(15, highSeverityCount * 1.5);
+
+    // Final OFI Score calculation
+    let ofiScore = Math.round(baseScore * densityMultiplier + highSeverityBoost);
+
+    // Apply ceiling at 100
+    ofiScore = Math.min(100, Math.max(0, ofiScore));
 
     const themeCounts: Record<string, { count: number; totalSeverity: number }> = {};
     recentCards.forEach(card => {
@@ -102,6 +133,19 @@ export async function POST(request: NextRequest) {
       .eq('account_id', accountId)
       .eq('snapshot_date', today);
 
+    // Log OFI calculation details for debugging
+    console.log(`OFI Calculation for account ${accountId}:`, {
+      recentCards: recentCards.length,
+      highSeverityCount,
+      totalCases: caseVolume,
+      weightedScore,
+      baseScore,
+      frictionDensity: frictionDensity.toFixed(2) + '%',
+      densityMultiplier: densityMultiplier.toFixed(2),
+      highSeverityBoost,
+      finalOfiScore: ofiScore
+    });
+
     const { data: snapshot, error: snapshotError} = await supabase
       .from('account_snapshots')
       .insert({
@@ -117,6 +161,10 @@ export async function POST(request: NextRequest) {
         score_breakdown: {
           severity_weighted: weightedScore,
           card_count: recentCards.length,
+          base_score: baseScore,
+          friction_density: frictionDensity,
+          density_multiplier: densityMultiplier,
+          high_severity_boost: highSeverityBoost,
         },
       })
       .select()

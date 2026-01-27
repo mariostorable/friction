@@ -13,6 +13,7 @@ interface PortfolioSummaryProps {
 export default function PortfolioSummary({ top25, singleOperator }: PortfolioSummaryProps) {
   const [showFrictionTooltip, setShowFrictionTooltip] = useState(false);
   const [showAbnormalVolumeModal, setShowAbnormalVolumeModal] = useState(false);
+  const [hoveredStat, setHoveredStat] = useState<string | null>(null);
   const router = useRouter();
 
   const allAccounts = [...top25, ...singleOperator];
@@ -72,7 +73,8 @@ export default function PortfolioSummary({ top25, singleOperator }: PortfolioSum
       icon: TrendingUp,
       color: 'text-red-600',
       bg: 'bg-red-50',
-      subtext: '▲ worsening',
+      subtext: `${trendingUp} worsening`,
+      tooltip: 'Accounts where OFI score is increasing (friction getting worse over time)',
     },
     {
       name: 'Trending Down',
@@ -80,7 +82,8 @@ export default function PortfolioSummary({ top25, singleOperator }: PortfolioSum
       icon: TrendingDown,
       color: 'text-green-600',
       bg: 'bg-green-50',
-      subtext: '▼ improving',
+      subtext: `${trendingDown} improving`,
+      tooltip: 'Accounts where OFI score is decreasing (friction improving over time)',
     },
     {
       name: 'Active Alerts',
@@ -95,7 +98,8 @@ export default function PortfolioSummary({ top25, singleOperator }: PortfolioSum
       icon: BarChart3,
       color: abnormalVolumeAccounts > 0 ? 'text-orange-600' : 'text-gray-600',
       bg: abnormalVolumeAccounts > 0 ? 'bg-orange-50' : 'bg-gray-50',
-      subtext: 'unusual case count',
+      subtext: `${abnormalVolumeAccounts} accounts`,
+      tooltip: 'Accounts with case volumes 50%+ higher or lower than portfolio average',
     },
   ];
 
@@ -114,6 +118,8 @@ export default function PortfolioSummary({ top25, singleOperator }: PortfolioSum
             className={`bg-white rounded-lg border border-gray-200 relative ${isClickable ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
             style={{ overflow: 'visible' }}
             onClick={() => isClickable && setShowAbnormalVolumeModal(true)}
+            onMouseEnter={() => setHoveredStat(stat.name)}
+            onMouseLeave={() => setHoveredStat(null)}
           >
             <div className="p-5">
               <div className="flex items-center">
@@ -177,6 +183,14 @@ export default function PortfolioSummary({ top25, singleOperator }: PortfolioSum
                 </div>
               </div>
             </div>
+
+            {/* Tooltip */}
+            {stat.tooltip && hoveredStat === stat.name && (
+              <div className="absolute left-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 z-50">
+                {stat.tooltip}
+                <div className="absolute -top-1 left-6 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+              </div>
+            )}
           </div>
         );
       })}

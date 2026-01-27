@@ -112,6 +112,7 @@ export async function POST(request: NextRequest) {
         service_level: sfAccount.LevelOfService__c || null,
         managed_account: sfAccount.Managed_Account__c || null,
         cs_segment: sfAccount.VitallyClient_Success_Tier__c || null,
+        // Don't set status here - preserve existing status on update, default to 'active' via column default on insert
       };
     });
 
@@ -130,11 +131,12 @@ export async function POST(request: NextRequest) {
 
     await supabase.from('portfolios').delete().eq('user_id', user.id);
 
-    // Get all accounts with vertical field to filter by product
+    // Get all accounts with vertical field to filter by product (active only)
     const { data: allAccounts } = await supabase
       .from('accounts')
       .select('id, vertical, arr')
       .eq('user_id', user.id)
+      .eq('status', 'active')
       .not('arr', 'is', null)
       .order('arr', { ascending: false });
 

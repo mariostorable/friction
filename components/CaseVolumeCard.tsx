@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { AlertTriangle, TrendingUp, TrendingDown, CheckCircle } from 'lucide-react';
 
 interface CaseVolumeCardProps {
@@ -17,6 +18,8 @@ export default function CaseVolumeCard({
   last7Days,
   accountName
 }: CaseVolumeCardProps) {
+  const [showTooltip, setShowTooltip] = useState(false);
+
   // Calculate deviations for 90-day totals
   const vsAccountAvg = accountHistoricalAvg > 0
     ? ((currentVolume - accountHistoricalAvg) / accountHistoricalAvg) * 100
@@ -78,11 +81,29 @@ export default function CaseVolumeCard({
   // Portfolio weekly average for display
   const portfolioWeeklyAvg = portfolioAvg / 13;
 
+  const getTooltipText = () => {
+    if (isAnomalouslyHigh) return 'Warning: Case volume is 50%+ above this account\'s typical weekly baseline';
+    if (isAnomalouslyLow) return 'Notice: Case volume is 50%+ below this account\'s typical weekly baseline';
+    return 'Case volume is within normal range for this account';
+  };
+
   return (
-    <div className={`rounded-lg border p-6 ${getStatusColor()}`}>
+    <div className={`rounded-lg border p-6 ${getStatusColor()} relative`}>
       <div className="mb-4">
         <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-          {getStatusIcon()}
+          <div
+            className="relative"
+            onMouseEnter={() => setShowTooltip(true)}
+            onMouseLeave={() => setShowTooltip(false)}
+          >
+            {getStatusIcon()}
+            {showTooltip && (
+              <div className="absolute left-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 z-50 whitespace-normal">
+                {getTooltipText()}
+                <div className="absolute -top-1 left-3 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+              </div>
+            )}
+          </div>
           Support Volume Analysis
         </h3>
         <p className="text-sm text-gray-600 mt-1">{getStatusText()}</p>

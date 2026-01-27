@@ -28,6 +28,8 @@ export default function Dashboard() {
   const [softwareFilter, setSoftwareFilter] = useState<'all' | 'edge' | 'sitelink'>('all');
   const [isSalesforceConnected, setIsSalesforceConnected] = useState(false);
   const [checkingConnection, setCheckingConnection] = useState(true);
+  const [hoveredColumn, setHoveredColumn] = useState<string | null>(null);
+  const [hoveredCaseIcon, setHoveredCaseIcon] = useState<string | null>(null);
   const supabase = createClientComponentClient();
   const router = useRouter();
 
@@ -785,8 +787,21 @@ export default function Dashboard() {
                       <th onClick={() => handleSort('ofi')} className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
                         OFI Score {getSortIcon('ofi')}
                       </th>
-                      <th onClick={() => handleSort('case_volume')} className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
-                        Cases (90d) {getSortIcon('case_volume')}
+                      <th
+                        onClick={() => handleSort('case_volume')}
+                        onMouseEnter={() => setHoveredColumn('case_volume')}
+                        onMouseLeave={() => setHoveredColumn(null)}
+                        className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 relative"
+                      >
+                        <div className="flex items-center gap-1">
+                          Cases (90d) {getSortIcon('case_volume')}
+                        </div>
+                        {hoveredColumn === 'case_volume' && (
+                          <div className="absolute left-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 z-50 whitespace-normal normal-case font-normal">
+                            Total number of Salesforce cases for this account in the last 90 days
+                            <div className="absolute -top-1 left-6 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                          </div>
+                        )}
                       </th>
                       <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trend</th>
                       <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Analyzed</th>
@@ -828,20 +843,35 @@ export default function Dashboard() {
                           {account.current_snapshot?.case_volume !== undefined ? (
                             <div className="flex items-center gap-1">
                               <span className="text-gray-900 font-medium">{account.current_snapshot.case_volume}</span>
-                              {portfolioCaseVolumeAvg > 0 && (
-                                <span className={`text-xs ${
-                                  account.current_snapshot.case_volume > portfolioCaseVolumeAvg * 1.5
-                                    ? 'text-red-600 font-medium'
-                                    : account.current_snapshot.case_volume < portfolioCaseVolumeAvg * 0.5
-                                    ? 'text-yellow-600'
-                                    : 'text-gray-500'
-                                }`}>
-                                  {account.current_snapshot.case_volume > portfolioCaseVolumeAvg * 1.5
-                                    ? '⚠️'
-                                    : account.current_snapshot.case_volume < portfolioCaseVolumeAvg * 0.5
-                                    ? '⬇️'
-                                    : ''}
-                                </span>
+                              {portfolioCaseVolumeAvg > 0 && account.current_snapshot.case_volume > portfolioCaseVolumeAvg * 1.5 && (
+                                <div
+                                  className="relative inline-block"
+                                  onMouseEnter={() => setHoveredCaseIcon(`high-${account.id}`)}
+                                  onMouseLeave={() => setHoveredCaseIcon(null)}
+                                >
+                                  <span className="text-xs text-red-600 font-medium cursor-help">⚠️</span>
+                                  {hoveredCaseIcon === `high-${account.id}` && (
+                                    <div className="absolute left-0 top-full mt-1 w-56 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 z-50 whitespace-normal">
+                                      High volume: 50%+ above portfolio average ({Math.round(portfolioCaseVolumeAvg)} cases)
+                                      <div className="absolute -top-1 left-3 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              {portfolioCaseVolumeAvg > 0 && account.current_snapshot.case_volume < portfolioCaseVolumeAvg * 0.5 && (
+                                <div
+                                  className="relative inline-block"
+                                  onMouseEnter={() => setHoveredCaseIcon(`low-${account.id}`)}
+                                  onMouseLeave={() => setHoveredCaseIcon(null)}
+                                >
+                                  <span className="text-xs text-yellow-600 cursor-help">⬇️</span>
+                                  {hoveredCaseIcon === `low-${account.id}` && (
+                                    <div className="absolute left-0 top-full mt-1 w-56 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 z-50 whitespace-normal">
+                                      Low volume: 50%+ below portfolio average ({Math.round(portfolioCaseVolumeAvg)} cases)
+                                      <div className="absolute -top-1 left-3 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                                    </div>
+                                  )}
+                                </div>
                               )}
                             </div>
                           ) : (

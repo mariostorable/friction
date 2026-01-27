@@ -24,6 +24,7 @@ interface CaseOriginsAlertProps {
 
 export default function CaseOriginsAlert({ origins, accountName, totalCases }: CaseOriginsAlertProps) {
   const [expandedOrigins, setExpandedOrigins] = useState<Set<string>>(new Set());
+  const [hoveredIcon, setHoveredIcon] = useState<string | null>(null);
 
   if (origins.length === 0) return null;
 
@@ -61,7 +62,19 @@ export default function CaseOriginsAlert({ origins, accountName, totalCases }: C
       <div className="flex items-start justify-between mb-4">
         <div>
           <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-blue-600" />
+            <div
+              className="relative"
+              onMouseEnter={() => setHoveredIcon('main')}
+              onMouseLeave={() => setHoveredIcon(null)}
+            >
+              <AlertCircle className="w-5 h-5 text-blue-600" />
+              {hoveredIcon === 'main' && (
+                <div className="absolute left-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 z-50 whitespace-normal">
+                  Shows which channels customers are using to contact support (phone, email, web, chat, etc.)
+                  <div className="absolute -top-1 left-3 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                </div>
+              )}
+            </div>
             Case Origins (Last 7 Days)
           </h3>
           <p className="text-sm text-gray-600 mt-1">
@@ -73,7 +86,19 @@ export default function CaseOriginsAlert({ origins, accountName, totalCases }: C
       {hasAnomalies && (
         <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
           <p className="text-sm text-yellow-800 font-medium flex items-center gap-2">
-            <AlertCircle className="w-4 h-4" />
+            <div
+              className="relative"
+              onMouseEnter={() => setHoveredIcon('alert')}
+              onMouseLeave={() => setHoveredIcon(null)}
+            >
+              <AlertCircle className="w-4 h-4" />
+              {hoveredIcon === 'alert' && (
+                <div className="absolute left-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 z-50 whitespace-normal">
+                  Warning: Over 40% of cases coming from one channel may indicate a specific problem with that support workflow or customer preference.
+                  <div className="absolute -top-1 left-3 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                </div>
+              )}
+            </div>
             Alert: {anomalousOrigins[0].percentage}% of cases coming from {anomalousOrigins[0].origin} channel
           </p>
         </div>
@@ -91,7 +116,19 @@ export default function CaseOriginsAlert({ origins, accountName, totalCases }: C
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  {getOriginIcon(originData.origin)}
+                  <div
+                    className="relative"
+                    onMouseEnter={() => setHoveredIcon(originData.origin)}
+                    onMouseLeave={() => setHoveredIcon(null)}
+                  >
+                    {getOriginIcon(originData.origin)}
+                    {hoveredIcon === originData.origin && (
+                      <div className="absolute left-0 top-full mt-2 w-56 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 z-50 whitespace-normal">
+                        {originData.percentage}% of recent cases came from this channel. High concentration in one channel may indicate specific workflow issues.
+                        <div className="absolute -top-1 left-3 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                      </div>
+                    )}
+                  </div>
                   <div>
                     <h4 className="font-semibold">{originData.origin}</h4>
                     <p className="text-sm opacity-80">

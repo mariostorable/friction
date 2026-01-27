@@ -214,10 +214,25 @@ Return a single JSON object with these fields:
       }, { status: 500 });
     }
 
-    await supabase
+    const inputIds = rawInputs.map(r => r.id);
+    console.log(`Marking ${inputIds.length} inputs as processed:`, inputIds);
+
+    const { error: updateError } = await supabase
       .from('raw_inputs')
       .update({ processed: true })
-      .in('id', rawInputs.map(r => r.id));
+      .in('id', inputIds);
+
+    if (updateError) {
+      console.error('CRITICAL: Failed to mark inputs as processed:', updateError);
+      return NextResponse.json({
+        error: 'Failed to mark cases as processed',
+        details: updateError.message,
+        analyzed: insertedCards?.length || 0,
+        warning: 'Friction cards were created but cases were not marked as processed. This will cause duplicate analysis if you try again.'
+      }, { status: 500 });
+    }
+
+    console.log(`Successfully marked ${inputIds.length} inputs as processed`);
 
     // Check if there are more unprocessed cases remaining
     const { count: remainingCount } = await supabase

@@ -3,7 +3,8 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { LogOut, User, HelpCircle, Target, TrendingDown, BarChart3, AlertTriangle, CheckCircle } from 'lucide-react';
+import { LogOut, User, HelpCircle, Target, TrendingDown, BarChart3, AlertTriangle, CheckCircle, Link as LinkIcon } from 'lucide-react';
+import SalesforceConnector from '@/components/SalesforceConnector';
 
 export default function SettingsPage() {
   const [user, setUser] = useState<any>(null);
@@ -222,6 +223,15 @@ export default function SettingsPage() {
               </ul>
             </div>
           </div>
+        </div>
+
+        {/* Salesforce Integration Section */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <LinkIcon className="w-6 h-6 text-blue-600" />
+            <h2 className="text-xl font-semibold text-gray-900">Salesforce Integration</h2>
+          </div>
+          <SalesforceConnector />
         </div>
 
         {/* Account Section */}

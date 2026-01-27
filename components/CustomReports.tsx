@@ -47,6 +47,7 @@ export default function CustomReports({ allAccounts }: CustomReportsProps) {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [sorting, setSorting] = useState<SortingState>([{ id: 'ofi_score', desc: true }]);
   const [globalFilter, setGlobalFilter] = useState('');
+  const [hoveredColumn, setHoveredColumn] = useState<string | null>(null);
 
   // Transform accounts data for the table
   const data = useMemo<AccountRow[]>(() => {
@@ -133,7 +134,21 @@ export default function CustomReports({ allAccounts }: CustomReportsProps) {
       },
       {
         accessorKey: 'case_volume',
-        header: 'Cases (90d)',
+        header: () => (
+          <div
+            className="relative"
+            onMouseEnter={() => setHoveredColumn('case_volume')}
+            onMouseLeave={() => setHoveredColumn(null)}
+          >
+            Cases (90d)
+            {hoveredColumn === 'case_volume' && (
+              <div className="absolute left-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 z-50 whitespace-normal font-normal">
+                Total number of Salesforce cases for this account in the last 90 days
+                <div className="absolute -top-1 left-6 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+              </div>
+            )}
+          </div>
+        ),
         cell: ({ row }) => (
           <span>{row.original.case_volume ?? '-'}</span>
         ),

@@ -395,7 +395,7 @@ export default function AccountDetailPage() {
   }
 
   async function analyzeFriction() {
-    if (!confirm('This will:\n1. Sync Salesforce Cases (last 90 days)\n2. Analyze up to 100 cases with Claude\n3. Calculate OFI score\n\nFor accounts with many cases, you may need to click Analyze multiple times. Continue?')) {
+    if (!confirm('This will:\n1. Sync Salesforce Cases (last 90 days)\n2. Analyze unprocessed cases with Claude (processes in batches)\n3. Calculate OFI score\n\nFor accounts with many cases, you may need to click Analyze multiple times. Continue?')) {
       return;
     }
 

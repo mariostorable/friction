@@ -25,6 +25,7 @@ interface FrictionClustersProps {
 export default function FrictionClusters({ frictionCards, themes }: FrictionClustersProps) {
   const [expandedTheme, setExpandedTheme] = useState<string | null>(null);
   const [expandedCluster, setExpandedCluster] = useState<string | null>(null);
+  const [hoveredCluster, setHoveredCluster] = useState<string | null>(null);
 
   console.log('FrictionClusters component rendering:', {
     frictionCardsCount: frictionCards.length,
@@ -220,7 +221,19 @@ export default function FrictionClusters({ frictionCards, themes }: FrictionClus
                                 ) : (
                                   <ChevronDown className="w-4 h-4 text-gray-500" />
                                 )}
-                                <AlertTriangle className="w-4 h-4 text-orange-500" />
+                                <div
+                                  className="relative"
+                                  onMouseEnter={() => setHoveredCluster(clusterKey)}
+                                  onMouseLeave={() => setHoveredCluster(null)}
+                                >
+                                  <AlertTriangle className="w-4 h-4 text-orange-500" />
+                                  {hoveredCluster === clusterKey && (
+                                    <div className="absolute left-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 z-50 whitespace-normal">
+                                      Friction cluster: Related issues grouped by pattern. Click to expand and see individual cases.
+                                      <div className="absolute -top-1 left-3 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                               <div className="text-left">
                                 <p className="font-medium text-gray-900">{cluster.pattern}</p>
