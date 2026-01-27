@@ -26,6 +26,12 @@ export default function FrictionClusters({ frictionCards, themes }: FrictionClus
   const [expandedTheme, setExpandedTheme] = useState<string | null>(null);
   const [expandedCluster, setExpandedCluster] = useState<string | null>(null);
 
+  console.log('FrictionClusters component rendering:', {
+    frictionCardsCount: frictionCards.length,
+    themesCount: themes.length,
+    frictionCards: frictionCards.slice(0, 2) // Log first 2 cards
+  });
+
   // Group by theme first
   const cardsByTheme = frictionCards.reduce((acc, card) => {
     if (!acc[card.theme_key]) acc[card.theme_key] = [];
