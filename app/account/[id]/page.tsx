@@ -53,6 +53,13 @@ export default function AccountDetailPage() {
     try {
       setLoading(true);
 
+      // Get current user first
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('No authenticated user');
+        return;
+      }
+
       // Load account
       const { data: accountData } = await supabase
         .from('accounts')
@@ -73,16 +80,20 @@ export default function AccountDetailPage() {
       if (snapshotsData) setSnapshots(snapshotsData);
 
       // Load friction cards (last 30 days) with raw_inputs for case metadata and source URL
-      const { data: cardsData } = await supabase
+      const { data: cardsData, error: cardsError } = await supabase
         .from('friction_cards')
         .select(`
           *,
           raw_input:raw_inputs(source_url, metadata, created_at)
         `)
         .eq('account_id', accountId)
+        .eq('user_id', user.id)
         .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
         .order('created_at', { ascending: false });
 
+      if (cardsError) {
+        console.error('Error loading friction cards:', cardsError);
+      }
       if (cardsData) setFrictionCards(cardsData);
 
       // Load themes
@@ -103,7 +114,6 @@ export default function AccountDetailPage() {
         const avgVolume = snapshotsData.reduce((sum, s) => sum + (s.case_volume || 0), 0) / snapshotsData.length;
 
         // Get portfolio average (all Top 25 accounts)
-        const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           // Get both EDGE and SiteLink portfolios
           const { data: portfolios } = await supabase
@@ -149,7 +159,37 @@ export default function AccountDetailPage() {
             // Group cases by origin for smart alerts
             const originGroups: Record<string, any[]> = {};
             recentCases.forEach(caseItem => {
-              const origin = caseItem.metadata?.origin || 'Unknown';
+              // Try multiple possible field names from Salesforce (check all common variations)
+              let origin = caseItem.metadata?.Origin ||
+                          caseItem.metadata?.SuppliedChannel ||
+                          caseItem.metadata?.origin ||
+                          caseItem.metadata?.supplied_channel ||
+                          caseItem.metadata?.CaseOrigin ||
+                          caseItem.metadata?.['Case Origin'] ||
+                          caseItem.metadata?.Channel ||
+                          caseItem.metadata?.channel ||
+                          caseItem.metadata?.Source ||
+                          caseItem.metadata?.source;
+
+              // If still not found, search for any field containing "origin" or "channel" in the name
+              if (!origin || origin === '') {
+                const metadata = caseItem.metadata || {};
+                for (const key in metadata) {
+                  const lowerKey = key.toLowerCase();
+                  if ((lowerKey.includes('origin') || lowerKey.includes('channel') || lowerKey.includes('source'))
+                      && metadata[key]
+                      && typeof metadata[key] === 'string') {
+                    origin = metadata[key];
+                    break;
+                  }
+                }
+              }
+
+              // Default to Unknown if still not found
+              if (!origin || origin === '') {
+                origin = 'Unknown';
+              }
+
               if (!originGroups[origin]) {
                 originGroups[origin] = [];
               }

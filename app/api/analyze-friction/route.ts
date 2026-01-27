@@ -21,6 +21,14 @@ export async function POST(request: NextRequest) {
 
     console.log('Analyzing friction for account:', accountId);
 
+    // Check if API key is present
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return NextResponse.json({
+        error: 'Claude API key not configured. Please set ANTHROPIC_API_KEY environment variable.',
+        analyzed: 0
+      }, { status: 500 });
+    }
+
     const { data: rawInputs } = await supabase
       .from('raw_inputs')
       .select('*')
@@ -41,6 +49,8 @@ export async function POST(request: NextRequest) {
 
     const frictionCards = [];
     let parseErrorCount = 0;
+    let apiErrorCount = 0;
+    const errors: string[] = [];
 
     for (const input of rawInputs) {
       const prompt = `Analyze this support case and respond with ONLY valid JSON (no markdown):
@@ -79,15 +89,26 @@ Return a single JSON object with these fields:
           'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-          model: 'claude-3-5-sonnet-20241022',
+          model: 'claude-3-haiku-20240307',
           max_tokens: 500,
           messages: [{ role: 'user', content: prompt }],
         }),
       });
 
       if (!anthropicResponse.ok) {
+        apiErrorCount++;
         const errorData = await anthropicResponse.json().catch(() => ({}));
-        console.error('Anthropic API error:', anthropicResponse.status, errorData);
+        const errorMsg = `API Error ${anthropicResponse.status}: ${errorData.error?.message || JSON.stringify(errorData)}`;
+        console.error('Anthropic API error:', errorMsg);
+        errors.push(errorMsg);
+        if (apiErrorCount === 1) {
+          // Return immediately on first API error to help diagnose
+          return NextResponse.json({
+            error: `Claude API call failed: ${errorMsg}`,
+            analyzed: 0,
+            api_errors: apiErrorCount
+          }, { status: 500 });
+        }
         continue;
       }
 
@@ -118,13 +139,15 @@ Return a single JSON object with these fields:
       }
     }
 
-    console.log(`Analyzed ${frictionCards.length} cases successfully, ${parseErrorCount} failed to parse`);
+    console.log(`Analyzed ${frictionCards.length} cases successfully, ${parseErrorCount} parse errors, ${apiErrorCount} API errors`);
 
     if (frictionCards.length === 0) {
       return NextResponse.json({
-        error: `No cases could be analyzed. Tried to analyze ${rawInputs.length} cases but all failed to parse. This might be a temporary issue with Claude API.`,
+        error: `No cases could be analyzed. Tried ${rawInputs.length} cases. API errors: ${apiErrorCount}, Parse errors: ${parseErrorCount}. ${errors[0] || 'Unknown error'}`,
         analyzed: 0,
-        parse_errors: parseErrorCount
+        parse_errors: parseErrorCount,
+        api_errors: apiErrorCount,
+        sample_error: errors[0]
       }, { status: 500 });
     }
 

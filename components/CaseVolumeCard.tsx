@@ -17,7 +17,7 @@ export default function CaseVolumeCard({
   last7Days,
   accountName
 }: CaseVolumeCardProps) {
-  // Calculate deviations
+  // Calculate deviations for 90-day totals
   const vsAccountAvg = accountHistoricalAvg > 0
     ? ((currentVolume - accountHistoricalAvg) / accountHistoricalAvg) * 100
     : 0;
@@ -26,9 +26,15 @@ export default function CaseVolumeCard({
     ? ((currentVolume - portfolioAvg) / portfolioAvg) * 100
     : 0;
 
-  // Determine status
-  const isAnomalouslyHigh = vsAccountAvg > 50; // 50% above their own average
-  const isAnomalouslyLow = vsAccountAvg < -50; // 50% below their own average
+  // Calculate weekly baseline and 7-day deviation (for status determination)
+  const accountWeeklyBaseline = accountHistoricalAvg / 13; // 90 days ≈ 13 weeks
+  const vs7DayBaseline = accountWeeklyBaseline > 0
+    ? ((last7Days - accountWeeklyBaseline) / accountWeeklyBaseline) * 100
+    : 0;
+
+  // Determine status based on 7-day volume vs weekly baseline (NOT 90-day totals)
+  const isAnomalouslyHigh = vs7DayBaseline > 50; // 50% above their weekly baseline
+  const isAnomalouslyLow = vs7DayBaseline < -50; // 50% below their weekly baseline
   const isNormal = !isAnomalouslyHigh && !isAnomalouslyLow;
 
   const getStatusColor = () => {
@@ -55,29 +61,22 @@ export default function CaseVolumeCard({
                    currentVolume < portfolioAvg * 0.5 ? 'much lower than peers' :
                    'similar to peers';
 
-    // Determine trend
-    const trend = vsAccountAvg === 0 ? 'stable at their usual level' :
-                 vsAccountAvg > 0 ? `trending up ${Math.abs(vsAccountAvg).toFixed(0)}% above their baseline` :
-                 `trending down ${Math.abs(vsAccountAvg).toFixed(0)}% below their baseline`;
+    // Determine trend based on 7-day deviation
+    const trend = vs7DayBaseline === 0 ? 'stable at their usual level' :
+                 vs7DayBaseline > 0 ? `trending up ${Math.abs(vs7DayBaseline).toFixed(0)}% above their baseline` :
+                 `trending down ${Math.abs(vs7DayBaseline).toFixed(0)}% below their baseline`;
 
     if (isAnomalouslyHigh) {
-      return `This account is experiencing unusually high support volume - ${vsPeers} and ${trend}. This may indicate emerging issues requiring attention.`;
+      return `Support volume is ${vsPeers} and ${trend}.`;
     }
     if (isAnomalouslyLow) {
-      return `This account has unusually low support volume - ${vsPeers} and ${trend}. This could indicate improved product experience or reduced engagement.`;
+      return `Support volume is ${vsPeers} and ${trend}.`;
     }
     return `Support volume is ${vsPeers} and ${trend}.`;
   };
 
-  // Calculate weekly averages (90 days ≈ 13 weeks)
-  const accountWeeklyAvg = accountHistoricalAvg / 13;
+  // Portfolio weekly average for display
   const portfolioWeeklyAvg = portfolioAvg / 13;
-  const expectedWeekly = accountWeeklyAvg;
-
-  // Calculate 7-day deviation from expected
-  const vs7DayExpected = expectedWeekly > 0
-    ? ((last7Days - expectedWeekly) / expectedWeekly) * 100
-    : 0;
 
   return (
     <div className={`rounded-lg border p-6 ${getStatusColor()}`}>
@@ -100,7 +99,7 @@ export default function CaseVolumeCard({
           </div>
           <div className="flex items-baseline gap-2">
             <div className="text-2xl font-bold text-gray-900">
-              {accountWeeklyAvg.toFixed(1)}
+              {accountWeeklyBaseline.toFixed(1)}
             </div>
             <div className="text-xs text-gray-500">cases/week</div>
           </div>
@@ -123,13 +122,13 @@ export default function CaseVolumeCard({
             {(last7Days / 7).toFixed(1)} avg cases/day
           </div>
           <div className={`text-xs font-medium mt-1 ${
-            vs7DayExpected > 20 ? 'text-red-600' :
-            vs7DayExpected < -20 ? 'text-yellow-600' :
+            vs7DayBaseline > 20 ? 'text-red-600' :
+            vs7DayBaseline < -20 ? 'text-yellow-600' :
             'text-gray-600'
           }`}>
-            {Math.abs(vs7DayExpected) < 10 ? 'Normal week' :
-             vs7DayExpected > 0 ? `${vs7DayExpected.toFixed(0)}% above baseline` :
-             `${Math.abs(vs7DayExpected).toFixed(0)}% below baseline`}
+            {Math.abs(vs7DayBaseline) < 10 ? 'Normal week' :
+             vs7DayBaseline > 0 ? `${vs7DayBaseline.toFixed(0)}% above baseline` :
+             `${Math.abs(vs7DayBaseline).toFixed(0)}% below baseline`}
           </div>
         </div>
       </div>

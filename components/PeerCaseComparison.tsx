@@ -18,28 +18,27 @@ interface PeerCaseComparisonProps {
 }
 
 export default function PeerCaseComparison({ currentAccount, peers }: PeerCaseComparisonProps) {
-  // Calculate statistics
-  const sortedPeers = [...peers].sort((a, b) => b.caseVolume - a.caseVolume);
+  // Filter to only peers with the same software provider
+  const productPeers = peers.filter(p => p.product === currentAccount.product);
+
+  // Calculate statistics using product-specific peers
+  const sortedPeers = [...productPeers].sort((a, b) => b.caseVolume - a.caseVolume);
   const currentRank = sortedPeers.findIndex(p => p.name === currentAccount.name) + 1;
 
-  const avgVolume = peers.reduce((sum, p) => sum + p.caseVolume, 0) / peers.length;
-  const medianVolume = sortedPeers[Math.floor(sortedPeers.length / 2)].caseVolume;
-
-  // Get product-specific peers
-  const productPeers = peers.filter(p => p.product === currentAccount.product);
-  const productAvg = productPeers.length > 0
+  const avgVolume = productPeers.length > 0
     ? productPeers.reduce((sum, p) => sum + p.caseVolume, 0) / productPeers.length
-    : avgVolume;
+    : 0;
+  const medianVolume = sortedPeers[Math.floor(sortedPeers.length / 2)]?.caseVolume || 0;
 
-  // Find similar accounts (within 20% of current volume)
+  // Find similar accounts (within 20% of current volume) within the same product
   const similarAccounts = sortedPeers.filter(p => {
+    if (p.name === currentAccount.name) return false;
     const diff = Math.abs(p.caseVolume - currentAccount.caseVolume);
     const percentDiff = (diff / currentAccount.caseVolume) * 100;
-    return percentDiff <= 20 && p.name !== currentAccount.name;
+    return percentDiff <= 20;
   });
 
-  const vsAvg = ((currentAccount.caseVolume - avgVolume) / avgVolume) * 100;
-  const vsProductAvg = ((currentAccount.caseVolume - productAvg) / productAvg) * 100;
+  const vsAvg = avgVolume > 0 ? ((currentAccount.caseVolume - avgVolume) / avgVolume) * 100 : 0;
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
@@ -50,7 +49,7 @@ export default function PeerCaseComparison({ currentAccount, peers }: PeerCaseCo
             Peer Comparison
           </h3>
           <p className="text-sm text-gray-600 mt-1">
-            Case volume vs Top 25 accounts (last 90 days)
+            Case volume vs Top 25 {currentAccount.product} accounts (last 90 days)
           </p>
         </div>
       </div>
@@ -61,10 +60,10 @@ export default function PeerCaseComparison({ currentAccount, peers }: PeerCaseCo
           <div>
             <p className="text-sm text-gray-600 font-medium">Portfolio Ranking</p>
             <p className="text-3xl font-bold text-gray-900">#{currentRank}</p>
-            <p className="text-xs text-gray-500 mt-1">out of {peers.length} accounts</p>
+            <p className="text-xs text-gray-500 mt-1">out of {productPeers.length} {currentAccount.product} accounts</p>
           </div>
           <div className="text-right">
-            <p className="text-sm text-gray-600 mb-1">vs Portfolio Avg</p>
+            <p className="text-sm text-gray-600 mb-1">vs {currentAccount.product} Avg</p>
             <div className={`flex items-center gap-1 ${
               vsAvg > 0 ? 'text-red-600' : vsAvg < 0 ? 'text-green-600' : 'text-gray-600'
             }`}>
@@ -81,29 +80,16 @@ export default function PeerCaseComparison({ currentAccount, peers }: PeerCaseCo
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-4">
-        {/* Portfolio Average */}
-        <div className="text-center p-3 bg-gray-50 rounded-lg">
-          <p className="text-xs text-gray-600 font-medium uppercase tracking-wide">
-            Portfolio Avg
-          </p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">
-            {avgVolume.toFixed(0)}
-          </p>
-          <p className="text-xs text-gray-500">cases/90d</p>
-        </div>
-
+      <div className="grid grid-cols-2 gap-4 mb-4">
         {/* Product Average */}
         <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
           <p className="text-xs text-blue-700 font-medium uppercase tracking-wide">
             {currentAccount.product} Avg
           </p>
           <p className="text-2xl font-bold text-blue-900 mt-1">
-            {productAvg.toFixed(0)}
+            {avgVolume.toFixed(0)}
           </p>
-          <p className="text-xs text-blue-600">
-            {vsProductAvg > 0 ? '+' : ''}{vsProductAvg.toFixed(0)}% vs you
-          </p>
+          <p className="text-xs text-blue-600">cases/90d</p>
         </div>
 
         {/* Median */}
@@ -162,7 +148,7 @@ export default function PeerCaseComparison({ currentAccount, peers }: PeerCaseCo
       {similarAccounts.length > 0 && (
         <div className="pt-4 border-t border-gray-200">
           <p className="text-xs text-gray-600 font-medium mb-2">
-            SIMILAR ACCOUNTS (within 20% of your volume)
+            SIMILAR {currentAccount.product.toUpperCase()} ACCOUNTS (within 20% of your volume)
           </p>
           <div className="flex flex-wrap gap-2">
             {similarAccounts.slice(0, 5).map(account => (

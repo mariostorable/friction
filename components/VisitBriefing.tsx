@@ -131,10 +131,11 @@ export default function VisitBriefing({ account, frictionCards, snapshot }: Visi
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     const score = briefing.ofi_score;
+    const severityText = score >= 70 ? 'CRITICAL' : score >= 40 ? 'MODERATE' : 'HEALTHY';
     if (score >= 70) doc.setTextColor(220, 38, 38);
     else if (score >= 40) doc.setTextColor(234, 179, 8);
     else doc.setTextColor(22, 163, 74);
-    doc.text('OFI Score: ' + score + ' (' + briefing.trend + ')', margin, y);
+    doc.text('OFI Score: ' + score + ' - ' + severityText + ' (' + briefing.trend + ')', margin, y);
     doc.setTextColor(0, 0, 0);
     y += 12;
 
@@ -391,8 +392,20 @@ export default function VisitBriefing({ account, frictionCards, snapshot }: Visi
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-gray-600">OFI Score</p>
-                    <p className="text-3xl font-bold text-blue-600">{briefing.ofi_score}</p>
-                    <p className="text-sm text-gray-600">{briefing.trend}</p>
+                    <p className={`text-3xl font-bold ${
+                      briefing.ofi_score >= 70 ? 'text-red-600' :
+                      briefing.ofi_score >= 40 ? 'text-yellow-600' :
+                      'text-green-600'
+                    }`}>{briefing.ofi_score}</p>
+                    <p className={`text-sm font-medium ${
+                      briefing.ofi_score >= 70 ? 'text-red-700' :
+                      briefing.ofi_score >= 40 ? 'text-yellow-700' :
+                      'text-green-700'
+                    }`}>
+                      {briefing.ofi_score >= 70 ? 'CRITICAL' :
+                       briefing.ofi_score >= 40 ? 'MODERATE' :
+                       'HEALTHY'} - {briefing.trend}
+                    </p>
                   </div>
                 </div>
               </div>

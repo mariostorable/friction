@@ -160,6 +160,14 @@ export default function Dashboard() {
       const result = await response.json();
       setSyncProgress(`Step 2/2: Analyzing up to 3 accounts (100 cases from last 90 days)...`);
 
+      // Get baseline snapshot count before analysis starts
+      const today = new Date().toISOString().split('T')[0];
+      const { data: initialSnapshots } = await supabase
+        .from('account_snapshots')
+        .select('id')
+        .eq('snapshot_date', today);
+      const initialSnapshotCount = initialSnapshots?.length || 0;
+
       // Poll for progress
       let attempts = 0;
       let previousCardCount = 0;
@@ -195,9 +203,13 @@ export default function Dashboard() {
         if (attempts >= maxAttempts) {
           setSyncProgress('Refreshing dashboard...');
           await loadDashboard();
+          const newlyAnalyzed = accountsAnalyzed - initialSnapshotCount;
           const remaining = totalPortfolioAccounts - accountsAnalyzed;
+          const analyzedText = newlyAnalyzed > 0
+            ? `✓ ${newlyAnalyzed} account${newlyAnalyzed > 1 ? 's' : ''} analyzed!`
+            : `✓ Sync complete!`;
           setSyncProgress(remaining > 0
-            ? `✓ Sync complete! ${remaining} accounts still need analysis.`
+            ? `${analyzedText} ${remaining} accounts still need analysis.`
             : `✓ All ${totalPortfolioAccounts} accounts are up to date!`);
           setSyncing(false);
           setTimeout(() => setSyncProgress(''), 10000);
@@ -231,11 +243,15 @@ export default function Dashboard() {
             setSyncProgress('Refreshing dashboard...');
             await loadDashboard();
 
-            // Calculate remaining accounts
+            // Calculate newly analyzed accounts in this sync
+            const newlyAnalyzed = accountsAnalyzed - initialSnapshotCount;
             const remaining = totalPortfolioAccounts - accountsAnalyzed;
 
             if (remaining > 0) {
-              setSyncProgress(`✓ 1 account analyzed! ${remaining} accounts still need analysis.`);
+              const analyzedText = newlyAnalyzed > 0
+                ? `✓ ${newlyAnalyzed} account${newlyAnalyzed > 1 ? 's' : ''} analyzed!`
+                : `✓ Sync complete!`;
+              setSyncProgress(`${analyzedText} ${remaining} accounts still need analysis.`);
             } else {
               setSyncProgress(`✓ All ${totalPortfolioAccounts} accounts are up to date!`);
             }
@@ -596,22 +612,21 @@ export default function Dashboard() {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th onClick={() => handleSort('name')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
+                      <th onClick={() => handleSort('name')} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
                         Account {getSortIcon('name')}
                       </th>
-                      <th onClick={() => handleSort('arr')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
+                      <th onClick={() => handleSort('arr')} className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
                         ARR {getSortIcon('arr')}
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Software</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Products</th>
-                      <th onClick={() => handleSort('ofi')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Software</th>
+                      <th onClick={() => handleSort('ofi')} className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
                         OFI Score {getSortIcon('ofi')}
                       </th>
-                      <th onClick={() => handleSort('case_volume')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
+                      <th onClick={() => handleSort('case_volume')} className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
                         Cases (90d) {getSortIcon('case_volume')}
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trend</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Analyzed</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trend</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Analyzed</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -621,20 +636,17 @@ export default function Dashboard() {
                         onClick={() => router.push(`/account/${account.id}`)}
                         className="hover:bg-gray-50 cursor-pointer"
                       >
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900">{account.name}</div>
-                          <div className="text-sm text-gray-500">{account.segment}</div>
+                          <div className="text-xs text-gray-500">{account.segment}</div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          ${(account.arr || 0).toLocaleString()}
+                        <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                          ${Math.round(account.arr || 0).toLocaleString()}
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-900">
+                        <td className="px-3 py-3 text-sm text-gray-900">
                           {getPrimarySoftware(account)}
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-500">
-                          {account.vertical || 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-3 py-3 whitespace-nowrap">
                           {account.current_snapshot?.ofi_score ? (
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                               account.current_snapshot.ofi_score >= 70
@@ -643,21 +655,15 @@ export default function Dashboard() {
                                 ? 'bg-yellow-100 text-yellow-800'
                                 : 'bg-green-100 text-green-800'
                             }`}>
-                              {account.current_snapshot.ofi_score} - {
-                                account.current_snapshot.ofi_score >= 70
-                                  ? 'High Friction'
-                                  : account.current_snapshot.ofi_score >= 40
-                                  ? 'Medium Friction'
-                                  : 'Low Friction'
-                              }
+                              {account.current_snapshot.ofi_score}
                             </span>
                           ) : (
-                            <span className="text-sm text-gray-400">Not analyzed</span>
+                            <span className="text-xs text-gray-400">-</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <td className="px-3 py-3 whitespace-nowrap text-sm">
                           {account.current_snapshot?.case_volume !== undefined ? (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1">
                               <span className="text-gray-900 font-medium">{account.current_snapshot.case_volume}</span>
                               {portfolioCaseVolumeAvg > 0 && (
                                 <span className={`text-xs ${
@@ -668,9 +674,9 @@ export default function Dashboard() {
                                     : 'text-gray-500'
                                 }`}>
                                   {account.current_snapshot.case_volume > portfolioCaseVolumeAvg * 1.5
-                                    ? '⚠️ High'
+                                    ? '⚠️'
                                     : account.current_snapshot.case_volume < portfolioCaseVolumeAvg * 0.5
-                                    ? '⬇️ Low'
+                                    ? '⬇️'
                                     : ''}
                                 </span>
                               )}
@@ -679,10 +685,10 @@ export default function Dashboard() {
                             <span className="text-gray-400">-</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-3 py-3 whitespace-nowrap">
                           {getTrendIcon(account.current_snapshot?.trend_direction)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
                           {account.current_snapshot?.created_at
                             ? new Date(account.current_snapshot.created_at).toLocaleDateString()
                             : 'Never'}
