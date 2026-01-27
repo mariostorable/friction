@@ -102,9 +102,15 @@ export async function POST(request: NextRequest) {
         console.log(`Processing case ${i + 1}/${rawInputs.length}...`);
       }
 
+      // Truncate case text to 2000 characters to avoid hitting API limits
+      const truncatedText = input.text_content?.slice(0, 2000) || '';
+      const truncationNote = input.text_content && input.text_content.length > 2000
+        ? '\n[Case text truncated for analysis]'
+        : '';
+
       const prompt = `Analyze this support case and respond with ONLY valid JSON (no markdown):
 
-${input.text_content}
+${truncatedText}${truncationNote}
 
 Return a single JSON object with these fields:
 - summary: Brief description of the issue (1 sentence)

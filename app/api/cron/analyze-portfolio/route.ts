@@ -239,6 +239,13 @@ export async function GET(request: NextRequest) {
             if (i % 20 === 0 && i > 0) {
               console.log(`Progress: ${i}/${insertedInputs.length} cases analyzed for ${account.name}`);
             }
+
+            // Truncate case text to 2000 characters to avoid hitting API limits
+            const truncatedText = input.text_content?.slice(0, 2000) || '';
+            const truncationNote = input.text_content && input.text_content.length > 2000
+              ? '\n[Case text truncated for analysis]'
+              : '';
+
             const prompt = `Analyze this customer support case and return ONLY valid JSON with no other text, explanation, or markdown formatting.
 
 Required JSON structure:
@@ -251,7 +258,7 @@ Required JSON structure:
 }
 
 Case to analyze:
-${input.text_content}
+${truncatedText}${truncationNote}
 
 Return ONLY the JSON object, nothing else.`;
 
