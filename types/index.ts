@@ -32,7 +32,7 @@ export interface Account {
   customer_since: string | null;
   owner_name: string | null;
   owner_email: string | null;
-  status: 'active' | 'churned' | 'prospect';
+  status: 'active' | 'cancelled' | 'churned' | 'prospect';
   metadata: Record<string, any>;
   last_synced_at: string;
   created_at: string;
@@ -147,6 +147,12 @@ export interface ThemeSummary {
 
 export interface ScoreBreakdown {
   severity_weighted?: number;
+  card_count?: number;
+  base_score?: number;
+  friction_density?: number;
+  density_multiplier?: number;
+  high_severity_boost?: number;
+  // Legacy fields (deprecated)
   trend_factor?: number;
   recency_boost?: number;
   explanation?: string;

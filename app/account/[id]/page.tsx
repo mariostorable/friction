@@ -663,21 +663,39 @@ export default function AccountDetailPage() {
               <h3 className="text-sm font-semibold text-gray-900 mb-3">How this score is calculated:</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Severity-weighted signals:</span>
+                  <span className="text-gray-600">Friction cards (last 14 days):</span>
+                  <span className="font-medium text-gray-900">
+                    {latestSnapshot.score_breakdown?.card_count || latestSnapshot.friction_card_count}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Severity-weighted score:</span>
                   <span className="font-medium text-gray-900">
                     {latestSnapshot.score_breakdown?.severity_weighted || 0}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Trend factor:</span>
+                  <span className="text-gray-600">Base score (log scale):</span>
                   <span className="font-medium text-gray-900">
-                    {latestSnapshot.score_breakdown?.trend_factor || 0}
+                    {latestSnapshot.score_breakdown?.base_score ? latestSnapshot.score_breakdown.base_score.toFixed(1) : '0'}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Recency boost:</span>
+                  <span className="text-gray-600">Friction density (% of cases):</span>
                   <span className="font-medium text-gray-900">
-                    {latestSnapshot.score_breakdown?.recency_boost || 0}
+                    {latestSnapshot.score_breakdown?.friction_density ? latestSnapshot.score_breakdown.friction_density.toFixed(1) + '%' : '0%'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Density multiplier:</span>
+                  <span className="font-medium text-gray-900">
+                    {latestSnapshot.score_breakdown?.density_multiplier ? latestSnapshot.score_breakdown.density_multiplier.toFixed(2) + 'x' : '1.0x'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">High severity boost:</span>
+                  <span className="font-medium text-gray-900">
+                    +{latestSnapshot.score_breakdown?.high_severity_boost?.toFixed(1) || 0}
                   </span>
                 </div>
                 <div className="pt-2 mt-2 border-t border-gray-100 flex justify-between">
@@ -685,10 +703,11 @@ export default function AccountDetailPage() {
                   <span className="font-bold text-gray-900">{ofiScore.toFixed(0)}</span>
                 </div>
               </div>
-              <p className="mt-3 text-xs text-gray-500">
-                Scores above 70 indicate high friction. Scores below 30 indicate healthy operations.
-                The score is normalized to 0-100 based on your portfolio's distribution.
-              </p>
+              <div className="mt-3 text-xs text-gray-500 space-y-1">
+                <p><strong>Formula:</strong> (Base Score × Density Multiplier) + High Severity Boost</p>
+                <p><strong>Severity weights:</strong> 1→1pt, 2→2pts, 3→3pts, 4→5pts, 5→8pts</p>
+                <p><strong>Scores:</strong> 70+ = High Friction, 40-69 = Medium, 0-39 = Low</p>
+              </div>
             </div>
           )}
         </div>
