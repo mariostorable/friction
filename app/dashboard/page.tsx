@@ -575,8 +575,65 @@ export default function Dashboard() {
         {activeTab === 'portfolios' && (
           <>
             {top25.length === 0 && (
-              <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
-                <p className="text-gray-500">No accounts found. Click Sync Now to load accounts from Salesforce.</p>
+              <div className="max-w-2xl mx-auto">
+                <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl border-2 border-purple-200 p-8 text-center">
+                  <div className="mb-6">
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-600 rounded-full mb-4">
+                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to Friction Intelligence!</h2>
+                    <p className="text-gray-600 mb-6">Let's get started by syncing your Salesforce accounts</p>
+                  </div>
+
+                  <div className="bg-white rounded-lg p-6 mb-6 text-left">
+                    <h3 className="font-semibold text-gray-900 mb-4">What happens when you sync:</h3>
+                    <ol className="space-y-3">
+                      <li className="flex items-start gap-3">
+                        <span className="flex-shrink-0 w-6 h-6 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-sm font-semibold">1</span>
+                        <span className="text-gray-700">Import your Top 25 accounts from Salesforce (EDGE & SiteLink)</span>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex-shrink-0 w-6 h-6 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-sm font-semibold">2</span>
+                        <span className="text-gray-700">Load support cases from the last 90 days</span>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex-shrink-0 w-6 h-6 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-sm font-semibold">3</span>
+                        <span className="text-gray-700">Analyze up to 3 accounts with AI to identify friction patterns</span>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex-shrink-0 w-6 h-6 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-sm font-semibold">4</span>
+                        <span className="text-gray-700">Calculate Operational Friction Index (OFI) scores</span>
+                      </li>
+                    </ol>
+                  </div>
+
+                  <button
+                    onClick={syncSalesforce}
+                    disabled={syncing}
+                    className="inline-flex items-center gap-2 px-8 py-4 text-lg font-semibold text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all"
+                  >
+                    {syncing ? (
+                      <>
+                        <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Syncing from Salesforce...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Sync from Salesforce
+                      </>
+                    )}
+                  </button>
+
+                  <p className="text-sm text-gray-500 mt-4">Takes 2-5 minutes • You can continue working while it syncs</p>
+                </div>
               </div>
             )}
 
