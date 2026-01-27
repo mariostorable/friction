@@ -190,13 +190,31 @@ Return a single JSON object with these fields:
 
     console.log(`Analyzed ${frictionCards.length} cases successfully, ${parseErrorCount} parse errors, ${apiErrorCount} API errors`);
 
+    // IMPORTANT: Mark ALL cases as processed, even if they failed
+    // This prevents cases from getting stuck in an infinite loop
+    const inputIds = rawInputs.map(r => r.id);
+    console.log(`Marking ${inputIds.length} inputs as processed (including ${parseErrorCount + apiErrorCount} failed):`, inputIds);
+
+    const { error: updateError } = await supabase
+      .from('raw_inputs')
+      .update({ processed: true })
+      .in('id', inputIds);
+
+    if (updateError) {
+      console.error('CRITICAL: Failed to mark inputs as processed:', updateError);
+    } else {
+      console.log(`Successfully marked ${inputIds.length} inputs as processed`);
+    }
+
+    // If no cards were created, return error but cases are already marked processed
     if (frictionCards.length === 0) {
       return NextResponse.json({
         error: `No cases could be analyzed. Tried ${rawInputs.length} cases. API errors: ${apiErrorCount}, Parse errors: ${parseErrorCount}. ${errors[0] || 'Unknown error'}`,
         analyzed: 0,
         parse_errors: parseErrorCount,
         api_errors: apiErrorCount,
-        sample_error: errors[0]
+        sample_error: errors[0],
+        marked_processed: inputIds.length
       }, { status: 500 });
     }
 
@@ -207,32 +225,12 @@ Return a single JSON object with these fields:
 
     if (cardError) {
       console.error('Card insert error:', JSON.stringify(cardError));
-      return NextResponse.json({ 
-        error: 'Failed to create friction cards', 
-        details: cardError.message,
-        code: cardError.code 
-      }, { status: 500 });
-    }
-
-    const inputIds = rawInputs.map(r => r.id);
-    console.log(`Marking ${inputIds.length} inputs as processed:`, inputIds);
-
-    const { error: updateError } = await supabase
-      .from('raw_inputs')
-      .update({ processed: true })
-      .in('id', inputIds);
-
-    if (updateError) {
-      console.error('CRITICAL: Failed to mark inputs as processed:', updateError);
       return NextResponse.json({
-        error: 'Failed to mark cases as processed',
-        details: updateError.message,
-        analyzed: insertedCards?.length || 0,
-        warning: 'Friction cards were created but cases were not marked as processed. This will cause duplicate analysis if you try again.'
+        error: 'Failed to create friction cards',
+        details: cardError.message,
+        code: cardError.code
       }, { status: 500 });
     }
-
-    console.log(`Successfully marked ${inputIds.length} inputs as processed`);
 
     // Check if there are more unprocessed cases remaining
     const { count: remainingCount } = await supabase
