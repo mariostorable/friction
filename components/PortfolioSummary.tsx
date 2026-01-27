@@ -91,6 +91,8 @@ export default function PortfolioSummary({ top25, singleOperator }: PortfolioSum
       icon: AlertCircle,
       color: totalAlerts > 0 ? 'text-yellow-600' : 'text-gray-600',
       bg: totalAlerts > 0 ? 'bg-yellow-50' : 'bg-gray-50',
+      subtext: totalAlerts > 0 ? `${totalAlerts} active` : 'None active',
+      tooltip: 'Automated alerts for: High Friction (OFI ≥ 70), Critical Issues (3+ high-severity cases), and Abnormal Volume Spikes. Alerts expire after 7 days.',
     },
     {
       name: 'Abnormal Volume',

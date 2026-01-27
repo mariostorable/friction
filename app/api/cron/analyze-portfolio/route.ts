@@ -373,6 +373,56 @@ Return ONLY the JSON object, nothing else.`;
               accountsAnalyzed++; // Count snapshot errors too
             } else {
               console.log(`✓ Snapshot created successfully for ${account.name}`);
+
+              // Generate alerts based on the analysis
+              const alerts = [];
+
+              // Alert 1: High Friction (OFI > 70)
+              if (ofiScore >= 70) {
+                alerts.push({
+                  user_id: portfolio.user_id,
+                  account_id: accountId,
+                  alert_type: 'high_friction',
+                  severity: 'high',
+                  title: `High Friction: ${account.name}`,
+                  message: `OFI score is ${ofiScore}, indicating significant customer friction. ${highSeverityCount} high-severity issues detected.`,
+                  evidence: {
+                    ofi_score: ofiScore,
+                    high_severity_count: highSeverityCount,
+                    friction_card_count: frictionCards.length,
+                    case_volume: casesData.records.length
+                  },
+                  expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
+                });
+              }
+
+              // Alert 2: Critical Severity Issues (3+ high-severity cards)
+              if (highSeverityCount >= 3) {
+                alerts.push({
+                  user_id: portfolio.user_id,
+                  account_id: accountId,
+                  alert_type: 'critical_severity',
+                  severity: 'critical',
+                  title: `Critical Issues: ${account.name}`,
+                  message: `${highSeverityCount} critical severity issues detected in recent cases.`,
+                  evidence: {
+                    high_severity_count: highSeverityCount,
+                    ofi_score: ofiScore
+                  },
+                  expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+                });
+              }
+
+              // Insert alerts if any were generated
+              if (alerts.length > 0) {
+                const { error: alertError } = await supabase.from('alerts').insert(alerts);
+                if (alertError) {
+                  console.error(`Error creating alerts for ${account.name}:`, alertError);
+                } else {
+                  console.log(`✓ Created ${alerts.length} alert(s) for ${account.name}`);
+                }
+              }
+
               results.push({ accountId, account: account.name, status: 'success', cases: casesData.records.length, analyzed: frictionCards.length, ofi: ofiScore });
               accountsAnalyzed++; // Increment counter after successful processing
             }

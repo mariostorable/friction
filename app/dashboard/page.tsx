@@ -139,6 +139,28 @@ export default function Dashboard() {
             const avgVolume = allSnapshots.reduce((sum, s) => sum + (s.case_volume || 0), 0) / allSnapshots.length;
             setPortfolioCaseVolumeAvg(avgVolume);
           }
+
+          // Fetch active alert counts for each account
+          const { data: alerts } = await supabase
+            .from('alerts')
+            .select('account_id')
+            .in('account_id', accountIds)
+            .eq('dismissed', false);
+
+          if (alerts && alerts.length > 0) {
+            // Count alerts per account
+            const alertCounts = alerts.reduce((acc: any, alert: any) => {
+              acc[alert.account_id] = (acc[alert.account_id] || 0) + 1;
+              return acc;
+            }, {});
+
+            // Add alert counts to accounts
+            const accountsWithAlerts = accountsWithSnapshot.map(acc => ({
+              ...acc,
+              alert_count: alertCounts[acc.id] || 0
+            }));
+            setTop25(accountsWithAlerts);
+          }
         }
       }
 
