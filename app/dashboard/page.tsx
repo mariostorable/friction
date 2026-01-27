@@ -191,8 +191,18 @@ export default function Dashboard() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Sync API error:', errorData);
+        let errorData;
+        let errorText = '';
+
+        try {
+          const responseText = await response.text();
+          errorText = responseText;
+          errorData = JSON.parse(responseText);
+          console.error('Sync API error - Status:', response.status, 'Data:', errorData);
+        } catch (parseError) {
+          console.error('Failed to parse error response:', errorText);
+          errorData = { error: 'Invalid error response from server' };
+        }
 
         // Check if Salesforce is not connected
         if (errorData.error === 'Salesforce not connected' || errorData.error === 'No tokens found') {
@@ -202,7 +212,10 @@ export default function Dashboard() {
           return;
         }
 
-        throw new Error(errorData.error || `Sync failed with status ${response.status}`);
+        // Create detailed error message
+        const errorMsg = errorData.error || errorData.message || `HTTP ${response.status} error`;
+        const errorDetails = errorData.details || '';
+        throw new Error(`${errorMsg}${errorDetails ? ` - ${errorDetails}` : ''}`);
       }
 
       const result = await response.json();
@@ -369,22 +382,30 @@ export default function Dashboard() {
       setTimeout(pollProgress, 2000); // Start polling after 2 seconds
 
     } catch (error) {
-      console.error('Sync error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Sync error (full):', error);
+      console.error('Error type:', typeof error);
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
 
       // Provide helpful error messages based on common issues
       let userMessage = '❌ Failed to sync with Salesforce\n\n';
 
-      if (errorMessage.includes('401') || errorMessage.includes('unauthorized') || errorMessage.includes('not connected')) {
+      if (errorMessage.toLowerCase().includes('401') || errorMessage.toLowerCase().includes('unauthorized') || errorMessage.toLowerCase().includes('not connected')) {
         userMessage += '🔐 Authentication Issue\n\nYour Salesforce connection may have expired or is not set up.\n\n📝 Steps to fix:\n1. Click Settings (top right)\n2. Connect or reconnect to Salesforce\n3. Come back and try syncing again';
-      } else if (errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT')) {
+      } else if (errorMessage.toLowerCase().includes('timeout') || errorMessage.toLowerCase().includes('etimedout')) {
         userMessage += '⏱️ Connection Timeout\n\nThe request took too long - this can happen with large datasets.\n\n📝 What to do:\nJust click the sync button again to retry. Your progress is saved.';
-      } else if (errorMessage.includes('network') || errorMessage.includes('ECONNREFUSED')) {
-        userMessage += '🌐 Network Error\n\nUnable to reach Salesforce.\n\n📝 What to do:\n• Check your internet connection\n• Click the sync button to try again';
-      } else if (errorMessage.includes('rate limit')) {
+      } else if (errorMessage.toLowerCase().includes('network') || errorMessage.toLowerCase().includes('econnrefused') || errorMessage.toLowerCase().includes('fetch')) {
+        userMessage += '🌐 Network Error\n\nUnable to reach the server or Salesforce.\n\n📝 What to do:\n• Check your internet connection\n• Click the sync button to try again\n• Check browser console for details';
+      } else if (errorMessage.toLowerCase().includes('rate limit')) {
         userMessage += '⚠️ Rate Limit\n\nToo many requests to Salesforce API.\n\n📝 What to do:\nWait 2-3 minutes, then click sync again.';
+      } else if (errorMessage.toLowerCase().includes('invalid') || errorMessage.toLowerCase().includes('parse')) {
+        userMessage += '⚠️ Server Response Error\n\nThe server returned an unexpected response.\n\n📝 What to do:\n• Try clicking sync again\n• Check your Salesforce connection in Settings\n• Contact support if this persists';
       } else {
-        userMessage += `⚠️ ${errorMessage}\n\n📝 What to do:\n• Click the sync button to try again\n• If this keeps happening, go to Settings and reconnect Salesforce\n• Check the browser console for more details`;
+        userMessage += `Error Details:\n${errorMessage}\n\n📝 What to do:\n• Copy this error message\n• Try clicking sync again\n• If it fails again, go to Settings → Disconnect → Reconnect Salesforce\n• Open browser console (F12) for technical details`;
       }
 
       alert(userMessage);
