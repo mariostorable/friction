@@ -97,7 +97,12 @@ export default function AccountDetailPage() {
       if (cardsError) {
         console.error('Error loading friction cards:', cardsError);
       }
-      if (cardsData) setFrictionCards(cardsData);
+      if (cardsData) {
+        console.log(`Loaded ${cardsData.length} friction cards for account`);
+        setFrictionCards(cardsData);
+      } else {
+        console.log('No friction cards data returned');
+      }
 
       // Load themes
       const { data: themesData } = await supabase
