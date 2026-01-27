@@ -26,12 +26,32 @@ export default function Dashboard() {
   const [sortField, setSortField] = useState<string>('arr');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [softwareFilter, setSoftwareFilter] = useState<'all' | 'edge' | 'sitelink'>('all');
+  const [isSalesforceConnected, setIsSalesforceConnected] = useState(false);
+  const [checkingConnection, setCheckingConnection] = useState(true);
   const supabase = createClientComponentClient();
   const router = useRouter();
 
   useEffect(() => {
     loadDashboard();
+    checkSalesforceConnection();
   }, []);
+
+  async function checkSalesforceConnection() {
+    try {
+      const { data: integration } = await supabase
+        .from('integrations')
+        .select('*')
+        .eq('integration_type', 'salesforce')
+        .eq('status', 'active')
+        .single();
+
+      setIsSalesforceConnected(!!integration);
+    } catch (error) {
+      setIsSalesforceConnected(false);
+    } finally {
+      setCheckingConnection(false);
+    }
+  }
 
   async function loadDashboard() {
     try {
@@ -156,7 +176,19 @@ export default function Dashboard() {
         method: 'POST',
       });
 
-      if (!response.ok) throw new Error('Sync failed');
+      if (!response.ok) {
+        const errorData = await response.json();
+
+        // Check if Salesforce is not connected
+        if (errorData.error === 'Salesforce not connected') {
+          alert('⚠️ Salesforce Not Connected\n\nYou need to connect your Salesforce account first.\n\n1. Click on Settings (top right)\n2. Connect to Salesforce\n3. Come back here and click "Sync from Salesforce"\n\nWould you like to go to Settings now?');
+          router.push('/settings');
+          setSyncing(false);
+          return;
+        }
+
+        throw new Error(errorData.error || 'Sync failed');
+      }
 
       const result = await response.json();
       setSyncProgress(`Step 2/2: Analyzing up to 3 accounts (100 cases from last 90 days)...`);
@@ -511,13 +543,15 @@ export default function Dashboard() {
 
           <div className="relative">
             <button
-              onClick={syncSalesforce}
-              disabled={syncing}
+              onClick={!isSalesforceConnected ? () => router.push('/settings') : syncSalesforce}
+              disabled={syncing || checkingConnection}
               onMouseEnter={() => setShowSyncTooltip(true)}
               onMouseLeave={() => setShowSyncTooltip(false)}
               className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${
-                syncing
+                syncing || checkingConnection
                   ? 'bg-gray-400 text-white cursor-not-allowed'
+                  : !isSalesforceConnected
+                  ? 'bg-orange-600 text-white hover:bg-orange-700'
                   : totalPortfolioAccounts === 0
                   ? 'bg-blue-600 text-white hover:bg-blue-700'
                   : accountsAnalyzedToday < totalPortfolioAccounts
@@ -531,8 +565,12 @@ export default function Dashboard() {
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
               )}
-              {syncing
+              {checkingConnection
+                ? 'Checking...'
+                : syncing
                 ? 'Syncing Portfolio...'
+                : !isSalesforceConnected
+                ? 'Connect Salesforce'
                 : totalPortfolioAccounts === 0
                 ? 'Sync from Salesforce'
                 : accountsAnalyzedToday < totalPortfolioAccounts
@@ -546,7 +584,15 @@ export default function Dashboard() {
             )}
 
             {/* Sync Status Tooltip */}
-            {showSyncTooltip && (analyzedAccountNames.length > 0 || pendingAccountNames.length > 0) && (
+            {showSyncTooltip && !isSalesforceConnected && (
+              <div className="absolute top-full right-0 mt-2 w-80 bg-orange-50 border border-orange-200 rounded-lg shadow-lg p-4 z-50">
+                <div className="text-sm text-orange-900">
+                  <p className="font-semibold mb-2">⚠️ Salesforce Not Connected</p>
+                  <p className="text-xs">Click to go to Settings and connect your Salesforce account.</p>
+                </div>
+              </div>
+            )}
+            {showSyncTooltip && isSalesforceConnected && (analyzedAccountNames.length > 0 || pendingAccountNames.length > 0) && (
               <div className="absolute top-full right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-50">
                 <div className="space-y-3">
                   {analyzedAccountNames.length > 0 && (
