@@ -432,9 +432,9 @@ export default function AccountDetailPage() {
       }
 
       alert(`✅ Analysis Complete!\n\nSynced: ${casesResult.synced} cases\nAnalyzed: ${analyzeResult.analyzed} friction points\nOFI Score: ${ofiResult.ofi_score}\nHigh Severity: ${ofiResult.high_severity}`);
-      
-      // Reload data
-      await loadAccountData();
+
+      // Force a full page refresh to ensure new data is loaded
+      window.location.reload();
       
     } catch (error) {
       console.error('Analysis error:', error);
