@@ -29,8 +29,8 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    // Fetch unprocessed cases in batches of 50 to avoid timeouts
-    const BATCH_SIZE = 50;
+    // Fetch unprocessed cases in batches of 100 to avoid timeouts
+    const BATCH_SIZE = 100;
     const { data: rawInputs } = await supabase
       .from('raw_inputs')
       .select('*')
