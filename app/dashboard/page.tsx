@@ -165,6 +165,20 @@ export default function Dashboard() {
   }
 
   async function syncSalesforce() {
+    // Double-check connection before syncing
+    const { data: integration } = await supabase
+      .from('integrations')
+      .select('*')
+      .eq('integration_type', 'salesforce')
+      .eq('status', 'active')
+      .single();
+
+    if (!integration) {
+      alert('⚠️ Salesforce Not Connected\n\nYou need to connect your Salesforce account first.\n\n1. Click on Settings (top right)\n2. Connect to Salesforce\n3. Come back here and click "Sync from Salesforce"');
+      router.push('/settings');
+      return;
+    }
+
     setSyncing(true);
     setSyncProgress('Step 1/2: Syncing account data from Salesforce...');
 
@@ -178,16 +192,17 @@ export default function Dashboard() {
 
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('Sync API error:', errorData);
 
         // Check if Salesforce is not connected
-        if (errorData.error === 'Salesforce not connected') {
-          alert('⚠️ Salesforce Not Connected\n\nYou need to connect your Salesforce account first.\n\n1. Click on Settings (top right)\n2. Connect to Salesforce\n3. Come back here and click "Sync from Salesforce"\n\nWould you like to go to Settings now?');
+        if (errorData.error === 'Salesforce not connected' || errorData.error === 'No tokens found') {
+          alert('⚠️ Salesforce Connection Issue\n\nYour Salesforce connection may have expired or is not properly configured.\n\n1. Go to Settings (top right)\n2. Reconnect to Salesforce\n3. Come back here and try syncing again');
           router.push('/settings');
           setSyncing(false);
           return;
         }
 
-        throw new Error(errorData.error || 'Sync failed');
+        throw new Error(errorData.error || `Sync failed with status ${response.status}`);
       }
 
       const result = await response.json();
@@ -358,23 +373,26 @@ export default function Dashboard() {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
       // Provide helpful error messages based on common issues
-      let userMessage = 'Failed to sync with Salesforce.\n\n';
+      let userMessage = '❌ Failed to sync with Salesforce\n\n';
 
-      if (errorMessage.includes('401') || errorMessage.includes('unauthorized')) {
-        userMessage += '❌ Authentication Error: Your Salesforce connection may have expired.\n\nPlease go to Settings and reconnect to Salesforce.';
+      if (errorMessage.includes('401') || errorMessage.includes('unauthorized') || errorMessage.includes('not connected')) {
+        userMessage += '🔐 Authentication Issue\n\nYour Salesforce connection may have expired or is not set up.\n\n📝 Steps to fix:\n1. Click Settings (top right)\n2. Connect or reconnect to Salesforce\n3. Come back and try syncing again';
       } else if (errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT')) {
-        userMessage += '⏱️ Connection Timeout: The request took too long.\n\nThis can happen with large datasets. Please try again.';
+        userMessage += '⏱️ Connection Timeout\n\nThe request took too long - this can happen with large datasets.\n\n📝 What to do:\nJust click the sync button again to retry. Your progress is saved.';
       } else if (errorMessage.includes('network') || errorMessage.includes('ECONNREFUSED')) {
-        userMessage += '🌐 Network Error: Unable to reach Salesforce.\n\nPlease check your internet connection and try again.';
+        userMessage += '🌐 Network Error\n\nUnable to reach Salesforce.\n\n📝 What to do:\n• Check your internet connection\n• Click the sync button to try again';
       } else if (errorMessage.includes('rate limit')) {
-        userMessage += '⚠️ Rate Limit: Too many requests to Salesforce.\n\nPlease wait a few minutes and try again.';
+        userMessage += '⚠️ Rate Limit\n\nToo many requests to Salesforce API.\n\n📝 What to do:\nWait 2-3 minutes, then click sync again.';
       } else {
-        userMessage += `Error: ${errorMessage}\n\nIf this persists, please check your Salesforce connection in Settings.`;
+        userMessage += `⚠️ ${errorMessage}\n\n📝 What to do:\n• Click the sync button to try again\n• If this keeps happening, go to Settings and reconnect Salesforce\n• Check the browser console for more details`;
       }
 
       alert(userMessage);
       setSyncing(false);
       setSyncProgress('');
+
+      // Refresh connection status in case it changed
+      await checkSalesforceConnection();
     }
   }
 
