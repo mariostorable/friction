@@ -29,14 +29,14 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
+    // Fetch ALL unprocessed cases (no limit)
     const { data: rawInputs } = await supabase
       .from('raw_inputs')
       .select('*')
       .eq('account_id', accountId)
       .eq('user_id', user.id)
       .eq('processed', false)
-      .order('created_at', { ascending: false })
-      .limit(50);
+      .order('created_at', { ascending: false });
 
     console.log('Found raw inputs:', rawInputs?.length || 0);
 
@@ -52,7 +52,56 @@ export async function POST(request: NextRequest) {
     let apiErrorCount = 0;
     const errors: string[] = [];
 
-    for (const input of rawInputs) {
+    // Helper function: sleep for rate limiting
+    const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+    // Helper function: retry with exponential backoff
+    const callAnthropicWithRetry = async (prompt: string, maxRetries = 5) => {
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': process.env.ANTHROPIC_API_KEY!,
+              'anthropic-version': '2023-06-01',
+            },
+            body: JSON.stringify({
+              model: 'claude-3-haiku-20240307',
+              max_tokens: 500,
+              messages: [{ role: 'user', content: prompt }],
+            }),
+          });
+
+          // If 529 (overloaded) or 429 (rate limit), retry with exponential backoff
+          if (response.status === 529 || response.status === 429) {
+            const waitTime = Math.min(3000 * Math.pow(2, attempt), 60000); // Start at 3s, max 60s
+            console.log(`API busy (${response.status}), waiting ${waitTime/1000}s before retry ${attempt + 1}/${maxRetries}...`);
+            await sleep(waitTime);
+            continue;
+          }
+
+          return response;
+        } catch (error) {
+          const waitTime = Math.min(3000 * Math.pow(2, attempt), 60000);
+          console.error(`Request error on attempt ${attempt + 1}:`, error);
+          if (attempt === maxRetries - 1) {
+            throw new Error(`API overloaded after ${maxRetries} retries. The service is experiencing high demand. Please wait 2-3 minutes and try again.`);
+          }
+          await sleep(waitTime);
+        }
+      }
+      throw new Error(`API overloaded after ${maxRetries} retries. Please try again in a few minutes.`);
+    };
+
+    for (let i = 0; i < rawInputs.length; i++) {
+      const input = rawInputs[i];
+
+      // Log progress every 10 cases
+      if (i % 10 === 0) {
+        console.log(`Processing case ${i + 1}/${rawInputs.length}...`);
+      }
+
       const prompt = `Analyze this support case and respond with ONLY valid JSON (no markdown):
 
 ${input.text_content}
@@ -81,19 +130,8 @@ Return a single JSON object with these fields:
 - root_cause: Your hypothesis about the underlying cause
 - evidence: Array of max 2 short quotes from the case that support your analysis`;
 
-      const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': process.env.ANTHROPIC_API_KEY!,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-3-haiku-20240307',
-          max_tokens: 500,
-          messages: [{ role: 'user', content: prompt }],
-        }),
-      });
+      // Use retry logic for API calls
+      const anthropicResponse = await callAnthropicWithRetry(prompt);
 
       if (!anthropicResponse.ok) {
         apiErrorCount++;
@@ -133,6 +171,9 @@ Return a single JSON object with these fields:
           lifecycle_stage: null,
           is_new_theme: false,
         });
+
+        // Delay between API calls to avoid rate limiting (500ms = ~2 requests/second)
+        await sleep(500);
       } catch (e) {
         parseErrorCount++;
         console.error('Parse error for case:', input.id, e);
