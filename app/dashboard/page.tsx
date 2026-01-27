@@ -158,7 +158,7 @@ export default function Dashboard() {
       if (!response.ok) throw new Error('Sync failed');
 
       const result = await response.json();
-      setSyncProgress(`Step 2/2: Analyzing up to 1 account (100 cases from last 90 days)...`);
+      setSyncProgress(`Step 2/2: Analyzing up to 3 accounts (100 cases from last 90 days)...`);
 
       // Poll for progress
       let attempts = 0;
