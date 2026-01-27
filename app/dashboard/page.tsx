@@ -565,7 +565,7 @@ export default function Dashboard() {
 
             {top25.length > 0 && (
               <PortfolioSummary
-                top25={top25}
+                top25={filterAccountsBySoftware(top25)}
                 singleOperator={[]}
               />
             )}
