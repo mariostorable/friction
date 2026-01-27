@@ -323,7 +323,24 @@ export default function Dashboard() {
 
     } catch (error) {
       console.error('Sync error:', error);
-      alert('Failed to sync with Salesforce. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      // Provide helpful error messages based on common issues
+      let userMessage = 'Failed to sync with Salesforce.\n\n';
+
+      if (errorMessage.includes('401') || errorMessage.includes('unauthorized')) {
+        userMessage += '❌ Authentication Error: Your Salesforce connection may have expired.\n\nPlease go to Settings and reconnect to Salesforce.';
+      } else if (errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT')) {
+        userMessage += '⏱️ Connection Timeout: The request took too long.\n\nThis can happen with large datasets. Please try again.';
+      } else if (errorMessage.includes('network') || errorMessage.includes('ECONNREFUSED')) {
+        userMessage += '🌐 Network Error: Unable to reach Salesforce.\n\nPlease check your internet connection and try again.';
+      } else if (errorMessage.includes('rate limit')) {
+        userMessage += '⚠️ Rate Limit: Too many requests to Salesforce.\n\nPlease wait a few minutes and try again.';
+      } else {
+        userMessage += `Error: ${errorMessage}\n\nIf this persists, please check your Salesforce connection in Settings.`;
+      }
+
+      alert(userMessage);
       setSyncing(false);
       setSyncProgress('');
     }
@@ -501,6 +518,8 @@ export default function Dashboard() {
               className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${
                 syncing
                   ? 'bg-gray-400 text-white cursor-not-allowed'
+                  : totalPortfolioAccounts === 0
+                  ? 'bg-purple-600 text-white hover:bg-purple-700'
                   : accountsAnalyzedToday < totalPortfolioAccounts
                   ? 'bg-purple-600 text-white hover:bg-purple-700'
                   : 'bg-green-600 text-white hover:bg-green-700'
@@ -512,7 +531,13 @@ export default function Dashboard() {
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
               )}
-              {syncing ? 'Syncing Portfolio...' : accountsAnalyzedToday < totalPortfolioAccounts ? 'Sync & Analyze All' : 'All Up to Date ✓'}
+              {syncing
+                ? 'Syncing Portfolio...'
+                : totalPortfolioAccounts === 0
+                ? 'Sync from Salesforce'
+                : accountsAnalyzedToday < totalPortfolioAccounts
+                ? 'Sync & Analyze All'
+                : 'All Up to Date ✓'}
             </button>
             {!syncing && accountsAnalyzedToday < totalPortfolioAccounts && (
               <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
