@@ -82,7 +82,7 @@ export default function AccountDetailPage() {
 
       if (snapshotsData) setSnapshots(snapshotsData);
 
-      // Load friction cards (last 30 days) with raw_inputs for case metadata and source URL
+      // Load ALL friction cards (no date filter for debugging)
       const { data: cardsData, error: cardsError } = await supabase
         .from('friction_cards')
         .select(`
@@ -91,17 +91,26 @@ export default function AccountDetailPage() {
         `)
         .eq('account_id', accountId)
         .eq('user_id', user.id)
-        .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
         .order('created_at', { ascending: false });
+
+      console.log('Friction cards query params:', {
+        account_id: accountId,
+        user_id: user.id,
+        note: 'Loading ALL friction cards (no date filter)'
+      });
 
       if (cardsError) {
         console.error('Error loading friction cards:', cardsError);
+        console.error('Full error details:', JSON.stringify(cardsError, null, 2));
       }
       if (cardsData) {
         console.log(`Loaded ${cardsData.length} friction cards for account`);
+        if (cardsData.length > 0) {
+          console.log('Sample friction card:', cardsData[0]);
+        }
         setFrictionCards(cardsData);
       } else {
-        console.log('No friction cards data returned');
+        console.log('No friction cards data returned (cardsData is null/undefined)');
       }
 
       // Load themes
