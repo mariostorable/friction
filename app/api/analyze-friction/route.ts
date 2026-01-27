@@ -29,14 +29,16 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    // Fetch ALL unprocessed cases (no limit)
+    // Fetch unprocessed cases in batches of 50 to avoid timeouts
+    const BATCH_SIZE = 50;
     const { data: rawInputs } = await supabase
       .from('raw_inputs')
       .select('*')
       .eq('account_id', accountId)
       .eq('user_id', user.id)
       .eq('processed', false)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(BATCH_SIZE);
 
     console.log('Found raw inputs:', rawInputs?.length || 0);
 
@@ -217,10 +219,23 @@ Return a single JSON object with these fields:
       .update({ processed: true })
       .in('id', rawInputs.map(r => r.id));
 
+    // Check if there are more unprocessed cases remaining
+    const { count: remainingCount } = await supabase
+      .from('raw_inputs')
+      .select('*', { count: 'exact', head: true })
+      .eq('account_id', accountId)
+      .eq('user_id', user.id)
+      .eq('processed', false);
+
+    const message = remainingCount && remainingCount > 0
+      ? `Created ${insertedCards?.length} friction cards. ${remainingCount} more cases remaining - click Analyze again to continue.`
+      : `Created ${insertedCards?.length} friction cards. All cases processed!`;
+
     return NextResponse.json({
       success: true,
       analyzed: insertedCards?.length || 0,
-      message: `Created ${insertedCards?.length} friction cards`
+      remaining: remainingCount || 0,
+      message
     });
 
   } catch (error) {

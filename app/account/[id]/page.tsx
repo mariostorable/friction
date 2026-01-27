@@ -395,56 +395,99 @@ export default function AccountDetailPage() {
   }
 
   async function analyzeFriction() {
-    if (!confirm('This will:\n1. Sync Salesforce Cases (last 90 days)\n2. Analyze them with Claude\n3. Calculate OFI score\n\nThis may take 30-60 seconds. Continue?')) {
+    if (!confirm('This will:\n1. Sync Salesforce Cases (last 90 days)\n2. Analyze up to 50 cases with Claude\n3. Calculate OFI score\n\nFor accounts with many cases, you may need to click Analyze multiple times. Continue?')) {
       return;
     }
 
     setAnalyzing(true);
     try {
       // Step 1: Sync Cases
+      console.log('Step 1: Syncing cases...');
       const casesResponse = await fetch('/api/salesforce/sync-cases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accountId }),
       });
 
-      const casesResult = await casesResponse.json();
-      
-      if (!casesResponse.ok) {
-        throw new Error(casesResult.error || 'Failed to sync cases');
+      console.log('Sync cases response status:', casesResponse.status);
+      const casesResponseText = await casesResponse.text();
+      console.log('Sync cases response (first 500 chars):', casesResponseText.substring(0, 500));
+
+      let casesResult;
+      try {
+        casesResult = JSON.parse(casesResponseText);
+      } catch (jsonError) {
+        console.error('Failed to parse sync cases response:', jsonError);
+        throw new Error(`STEP 1 FAILED - Sync Cases API returned invalid JSON. Status: ${casesResponse.status}. Response: ${casesResponseText.substring(0, 300)}`);
       }
 
+      if (!casesResponse.ok) {
+        throw new Error(`STEP 1 FAILED - ${casesResult.error || 'Failed to sync cases'}`);
+      }
+
+      console.log('Step 1 complete:', casesResult);
+
       // Step 2: Analyze with Claude
+      console.log('Step 2: Analyzing friction...');
       const analyzeResponse = await fetch('/api/analyze-friction', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accountId }),
       });
 
-      const analyzeResult = await analyzeResponse.json();
-      
-      if (!analyzeResponse.ok) {
-        throw new Error(analyzeResult.error || 'Failed to analyze friction');
+      console.log('Analyze friction response status:', analyzeResponse.status);
+      const analyzeResponseText = await analyzeResponse.text();
+      console.log('Analyze friction response (first 500 chars):', analyzeResponseText.substring(0, 500));
+
+      let analyzeResult;
+      try {
+        analyzeResult = JSON.parse(analyzeResponseText);
+      } catch (jsonError) {
+        console.error('Failed to parse analyze friction response:', jsonError);
+        throw new Error(`STEP 2 FAILED - Analyze Friction API returned invalid JSON. Status: ${analyzeResponse.status}. Response: ${analyzeResponseText.substring(0, 300)}`);
       }
 
+      if (!analyzeResponse.ok) {
+        throw new Error(`STEP 2 FAILED - ${analyzeResult.error || 'Failed to analyze friction'}`);
+      }
+
+      console.log('Step 2 complete:', analyzeResult);
+
       // Step 3: Calculate OFI
+      console.log('Step 3: Calculating OFI...');
       const ofiResponse = await fetch('/api/calculate-ofi', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accountId }),
       });
 
-      const ofiResult = await ofiResponse.json();
-      
-      if (!ofiResponse.ok) {
-        throw new Error(ofiResult.error || 'Failed to calculate OFI');
+      console.log('Calculate OFI response status:', ofiResponse.status);
+      const ofiResponseText = await ofiResponse.text();
+      console.log('Calculate OFI response (first 500 chars):', ofiResponseText.substring(0, 500));
+
+      let ofiResult;
+      try {
+        ofiResult = JSON.parse(ofiResponseText);
+      } catch (jsonError) {
+        console.error('Failed to parse OFI response:', jsonError);
+        throw new Error(`STEP 3 FAILED - Calculate OFI API returned invalid JSON. Status: ${ofiResponse.status}. Response: ${ofiResponseText.substring(0, 300)}`);
       }
 
-      alert(`✅ Analysis Complete!\n\nSynced: ${casesResult.synced} cases\nAnalyzed: ${analyzeResult.analyzed} friction points\nOFI Score: ${ofiResult.ofi_score}\nHigh Severity: ${ofiResult.high_severity}`);
+      if (!ofiResponse.ok) {
+        throw new Error(`STEP 3 FAILED - ${ofiResult.error || 'Failed to calculate OFI'}`);
+      }
+
+      console.log('Step 3 complete:', ofiResult);
+
+      const remainingMsg = analyzeResult.remaining && analyzeResult.remaining > 0
+        ? `\n\n⚠️ ${analyzeResult.remaining} cases remaining - click Analyze again to continue`
+        : '';
+
+      alert(`✅ Analysis Complete!\n\nSynced: ${casesResult.synced} cases\nAnalyzed: ${analyzeResult.analyzed} friction points\nOFI Score: ${ofiResult.ofi_score}\nHigh Severity: ${ofiResult.high_severity}${remainingMsg}`);
 
       // Force a full page refresh to ensure new data is loaded
       window.location.reload();
-      
+
     } catch (error) {
       console.error('Analysis error:', error);
       let errorMessage = 'Unknown error';
