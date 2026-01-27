@@ -246,7 +246,7 @@ export default function CustomReports({ allAccounts }: CustomReportsProps) {
           </div>
           <button
             onClick={exportToCSV}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             <Download className="w-4 h-4" />
             Export CSV
@@ -311,7 +311,7 @@ export default function CustomReports({ allAccounts }: CustomReportsProps) {
                       }}
                       className={`px-3 py-1 text-sm rounded-full border transition-colors capitalize ${
                         isActive
-                          ? 'bg-purple-100 border-purple-300 text-purple-700'
+                          ? 'bg-blue-100 border-blue-300 text-blue-700'
                           : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
                       }`}
                     >
