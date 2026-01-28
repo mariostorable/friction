@@ -47,15 +47,78 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No tokens found' }, { status: 400 });
     }
 
-    const accountsResponse = await fetch(
-      `${integration.instance_url}/services/data/v59.0/query?q=SELECT+Id,Name,MRR_MVR__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,(SELECT+Id+FROM+Assets)+FROM+Account+WHERE+ParentId=null+AND+MRR_MVR__c>0+ORDER+BY+MRR_MVR__c+DESC+LIMIT+200`,
-      {
-        headers: {
-          'Authorization': `Bearer ${tokens.access_token}`,
-          'Content-Type': 'application/json',
-        },
+    // Helper function to refresh Salesforce token
+    const refreshSalesforceToken = async () => {
+      if (!tokens.refresh_token) {
+        throw new Error('No refresh token available. Please reconnect Salesforce.');
       }
-    );
+
+      console.log('Refreshing Salesforce token...');
+
+      const refreshResponse = await fetch('https://storable.my.salesforce.com/services/oauth2/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: tokens.refresh_token,
+          client_id: process.env.SALESFORCE_CLIENT_ID!,
+          client_secret: process.env.SALESFORCE_CLIENT_SECRET!,
+        }),
+      });
+
+      if (!refreshResponse.ok) {
+        const errorText = await refreshResponse.text();
+        console.error('Token refresh failed:', errorText);
+        throw new Error('Failed to refresh Salesforce token. Please reconnect Salesforce.');
+      }
+
+      const refreshData = await refreshResponse.json();
+      console.log('Token refreshed successfully');
+
+      // Update tokens in database
+      await supabaseAdmin
+        .from('oauth_tokens')
+        .update({
+          access_token: refreshData.access_token,
+          expires_at: new Date(Date.now() + 7200000).toISOString(), // 2 hours from now
+        })
+        .eq('id', tokens.id);
+
+      return refreshData.access_token;
+    };
+
+    // Helper function to fetch accounts from Salesforce
+    const fetchSalesforceAccounts = async (accessToken: string) => {
+      return await fetch(
+        `${integration.instance_url}/services/data/v59.0/query?q=SELECT+Id,Name,MRR_MVR__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,(SELECT+Id+FROM+Assets)+FROM+Account+WHERE+ParentId=null+AND+MRR_MVR__c>0+ORDER+BY+MRR_MVR__c+DESC+LIMIT+200`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+    };
+
+    // Try to fetch accounts, refresh token if expired
+    let accountsResponse = await fetchSalesforceAccounts(tokens.access_token);
+
+    // If 401 Unauthorized, refresh token and retry
+    if (accountsResponse.status === 401) {
+      console.log('Access token expired, refreshing...');
+      try {
+        const newAccessToken = await refreshSalesforceToken();
+        accountsResponse = await fetchSalesforceAccounts(newAccessToken);
+      } catch (refreshError) {
+        return NextResponse.json({
+          error: 'Salesforce token expired',
+          details: refreshError instanceof Error ? refreshError.message : 'Please reconnect Salesforce from Settings',
+          needsReconnect: true
+        }, { status: 401 });
+      }
+    }
 
     if (!accountsResponse.ok) {
       const errorText = await accountsResponse.text();

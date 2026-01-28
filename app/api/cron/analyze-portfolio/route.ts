@@ -135,19 +135,75 @@ export async function GET(request: NextRequest) {
 
           if (!tokens) continue;
 
+          // Helper function to refresh Salesforce token
+          const refreshSalesforceToken = async () => {
+            if (!tokens.refresh_token) {
+              throw new Error('No refresh token available');
+            }
+
+            const refreshResponse = await fetch('https://storable.my.salesforce.com/services/oauth2/token', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: new URLSearchParams({
+                grant_type: 'refresh_token',
+                refresh_token: tokens.refresh_token,
+                client_id: process.env.SALESFORCE_CLIENT_ID!,
+                client_secret: process.env.SALESFORCE_CLIENT_SECRET!,
+              }),
+            });
+
+            if (!refreshResponse.ok) {
+              throw new Error('Failed to refresh Salesforce token');
+            }
+
+            const refreshData = await refreshResponse.json();
+
+            // Update tokens in database
+            await supabase
+              .from('oauth_tokens')
+              .update({
+                access_token: refreshData.access_token,
+                expires_at: new Date(Date.now() + 7200000).toISOString(),
+              })
+              .eq('id', tokens.id);
+
+            return refreshData.access_token;
+          };
+
           // Fetch ALL cases from Salesforce (looking back 90 days, most recent first) - Explicit LIMIT 2000 (Salesforce defaults to 100 without explicit limit)
           const query = `SELECT Id,CaseNumber,Subject,Description,Status,Priority,CreatedDate FROM Case WHERE AccountId='${account.salesforce_id}' AND CreatedDate=LAST_N_DAYS:90 ORDER BY CreatedDate DESC LIMIT 2000`;
           console.log(`Fetching cases for account: ${account.name} (${account.salesforce_id})`);
 
-          const casesResponse = await fetch(
-            `${integration.instance_url}/services/data/v59.0/query?q=${encodeURIComponent(query)}`,
-            {
-              headers: {
-                'Authorization': `Bearer ${tokens.access_token}`,
-                'Content-Type': 'application/json',
-              },
+          // Helper function to fetch cases
+          const fetchCases = async (accessToken: string) => {
+            return await fetch(
+              `${integration.instance_url}/services/data/v59.0/query?q=${encodeURIComponent(query)}`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json',
+                },
+              }
+            );
+          };
+
+          // Try to fetch cases, refresh token if expired
+          let casesResponse = await fetchCases(tokens.access_token);
+
+          // If 401 Unauthorized, refresh token and retry
+          if (casesResponse.status === 401) {
+            console.log(`Access token expired for ${account.name}, refreshing...`);
+            try {
+              const newAccessToken = await refreshSalesforceToken();
+              casesResponse = await fetchCases(newAccessToken);
+            } catch (refreshError) {
+              console.error(`Failed to refresh token for ${account.name}:`, refreshError);
+              results.push({ accountId, account: account.name, status: 'failed', error: 'Token refresh failed' });
+              continue;
             }
-          );
+          }
 
           if (!casesResponse.ok) {
             console.error(`Failed to fetch cases for ${account.name}:`, casesResponse.status);
