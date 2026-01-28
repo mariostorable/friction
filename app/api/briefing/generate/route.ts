@@ -129,7 +129,8 @@ function generateQuickBriefingPrompt(account: any, snapshot: any, frictionCards:
 ACCOUNT INFORMATION:
 - Name: ${account.name}
 - ARR: $${account.arr?.toLocaleString() || 'Unknown'}
-- Vertical: ${account.vertical || 'Unknown'}
+- Products: ${account.products || 'Unknown'}
+- Business Unit: ${account.vertical || 'Unknown'}
 - Segment: ${account.segment || 'Unknown'}
 - Customer Since: ${account.customer_since || 'Unknown'}
 - OFI Score: ${ofiScore.toFixed(0)} ${trendText} (${trend > 0 ? '+' : ''}${trend.toFixed(0)}%)
@@ -156,7 +157,8 @@ Generate a JSON object for a QUICK customer visit briefing (2-3 minute read):
   "account_name": "${account.name}",
   "visit_date": "${new Date().toISOString().split('T')[0]}",
   "arr": "$${account.arr?.toLocaleString() || 'Unknown'}",
-  "vertical": "${account.vertical || 'Unknown'}",
+  "products": "${account.products || 'Unknown'}",
+  "business_unit": "${account.vertical || 'Unknown'}",
   "segment": "${account.segment || 'Unknown'}",
   "ofi_score": ${ofiScore.toFixed(0)},
   "trend": "${trendText}",

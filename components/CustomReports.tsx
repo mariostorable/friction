@@ -52,16 +52,17 @@ export default function CustomReports({ allAccounts }: CustomReportsProps) {
   // Transform accounts data for the table
   const data = useMemo<AccountRow[]>(() => {
     return allAccounts.map(account => {
-      // Extract product from vertical
+      // Extract product from products field
       let product = 'Other';
-      if (account.vertical?.includes('EDGE')) product = 'EDGE';
-      else if (account.vertical?.includes('SiteLink')) product = 'SiteLink';
+      if (account.products?.includes('EDGE')) product = 'EDGE';
+      else if (account.products?.includes('SiteLink')) product = 'SiteLink';
 
       return {
         id: account.id,
         name: account.name,
         arr: account.arr,
         vertical: account.vertical,
+        products: account.products,
         segment: account.segment,
         ofi_score: account.current_snapshot?.ofi_score ?? null,
         case_volume: account.current_snapshot?.case_volume ?? null,

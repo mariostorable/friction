@@ -244,10 +244,10 @@ export function groupAccountsByProduct(
   };
 
   accounts.forEach(account => {
-    const vertical = account.vertical?.toLowerCase() || '';
-    if (vertical.includes('edge')) {
+    const products = account.products?.toLowerCase() || '';
+    if (products.includes('edge')) {
       groups.edge.push(account);
-    } else if (vertical.includes('sitelink')) {
+    } else if (products.includes('sitelink')) {
       groups.sitelink.push(account);
     } else {
       groups.other.push(account);

@@ -231,7 +231,7 @@ export default function PortfolioSummary({ top25, singleOperator }: PortfolioSum
                     <div className="flex-1">
                       <h3 className="font-semibold text-gray-900">{account.name}</h3>
                       <p className="text-sm text-gray-600 mt-1">
-                        ${(account.arr || 0).toLocaleString()} ARR • {account.vertical}
+                        ${(account.arr || 0).toLocaleString()} ARR • {account.products || 'N/A'}
                       </p>
                     </div>
                     <div className="text-right ml-4">

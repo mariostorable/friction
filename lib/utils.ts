@@ -1,17 +1,17 @@
 /**
- * Extracts the product type (EDGE vs SiteLink) from the account vertical field.
- * The vertical field stores product information as a string like "Software (EDGE)" or "Software (SiteLink)".
+ * Extracts the product type (EDGE vs SiteLink) from the account products field.
+ * The products field stores product information as a string like "Software (EDGE)" or "Software (SiteLink)".
  *
- * @param vertical - The account vertical string
+ * @param products - The account products string
  * @returns Product type: 'EDGE', 'SiteLink', or 'Other'
  */
-export function extractProductType(vertical: string | null): 'EDGE' | 'SiteLink' | 'Other' {
-  if (!vertical) return 'Other';
+export function extractProductType(products: string | null): 'EDGE' | 'SiteLink' | 'Other' {
+  if (!products) return 'Other';
 
-  const upperVertical = vertical.toUpperCase();
+  const upperProducts = products.toUpperCase();
 
-  if (upperVertical.includes('EDGE')) return 'EDGE';
-  if (upperVertical.includes('SITELINK')) return 'SiteLink';
+  if (upperProducts.includes('EDGE')) return 'EDGE';
+  if (upperProducts.includes('SITELINK')) return 'SiteLink';
 
   return 'Other';
 }

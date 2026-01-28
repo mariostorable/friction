@@ -41,10 +41,10 @@ export default function AccountCard({ account }: AccountCardProps) {
           <h3 className="font-semibold text-gray-900 mb-1">{account.name}</h3>
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <span>{mrr ? `$${mrr.toLocaleString()}/mo` : 'No MRR'}</span>
-            {account.vertical && (
+            {account.products && (
               <>
                 <span>•</span>
-                <span>{account.vertical}</span>
+                <span>{account.products}</span>
               </>
             )}
           </div>

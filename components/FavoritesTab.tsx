@@ -143,7 +143,7 @@ export default function FavoritesTab({ favorites, onUpdate }: FavoritesTabProps)
                         <p className="font-semibold text-gray-900">{account.name}</p>
                         <p className="text-sm text-gray-600">
                           ${Math.round((account.arr || 0) / 12).toLocaleString()}/mo
-                          {account.vertical && ` • ${account.vertical}`}
+                          {account.products && ` • ${account.products}`}
                         </p>
                       </div>
                       <Star className="w-5 h-5 text-gray-400" />

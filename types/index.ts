@@ -27,11 +27,16 @@ export interface Account {
   salesforce_id: string;
   name: string;
   arr: number | null;
-  vertical: 'storage' | 'marine' | 'rv' | null;
+  vertical: 'storage' | 'marine' | 'rv' | null; // Business unit (from Salesforce Industry)
+  products: string | null; // Product list (e.g., "Software (EDGE), Marketplace (SpareFoot)")
   segment: 'smb' | 'mid_market' | 'enterprise' | null;
   customer_since: string | null;
   owner_name: string | null;
   owner_email: string | null;
+  facility_count: number | null;
+  service_level: string | null;
+  managed_account: boolean | null;
+  cs_segment: string | null;
   status: 'active' | 'cancelled' | 'churned' | 'prospect';
   metadata: Record<string, any>;
   last_synced_at: string;

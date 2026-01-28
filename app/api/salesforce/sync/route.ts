@@ -131,6 +131,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'No accounts found', synced: 0 });
     }
 
+    // Helper function to map Salesforce Industry to business unit
+    const mapIndustryToVertical = (industry: string | null): 'storage' | 'marine' | 'rv' | null => {
+      if (!industry) return null;
+      const industryLower = industry.toLowerCase();
+
+      if (industryLower.includes('storage') || industryLower.includes('self storage')) {
+        return 'storage';
+      }
+      if (industryLower.includes('marine') || industryLower.includes('marina')) {
+        return 'marine';
+      }
+      if (industryLower.includes('rv') || industryLower.includes('recreational vehicle')) {
+        return 'rv';
+      }
+
+      // Default to storage if unclear
+      return 'storage';
+    };
+
     // Don't delete accounts - upsert to preserve friction data
     const accountsToUpsert = accountsData.records.map((sfAccount: any) => {
       const products = [];
@@ -167,7 +186,8 @@ export async function POST(request: NextRequest) {
         salesforce_id: sfAccount.Id,
         name: sfAccount.Name,
         arr: sfAccount.MRR_MVR__c ? sfAccount.MRR_MVR__c * 12 : null,
-        vertical: products.length > 0 ? products.join(', ') : null,
+        vertical: mapIndustryToVertical(sfAccount.Industry),
+        products: products.length > 0 ? products.join(', ') : null,
         segment: sfAccount.Type || null,
         owner_name: sfAccount.Owner?.Name || null,
         customer_since: sfAccount.CreatedDate || null,
@@ -175,6 +195,9 @@ export async function POST(request: NextRequest) {
         service_level: sfAccount.LevelOfService__c || null,
         managed_account: sfAccount.Managed_Account__c || null,
         cs_segment: sfAccount.VitallyClient_Success_Tier__c || null,
+        metadata: {
+          industry: sfAccount.Industry
+        },
         // Don't set status here - preserve existing status on update, default to 'active' via column default on insert
       };
     });

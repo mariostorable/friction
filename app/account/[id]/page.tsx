@@ -328,7 +328,8 @@ export default function AccountDetailPage() {
     rows.push(['Friction Intelligence Export']);
     rows.push(['Account:', account.name]);
     rows.push(['ARR:', `$${account.arr?.toLocaleString() || 'N/A'}`]);
-    rows.push(['Vertical:', account.vertical || 'N/A']);
+    rows.push(['Products:', account.products || 'N/A']);
+    rows.push(['Business Unit:', account.vertical || 'N/A']);
     rows.push(['Segment:', account.segment || 'N/A']);
     rows.push(['Customer Since:', account.customer_since ? new Date(account.customer_since).getFullYear() : 'N/A']);
     rows.push(['']);
@@ -579,7 +580,7 @@ export default function AccountDetailPage() {
                   {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(account.arr || 0)} ARR
                 </span>
                 <span>•</span>
-                <span>{account.vertical?.toUpperCase() || 'N/A'}</span>
+                <span>{account.products?.toUpperCase() || 'N/A'}</span>
                 <span>•</span>
                 <span>{account.segment?.replace('_', ' ').toUpperCase() || 'N/A'}</span>
                 {account.customer_since && (
@@ -740,8 +741,8 @@ export default function AccountDetailPage() {
             currentAccount={{
               name: account.name,
               caseVolume: caseVolumeMetrics.current,
-              product: account.vertical?.includes('EDGE') ? 'EDGE' :
-                       account.vertical?.includes('SiteLink') ? 'SiteLink' : 'Other'
+              product: account.products?.includes('EDGE') ? 'EDGE' :
+                       account.products?.includes('SiteLink') ? 'SiteLink' : 'Other'
             }}
             peers={peerAccounts}
           />

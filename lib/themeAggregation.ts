@@ -31,7 +31,7 @@ export function aggregateThemesByProduct(
   // Filter accounts by product type
   const filteredAccounts = productFilter === 'All'
     ? accounts
-    : accounts.filter(account => extractProductType(account.vertical) === productFilter);
+    : accounts.filter(account => extractProductType(account.products) === productFilter);
 
   // Map to collect all themes from all accounts
   const themeMap = new Map<string, {
@@ -152,7 +152,7 @@ export function getTotalIssueCount(themes: ThemeWithAccounts[]): number {
 export function getAffectedAccountCount(accounts: AccountWithMetrics[], productFilter: ProductFilter): number {
   const filteredAccounts = productFilter === 'All'
     ? accounts
-    : accounts.filter(account => extractProductType(account.vertical) === productFilter);
+    : accounts.filter(account => extractProductType(account.products) === productFilter);
 
   return filteredAccounts.filter(account =>
     account.current_snapshot?.top_themes &&

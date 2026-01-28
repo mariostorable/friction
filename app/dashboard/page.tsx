@@ -494,12 +494,12 @@ export default function Dashboard() {
 
   // Determine primary software provider for an account
   const getPrimarySoftware = (account: AccountWithMetrics): 'EDGE' | 'SiteLink' | 'N/A' => {
-    const vertical = account.vertical || '';
+    const products = account.products || '';
 
-    const hasEDGE = vertical.includes('EDGE') || vertical.includes('Storable Edge');
-    const hasSiteLink = vertical.includes('SiteLink');
+    const hasEDGE = products.includes('EDGE') || products.includes('Storable Edge');
+    const hasSiteLink = products.includes('SiteLink');
 
-    // If both are in the vertical string, prioritize EDGE (Storable's newer platform)
+    // If both are in the products string, prioritize EDGE (Storable's newer platform)
     if (hasEDGE && hasSiteLink) {
       return 'EDGE';
     }
