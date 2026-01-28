@@ -215,6 +215,27 @@ export async function GET(request: NextRequest) {
           console.log(`Found ${casesData.records?.length || 0} cases for ${account.name}`);
 
           if (!casesData.records || casesData.records.length === 0) {
+            // Get previous snapshot to calculate trend (even for zero cases)
+            const { data: previousSnapshot } = await supabase
+              .from('account_snapshots')
+              .select('ofi_score')
+              .eq('account_id', accountId)
+              .order('snapshot_date', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            let trendVsPriorPeriod = null;
+            let trendDirection: 'improving' | 'stable' | 'worsening' = 'stable';
+
+            if (previousSnapshot && previousSnapshot.ofi_score !== null) {
+              trendVsPriorPeriod = 0 - previousSnapshot.ofi_score;
+              if (trendVsPriorPeriod < -5) {
+                trendDirection = 'improving'; // Was higher, now 0 = improving
+              } else if (Math.abs(trendVsPriorPeriod) <= 5) {
+                trendDirection = 'stable';
+              }
+            }
+
             // Create snapshot with OFI 0 for accounts with no cases
             const { error: snapshotError } = await supabase.from('account_snapshots').insert({
               account_id: accountId,
@@ -223,6 +244,17 @@ export async function GET(request: NextRequest) {
               friction_card_count: 0,
               high_severity_count: 0,
               case_volume: 0,
+              top_themes: [],
+              score_breakdown: {
+                base_score: 0,
+                friction_density: 0,
+                density_multiplier: 0,
+                high_severity_boost: 0,
+                severity_weighted: 0,
+                card_count: 0
+              },
+              trend_vs_prior_period: trendVsPriorPeriod,
+              trend_direction: trendDirection
             });
 
             if (snapshotError) {
@@ -412,7 +444,50 @@ Return ONLY the JSON object, nothing else.`;
               finalOfiScore: ofiScore
             });
 
-            console.log(`Creating snapshot for ${account.name}: OFI ${ofiScore}, ${frictionCards.length} cards`);
+            // Calculate top themes from friction cards
+            const themeMap = new Map<string, { count: number, totalSeverity: number }>();
+            frictionCards.forEach(card => {
+              const existing = themeMap.get(card.theme_key) || { count: 0, totalSeverity: 0 };
+              existing.count++;
+              existing.totalSeverity += card.severity;
+              themeMap.set(card.theme_key, existing);
+            });
+
+            const topThemes = Array.from(themeMap.entries())
+              .map(([theme_key, data]) => ({
+                theme_key,
+                count: data.count,
+                avg_severity: data.totalSeverity / data.count
+              }))
+              .sort((a, b) => b.count - a.count)
+              .slice(0, 5); // Top 5 themes
+
+            // Get previous snapshot to calculate trend
+            const { data: previousSnapshot } = await supabase
+              .from('account_snapshots')
+              .select('ofi_score, snapshot_date')
+              .eq('account_id', accountId)
+              .order('snapshot_date', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            let trendVsPriorPeriod = null;
+            let trendDirection: 'improving' | 'stable' | 'worsening' = 'stable';
+
+            if (previousSnapshot && previousSnapshot.ofi_score !== null) {
+              trendVsPriorPeriod = ofiScore - previousSnapshot.ofi_score;
+
+              // Determine trend direction (threshold: ±5 points)
+              if (trendVsPriorPeriod > 5) {
+                trendDirection = 'worsening'; // Score going up = more friction = worse
+              } else if (trendVsPriorPeriod < -5) {
+                trendDirection = 'improving'; // Score going down = less friction = better
+              } else {
+                trendDirection = 'stable';
+              }
+            }
+
+            console.log(`Creating snapshot for ${account.name}: OFI ${ofiScore}, ${frictionCards.length} cards, trend: ${trendDirection}`);
 
             const { error: snapshotError } = await supabase.from('account_snapshots').insert({
               account_id: accountId,
@@ -421,6 +496,17 @@ Return ONLY the JSON object, nothing else.`;
               friction_card_count: frictionCards.length,
               high_severity_count: frictionCards.filter(c => c.severity >= 4).length,
               case_volume: casesData.records.length,
+              top_themes: topThemes,
+              score_breakdown: {
+                base_score: Math.round(baseScore * 10) / 10,
+                friction_density: Math.round(frictionDensity * 10) / 10,
+                density_multiplier: Math.round(densityMultiplier * 100) / 100,
+                high_severity_boost: highSeverityBoost,
+                severity_weighted: weightedScore,
+                card_count: frictionCards.length
+              },
+              trend_vs_prior_period: trendVsPriorPeriod,
+              trend_direction: trendDirection
             }).select();
 
             if (snapshotError) {
