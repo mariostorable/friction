@@ -19,6 +19,7 @@ export default function Dashboard() {
   const [accountsAnalyzedToday, setAccountsAnalyzedToday] = useState(0);
   const [totalPortfolioAccounts, setTotalPortfolioAccounts] = useState(0);
   const [portfolioCaseVolumeAvg, setPortfolioCaseVolumeAvg] = useState(0);
+  const [portfolioCasesPerFacilityAvg, setPortfolioCasesPerFacilityAvg] = useState(0);
   const [activeTab, setActiveTab] = useState<'portfolios' | 'favorites' | 'reports' | 'themes'>('portfolios');
   const [analyzedAccountNames, setAnalyzedAccountNames] = useState<string[]>([]);
   const [pendingAccountNames, setPendingAccountNames] = useState<string[]>([]);
@@ -139,6 +140,17 @@ export default function Dashboard() {
           if (allSnapshots && allSnapshots.length > 0) {
             const avgVolume = allSnapshots.reduce((sum, s) => sum + (s.case_volume || 0), 0) / allSnapshots.length;
             setPortfolioCaseVolumeAvg(avgVolume);
+          }
+
+          // Calculate portfolio-wide cases per facility average
+          const accountsWithFacilities = accountsWithSnapshot.filter(a => a.facility_count && a.facility_count > 0 && a.current_snapshot?.case_volume !== undefined);
+          if (accountsWithFacilities.length > 0) {
+            const totalCasesPerFacility = accountsWithFacilities.reduce((sum, a) => {
+              const casesPerFacility = (a.current_snapshot?.case_volume || 0) / (a.facility_count || 1);
+              return sum + casesPerFacility;
+            }, 0);
+            const avgCasesPerFacility = totalCasesPerFacility / accountsWithFacilities.length;
+            setPortfolioCasesPerFacilityAvg(avgCasesPerFacility);
           }
 
           // Fetch active alert counts for each account
@@ -885,6 +897,21 @@ export default function Dashboard() {
                           </div>
                         )}
                       </th>
+                      <th
+                        onMouseEnter={() => setHoveredColumn('cases_per_facility')}
+                        onMouseLeave={() => setHoveredColumn(null)}
+                        className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider relative"
+                      >
+                        <div className="flex items-center gap-1">
+                          Per Location
+                        </div>
+                        {hoveredColumn === 'cases_per_facility' && (
+                          <div className="absolute left-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 z-50 whitespace-normal normal-case font-normal">
+                            Average cases per facility location. Normalizes case volume across different-sized accounts. Anything above the portfolio average may indicate friction.
+                            <div className="absolute -top-1 left-6 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                          </div>
+                        )}
+                      </th>
                       <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trend</th>
                       <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Analyzed</th>
                     </tr>
@@ -956,6 +983,35 @@ export default function Dashboard() {
                                 </div>
                               )}
                             </div>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 whitespace-nowrap text-sm">
+                          {account.current_snapshot?.case_volume !== undefined && account.facility_count && account.facility_count > 0 ? (
+                            <div className="flex items-center gap-1">
+                              <span className="text-gray-900 font-medium">
+                                {(account.current_snapshot.case_volume / account.facility_count).toFixed(1)}
+                              </span>
+                              <span className="text-xs text-gray-500">({account.facility_count} loc)</span>
+                              {portfolioCasesPerFacilityAvg > 0 && (account.current_snapshot.case_volume / account.facility_count) > portfolioCasesPerFacilityAvg * 1.3 && (
+                                <div
+                                  className="relative inline-block"
+                                  onMouseEnter={() => setHoveredCaseIcon(`per-facility-high-${account.id}`)}
+                                  onMouseLeave={() => setHoveredCaseIcon(null)}
+                                >
+                                  <span className="text-xs text-orange-600 font-medium cursor-help">⚠️</span>
+                                  {hoveredCaseIcon === `per-facility-high-${account.id}` && (
+                                    <div className="absolute left-0 top-full mt-1 w-64 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 z-50 whitespace-normal">
+                                      Above normal: 30%+ above portfolio average ({portfolioCasesPerFacilityAvg.toFixed(1)} cases/location). May indicate friction.
+                                      <div className="absolute -top-1 left-3 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ) : account.facility_count === 0 ? (
+                            <span className="text-xs text-gray-400">No facilities</span>
                           ) : (
                             <span className="text-gray-400">-</span>
                           )}
