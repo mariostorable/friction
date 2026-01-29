@@ -471,7 +471,7 @@ export default function Dashboard() {
   const sortAccounts = (accounts: AccountWithMetrics[]) => {
     return accounts.sort((a, b) => {
       let aVal, bVal;
-      
+
       switch(sortField) {
         case 'name':
           aVal = a.name.toLowerCase();
@@ -481,6 +481,10 @@ export default function Dashboard() {
           aVal = a.arr || 0;
           bVal = b.arr || 0;
           break;
+        case 'software':
+          aVal = getPrimarySoftware(a);
+          bVal = getPrimarySoftware(b);
+          break;
         case 'ofi':
           aVal = a.current_snapshot?.ofi_score || 0;
           bVal = b.current_snapshot?.ofi_score || 0;
@@ -489,10 +493,28 @@ export default function Dashboard() {
           aVal = a.current_snapshot?.case_volume || 0;
           bVal = b.current_snapshot?.case_volume || 0;
           break;
+        case 'cases_per_facility':
+          aVal = (a.current_snapshot?.case_volume && a.facility_count && a.facility_count > 0)
+            ? (a.current_snapshot.case_volume / a.facility_count)
+            : 0;
+          bVal = (b.current_snapshot?.case_volume && b.facility_count && b.facility_count > 0)
+            ? (b.current_snapshot.case_volume / b.facility_count)
+            : 0;
+          break;
+        case 'trend':
+          // Sort by trend direction: worsening > stable > improving > none
+          const trendOrder = { 'worsening': 3, 'stable': 2, 'improving': 1, '': 0 };
+          aVal = trendOrder[a.current_snapshot?.trend_direction as keyof typeof trendOrder] || 0;
+          bVal = trendOrder[b.current_snapshot?.trend_direction as keyof typeof trendOrder] || 0;
+          break;
+        case 'last_analyzed':
+          aVal = a.current_snapshot?.created_at ? new Date(a.current_snapshot.created_at).getTime() : 0;
+          bVal = b.current_snapshot?.created_at ? new Date(b.current_snapshot.created_at).getTime() : 0;
+          break;
         default:
           return 0;
       }
-      
+
       if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
       if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
       return 0;
@@ -877,7 +899,9 @@ export default function Dashboard() {
                       <th onClick={() => handleSort('arr')} className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
                         ARR {getSortIcon('arr')}
                       </th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Software</th>
+                      <th onClick={() => handleSort('software')} className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
+                        Software {getSortIcon('software')}
+                      </th>
                       <th onClick={() => handleSort('ofi')} className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
                         OFI Score {getSortIcon('ofi')}
                       </th>
@@ -898,22 +922,27 @@ export default function Dashboard() {
                         )}
                       </th>
                       <th
+                        onClick={() => handleSort('cases_per_facility')}
                         onMouseEnter={() => setHoveredColumn('cases_per_facility')}
                         onMouseLeave={() => setHoveredColumn(null)}
-                        className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider relative"
+                        className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 relative"
                       >
                         <div className="flex items-center gap-1">
-                          Per Location
+                          Per Location (90d) {getSortIcon('cases_per_facility')}
                         </div>
                         {hoveredColumn === 'cases_per_facility' && (
                           <div className="absolute left-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 z-50 whitespace-normal normal-case font-normal">
-                            Average cases per facility location. Normalizes case volume across different-sized accounts. Anything above the portfolio average may indicate friction.
+                            Average cases per facility location over 90 days. Normalizes case volume across different-sized accounts. Anything above the portfolio average may indicate friction.
                             <div className="absolute -top-1 left-6 w-2 h-2 bg-gray-900 transform rotate-45"></div>
                           </div>
                         )}
                       </th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trend</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Analyzed</th>
+                      <th onClick={() => handleSort('trend')} className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
+                        Trend {getSortIcon('trend')}
+                      </th>
+                      <th onClick={() => handleSort('last_analyzed')} className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
+                        Last Analyzed {getSortIcon('last_analyzed')}
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
