@@ -29,8 +29,8 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    // Fetch unprocessed cases in batches of 100 to avoid timeouts
-    const BATCH_SIZE = 100;
+    // Fetch unprocessed cases in batches of 20 to avoid Vercel timeouts (10s limit on free tier)
+    const BATCH_SIZE = 20;
     const { data: rawInputs } = await supabase
       .from('raw_inputs')
       .select('*')
@@ -180,8 +180,8 @@ Return a single JSON object with these fields:
           is_new_theme: false,
         });
 
-        // Delay between API calls to avoid rate limiting (500ms = ~2 requests/second)
-        await sleep(500);
+        // Delay between API calls to avoid rate limiting (300ms = ~3 requests/second)
+        await sleep(300);
       } catch (e) {
         parseErrorCount++;
         console.error('Parse error for case:', input.id, e);
