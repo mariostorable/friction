@@ -22,6 +22,7 @@ import CaseVolumeCard from '@/components/CaseVolumeCard';
 import CaseOriginsAlert from '@/components/CaseOriginsAlert';
 import PeerCaseComparison from '@/components/PeerCaseComparison';
 import FrictionClusters from '@/components/FrictionClusters';
+import AnalysisResultModal from '@/components/AnalysisResultModal';
 
 export default function AccountDetailPage() {
   const params = useParams();
@@ -45,6 +46,13 @@ export default function AccountDetailPage() {
   });
   const [caseOrigins, setCaseOrigins] = useState<any[]>([]);
   const [peerAccounts, setPeerAccounts] = useState<any[]>([]);
+  const [analysisResult, setAnalysisResult] = useState<{
+    synced: number;
+    analyzed: number;
+    ofiScore: number;
+    highSeverity: number;
+    remaining?: number;
+  } | null>(null);
 
   const supabase = createClientComponentClient();
 
@@ -480,14 +488,14 @@ export default function AccountDetailPage() {
 
       console.log('Step 3 complete:', ofiResult);
 
-      const remainingMsg = analyzeResult.remaining && analyzeResult.remaining > 0
-        ? `\n\n⚠️ ${analyzeResult.remaining} cases remaining - click Analyze again to continue`
-        : '';
-
-      alert(`✅ Analysis Complete!\n\nSynced: ${casesResult.synced} cases\nAnalyzed: ${analyzeResult.analyzed} friction points\nOFI Score: ${ofiResult.ofi_score}\nHigh Severity: ${ofiResult.high_severity}${remainingMsg}`);
-
-      // Force a full page refresh to ensure new data is loaded
-      window.location.reload();
+      // Show modal instead of alert
+      setAnalysisResult({
+        synced: casesResult.synced,
+        analyzed: analyzeResult.analyzed,
+        ofiScore: ofiResult.ofi_score,
+        highSeverity: ofiResult.high_severity,
+        remaining: analyzeResult.remaining
+      });
 
     } catch (error) {
       console.error('Analysis error:', error);
@@ -812,6 +820,20 @@ export default function AccountDetailPage() {
           themes={themes}
         />
       </main>
+
+      {/* Analysis Result Modal */}
+      <AnalysisResultModal
+        isOpen={analysisResult !== null}
+        onClose={() => {
+          setAnalysisResult(null);
+          window.location.reload();
+        }}
+        synced={analysisResult?.synced || 0}
+        analyzed={analysisResult?.analyzed || 0}
+        ofiScore={analysisResult?.ofiScore || 0}
+        highSeverity={analysisResult?.highSeverity || 0}
+        remaining={analysisResult?.remaining}
+      />
     </div>
   );
 }
