@@ -1,5 +1,5 @@
 -- ================================================================
--- Setup pg_cron to call the Vercel analyze endpoint every 20 minutes
+-- Setup pg_cron to call the Vercel analyze endpoint every 10 minutes
 -- Run this in Supabase SQL Editor
 -- ================================================================
 
@@ -8,14 +8,15 @@ CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_net;
 
 -- Remove any existing jobs with this name to avoid duplicates
-SELECT cron.unschedule('analyze-portfolio-every-20min');
+SELECT cron.unschedule('analyze-portfolio-every-10min');
+SELECT cron.unschedule('analyze-portfolio-every-20min'); -- Remove old job if exists
 
--- Create a cron job that runs every 20 minutes
+-- Create a cron job that runs every 10 minutes
 -- This will call your Vercel endpoint which processes 3 accounts per run
--- With 17 pending accounts, this will complete in about 2 hours
+-- With 34 accounts, this will complete all in about 2 hours
 SELECT cron.schedule(
-  'analyze-portfolio-every-20min',     -- Job name
-  '*/20 * * * *',                       -- Run every 20 minutes
+  'analyze-portfolio-every-10min',     -- Job name
+  '*/10 * * * *',                       -- Run every 10 minutes
   $$
   SELECT
     net.http_get(
@@ -59,4 +60,4 @@ LIMIT 20;
 -- );
 
 -- To remove the job (if needed):
--- SELECT cron.unschedule('analyze-portfolio-every-20min');
+-- SELECT cron.unschedule('analyze-portfolio-every-10min');
