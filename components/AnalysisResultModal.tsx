@@ -6,6 +6,8 @@ import { useState } from 'react';
 interface AnalysisResultModalProps {
   isOpen: boolean;
   onClose: () => void;
+  accountName: string;
+  accountId: string;
   synced: number;
   analyzed: number;
   ofiScore: number;
@@ -16,6 +18,8 @@ interface AnalysisResultModalProps {
 export default function AnalysisResultModal({
   isOpen,
   onClose,
+  accountName,
+  accountId,
   synced,
   analyzed,
   ofiScore,
@@ -27,6 +31,9 @@ export default function AnalysisResultModal({
   if (!isOpen) return null;
 
   const resultText = `✅ Analysis Complete!
+
+Account: ${accountName}
+Account ID: ${accountId}
 
 Synced: ${synced} cases
 Analyzed: ${analyzed} friction points
@@ -58,6 +65,15 @@ High Severity: ${highSeverity}${remaining ? `\n\n⚠️ ${remaining} cases remai
 
         {/* Content - User can select text here */}
         <div className="p-6">
+          {/* Account Info */}
+          <div className="mb-4 pb-4 border-b border-gray-200 select-text">
+            <div className="text-sm">
+              <div className="font-semibold text-gray-900 mb-1">{accountName}</div>
+              <div className="text-xs text-gray-500 font-mono">{accountId}</div>
+            </div>
+          </div>
+
+          {/* Results */}
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 select-text">
             <div className="space-y-2 text-sm font-mono">
               <div className="flex justify-between">

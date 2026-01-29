@@ -828,6 +828,8 @@ export default function AccountDetailPage() {
           setAnalysisResult(null);
           window.location.reload();
         }}
+        accountName={account?.name || 'Unknown Account'}
+        accountId={accountId}
         synced={analysisResult?.synced || 0}
         analyzed={analysisResult?.analyzed || 0}
         ofiScore={analysisResult?.ofiScore || 0}
