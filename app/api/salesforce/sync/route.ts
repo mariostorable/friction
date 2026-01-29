@@ -131,18 +131,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'No accounts found', synced: 0 });
     }
 
-    // Helper function to map Salesforce Industry to business unit
-    const mapIndustryToVertical = (industry: string | null): 'storage' | 'marine' | 'rv' | null => {
-      if (!industry) return null;
-      const industryLower = industry.toLowerCase();
+    // Helper function to map Salesforce Type to business unit
+    const mapTypeToVertical = (type: string | null): 'storage' | 'marine' | 'rv' | null => {
+      if (!type) return null;
+      const typeLower = type.toLowerCase();
 
-      if (industryLower.includes('storage') || industryLower.includes('self storage')) {
-        return 'storage';
-      }
-      if (industryLower.includes('marine') || industryLower.includes('marina')) {
+      if (typeLower.includes('marine') || typeLower.includes('marina')) {
         return 'marine';
       }
-      if (industryLower.includes('rv') || industryLower.includes('recreational vehicle')) {
+      if (typeLower.includes('storage') || typeLower.includes('self storage')) {
+        return 'storage';
+      }
+      if (typeLower.includes('rv') || typeLower.includes('recreational vehicle')) {
         return 'rv';
       }
 
@@ -152,21 +152,40 @@ export async function POST(request: NextRequest) {
 
     // Don't delete accounts - upsert to preserve friction data
     const accountsToUpsert = accountsData.records.map((sfAccount: any) => {
+      const businessUnit = mapTypeToVertical(sfAccount.Type);
       const products = [];
 
-      // Product detection based on specific ID fields (most reliable)
-      if (sfAccount.Corp_Code__c) products.push('Software (SiteLink)');
-      if (sfAccount.SE_Company_UUID__c) products.push('Software (EDGE)');
-      if (sfAccount.SpareFoot_Client_Key__c) products.push('Marketplace (SpareFoot)');
-      if (sfAccount.Insurance_ZCRM_ID__c) products.push('Insurance');
+      // Product detection based on business unit and specific ID fields
+      // Storage products
+      if (businessUnit === 'storage') {
+        if (sfAccount.Corp_Code__c) products.push('Software (SiteLink)');
+        if (sfAccount.SE_Company_UUID__c) products.push('Software (EDGE)');
+        if (sfAccount.SpareFoot_Client_Key__c) products.push('Marketplace (SpareFoot)');
+        if (sfAccount.Insurance_ZCRM_ID__c) products.push('Insurance');
 
-      // Also check legacy fields to catch additional products
-      // (Don't skip if ID fields already found - accounts can have multiple products)
-      if (sfAccount.Current_FMS__c && !products.some(p => p.includes(sfAccount.Current_FMS__c))) {
-        products.push(`Software (${sfAccount.Current_FMS__c})`);
+        // Legacy fields for storage
+        if (sfAccount.Current_FMS__c && !products.some(p => p.includes(sfAccount.Current_FMS__c))) {
+          products.push(`Software (${sfAccount.Current_FMS__c})`);
+        }
+        if (sfAccount.Online_Listing_Service__c && !products.some(p => p.includes('Marketplace'))) {
+          products.push(`Marketplace (${sfAccount.Online_Listing_Service__c})`);
+        }
       }
-      if (sfAccount.Online_Listing_Service__c && !products.some(p => p.includes('Marketplace'))) {
-        products.push(`Marketplace (${sfAccount.Online_Listing_Service__c})`);
+
+      // Marine products - check Current_FMS__c for Molo or other marine software
+      if (businessUnit === 'marine') {
+        if (sfAccount.Current_FMS__c) {
+          products.push(`Software (${sfAccount.Current_FMS__c})`);
+        }
+        // Add marine marketplace if they have one
+        if (sfAccount.Online_Listing_Service__c) {
+          products.push(`Marketplace (${sfAccount.Online_Listing_Service__c})`);
+        }
+      }
+
+      // Common products across all business units
+      if (sfAccount.Insurance_ZCRM_ID__c && !products.includes('Insurance')) {
+        products.push('Insurance');
       }
       if (sfAccount.Current_Website_Provider__c) {
         products.push(`Website (${sfAccount.Current_Website_Provider__c})`);
@@ -186,7 +205,7 @@ export async function POST(request: NextRequest) {
         salesforce_id: sfAccount.Id,
         name: sfAccount.Name,
         arr: sfAccount.MRR_MVR__c ? sfAccount.MRR_MVR__c * 12 : null,
-        vertical: mapIndustryToVertical(sfAccount.Industry),
+        vertical: businessUnit,
         products: products.length > 0 ? products.join(', ') : null,
         segment: sfAccount.Type || null,
         owner_name: sfAccount.Owner?.Name || null,
@@ -196,7 +215,9 @@ export async function POST(request: NextRequest) {
         managed_account: sfAccount.Managed_Account__c || null,
         cs_segment: sfAccount.VitallyClient_Success_Tier__c || null,
         metadata: {
-          industry: sfAccount.Industry
+          industry: sfAccount.Industry,
+          type: sfAccount.Type,
+          current_fms: sfAccount.Current_FMS__c
         },
         // Don't set status here - preserve existing status on update, default to 'active' via column default on insert
       };
