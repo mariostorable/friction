@@ -51,11 +51,23 @@ export async function GET(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // Get all users with portfolios (EDGE and SiteLink)
+    // Clean up expired alerts
+    const { error: cleanupError } = await supabase
+      .from('alerts')
+      .delete()
+      .lt('expires_at', new Date().toISOString());
+
+    if (cleanupError) {
+      console.error('Error cleaning up expired alerts:', cleanupError);
+    } else {
+      console.log('✓ Expired alerts cleaned up');
+    }
+
+    // Get all users with portfolios (Storage and Marine)
     const { data: portfolios } = await supabase
       .from('portfolios')
       .select('user_id, account_ids, portfolio_type')
-      .in('portfolio_type', ['top_25_edge', 'top_25_sitelink']);
+      .in('portfolio_type', ['top_25_edge', 'top_25_sitelink', 'top_25_marine']);
 
     if (!portfolios || portfolios.length === 0) {
       return NextResponse.json({ message: 'No portfolios found' });
@@ -550,6 +562,25 @@ Return ONLY the JSON object, nothing else.`;
                   evidence: {
                     high_severity_count: highSeverityCount,
                     ofi_score: ofiScore
+                  },
+                  expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+                });
+              }
+
+              // Alert 3: Trending Worse (OFI increasing by >10 points)
+              if (trendDirection === 'worsening' && trendVsPriorPeriod && trendVsPriorPeriod > 10) {
+                alerts.push({
+                  user_id: portfolio.user_id,
+                  account_id: accountId,
+                  alert_type: 'trending_worse',
+                  severity: 'medium',
+                  title: `Friction Increasing: ${account.name}`,
+                  message: `OFI score increased by ${Math.round(trendVsPriorPeriod)} points, from ${previousSnapshot?.ofi_score} to ${ofiScore}.`,
+                  evidence: {
+                    ofi_score: ofiScore,
+                    previous_ofi_score: previousSnapshot?.ofi_score,
+                    change: trendVsPriorPeriod,
+                    trend_direction: trendDirection
                   },
                   expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
                 });
