@@ -26,6 +26,7 @@ export default function Dashboard() {
   const [sortField, setSortField] = useState<string>('arr');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [softwareFilter, setSoftwareFilter] = useState<'all' | 'edge' | 'sitelink'>('all');
+  const [businessUnit, setBusinessUnit] = useState<'all' | 'storage' | 'marine'>('all');
   const [isSalesforceConnected, setIsSalesforceConnected] = useState(false);
   const [checkingConnection, setCheckingConnection] = useState(true);
   const [hoveredColumn, setHoveredColumn] = useState<string | null>(null);
@@ -510,6 +511,17 @@ export default function Dashboard() {
     return 'N/A';
   };
 
+  // Filter accounts by business unit
+  const filterAccountsByBusinessUnit = (accounts: AccountWithMetrics[]) => {
+    if (businessUnit === 'all') {
+      return accounts;
+    }
+
+    return accounts.filter(account => {
+      return account.vertical === businessUnit;
+    });
+  };
+
   // Filter accounts by software provider
   const filterAccountsBySoftware = (accounts: AccountWithMetrics[]) => {
     if (softwareFilter === 'all') {
@@ -560,6 +572,45 @@ export default function Dashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Business Unit Filter */}
+        <div className="mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-700">Business Unit:</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setBusinessUnit('all')}
+                className={`px-4 py-1.5 text-sm rounded-lg font-medium transition-colors ${
+                  businessUnit === 'all'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setBusinessUnit('storage')}
+                className={`px-4 py-1.5 text-sm rounded-lg font-medium transition-colors ${
+                  businessUnit === 'storage'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                Storage
+              </button>
+              <button
+                onClick={() => setBusinessUnit('marine')}
+                className={`px-4 py-1.5 text-sm rounded-lg font-medium transition-colors ${
+                  businessUnit === 'marine'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                Marine
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div className="mb-6 flex items-center justify-between">
           <div className="flex gap-2">
             <button
@@ -768,7 +819,7 @@ export default function Dashboard() {
 
             {top25.length > 0 && (
               <PortfolioSummary
-                top25={filterAccountsBySoftware(top25)}
+                top25={filterAccountsBySoftware(filterAccountsByBusinessUnit(top25))}
                 singleOperator={[]}
               />
             )}
@@ -791,7 +842,7 @@ export default function Dashboard() {
                     <option value="sitelink">SiteLink Only</option>
                   </select>
                   <span className="text-sm text-gray-600">
-                    Showing {filterAccountsBySoftware(top25).length} of {top25.length} accounts
+                    Showing {filterAccountsBySoftware(filterAccountsByBusinessUnit(top25)).length} of {top25.length} accounts
                   </span>
                 </div>
               </div>
@@ -830,7 +881,7 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {sortAccounts(filterAccountsBySoftware(top25)).map((account) => (
+                    {sortAccounts(filterAccountsBySoftware(filterAccountsByBusinessUnit(top25))).map((account) => (
                       <tr
                         key={account.id}
                         onClick={() => router.push(`/account/${account.id}`)}
@@ -926,13 +977,13 @@ export default function Dashboard() {
 
         {activeTab === 'reports' && (
           <CustomReports
-            allAccounts={top25}
+            allAccounts={filterAccountsByBusinessUnit(top25)}
           />
         )}
 
         {activeTab === 'themes' && (
           <ThemesTab
-            accounts={top25}
+            accounts={filterAccountsByBusinessUnit(top25)}
           />
         )}
       </main>
