@@ -730,6 +730,7 @@ export default function AccountDetailPage() {
               portfolioAvg={caseVolumeMetrics.portfolioAvg}
               last7Days={caseVolumeMetrics.last7Days}
               accountName={account?.name || ''}
+              facilityCount={account?.facility_count || undefined}
             />
           </div>
         )}

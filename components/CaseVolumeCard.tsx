@@ -9,6 +9,7 @@ interface CaseVolumeCardProps {
   portfolioAvg: number;
   last7Days: number;
   accountName: string;
+  facilityCount?: number;
 }
 
 export default function CaseVolumeCard({
@@ -16,7 +17,8 @@ export default function CaseVolumeCard({
   accountHistoricalAvg,
   portfolioAvg,
   last7Days,
-  accountName
+  accountName,
+  facilityCount
 }: CaseVolumeCardProps) {
   const [showTooltip, setShowTooltip] = useState(false);
 
@@ -113,7 +115,7 @@ export default function CaseVolumeCard({
         {getStatusDescription()}
       </p>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className={`grid ${facilityCount && facilityCount > 0 ? 'grid-cols-3' : 'grid-cols-2'} gap-4`}>
         <div className="bg-white rounded-lg p-4 border border-gray-200">
           <div className="text-xs text-gray-600 uppercase tracking-wide mb-1">
             Weekly Baseline
@@ -152,6 +154,26 @@ export default function CaseVolumeCard({
              `${Math.abs(vs7DayBaseline).toFixed(0)}% below baseline`}
           </div>
         </div>
+
+        {facilityCount && facilityCount > 0 && (
+          <div className="bg-white rounded-lg p-4 border border-gray-200">
+            <div className="text-xs text-gray-600 uppercase tracking-wide mb-1">
+              Per Location
+            </div>
+            <div className="flex items-baseline gap-2">
+              <div className="text-2xl font-bold text-gray-900">
+                {(currentVolume / facilityCount).toFixed(1)}
+              </div>
+              <div className="text-xs text-gray-500">cases/loc</div>
+            </div>
+            <div className="text-xs text-gray-500 mt-0.5">
+              90-day average per facility
+            </div>
+            <div className="text-xs text-gray-600 mt-1">
+              {facilityCount} location{facilityCount === 1 ? '' : 's'} total
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mt-4 pt-3 border-t border-gray-200">
