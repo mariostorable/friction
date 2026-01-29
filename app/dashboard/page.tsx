@@ -993,7 +993,25 @@ export default function Dashboard() {
                               <span className="text-gray-900 font-medium">
                                 {(account.current_snapshot.case_volume / account.facility_count).toFixed(1)}
                               </span>
-                              <span className="text-xs text-gray-500">({account.facility_count} loc)</span>
+                              <div
+                                className="relative inline-block"
+                                onMouseEnter={() => setHoveredCaseIcon(`facility-${account.id}`)}
+                                onMouseLeave={() => setHoveredCaseIcon(null)}
+                              >
+                                <span className="text-xs text-gray-500 cursor-help">({account.facility_count} loc)</span>
+                                {hoveredCaseIcon === `facility-${account.id}` && (
+                                  <div className="absolute left-0 top-full mt-1 w-56 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 z-50 whitespace-normal">
+                                    <div className="font-semibold mb-1">{account.name}</div>
+                                    <div className="text-gray-300">
+                                      {account.facility_count} facilit{account.facility_count === 1 ? 'y' : 'ies'} / location{account.facility_count === 1 ? '' : 's'}
+                                    </div>
+                                    <div className="mt-2 text-gray-400 italic text-[10px]">
+                                      Individual facility names available in Salesforce
+                                    </div>
+                                    <div className="absolute -top-1 left-8 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                                  </div>
+                                )}
+                              </div>
                               {portfolioCasesPerFacilityAvg > 0 && (account.current_snapshot.case_volume / account.facility_count) > portfolioCasesPerFacilityAvg * 1.3 && (
                                 <div
                                   className="relative inline-block"
