@@ -185,7 +185,7 @@ export async function GET(request: NextRequest) {
           };
 
           // Fetch ALL cases from Salesforce (looking back 90 days, most recent first) - Explicit LIMIT 2000 (Salesforce defaults to 100 without explicit limit)
-          const query = `SELECT Id,CaseNumber,Subject,Description,Status,Priority,CreatedDate FROM Case WHERE AccountId='${account.salesforce_id}' AND CreatedDate=LAST_N_DAYS:90 ORDER BY CreatedDate DESC LIMIT 2000`;
+          const query = `SELECT Id,CaseNumber,Subject,Description,Status,Priority,CreatedDate,Origin FROM Case WHERE AccountId='${account.salesforce_id}' AND CreatedDate=LAST_N_DAYS:90 ORDER BY CreatedDate DESC LIMIT 2000`;
           console.log(`Fetching cases for account: ${account.name} (${account.salesforce_id})`);
 
           // Helper function to fetch cases
@@ -319,6 +319,7 @@ export async function GET(request: NextRequest) {
               case_number: sfCase.CaseNumber,
               subject: sfCase.Subject,
               status: sfCase.Status,
+              origin: sfCase.Origin || 'Unknown',
               created_date: sfCase.CreatedDate,
             },
             processed: false,
