@@ -71,14 +71,14 @@ export default function Dashboard() {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      // Load both EDGE and SiteLink portfolios
-      const edgePortfolio = portfolios?.find(p => p.portfolio_type === 'top_25_edge');
-      const sitelinkPortfolio = portfolios?.find(p => p.portfolio_type === 'top_25_sitelink');
+      // Load Storage and Marine portfolios
+      const storagePortfolio = portfolios?.find(p => p.portfolio_type === 'top_25_edge'); // Renamed from EDGE but keeping type for compatibility
+      const marinePortfolio = portfolios?.find(p => p.portfolio_type === 'top_25_marine');
 
       // Combine account IDs from both portfolios (remove duplicates)
       const allAccountIds = [
-        ...(edgePortfolio?.account_ids || []),
-        ...(sitelinkPortfolio?.account_ids || [])
+        ...(storagePortfolio?.account_ids || []),
+        ...(marinePortfolio?.account_ids || [])
       ];
       const uniqueAccountIds = Array.from(new Set(allAccountIds));
 

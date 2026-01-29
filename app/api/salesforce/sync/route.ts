@@ -238,42 +238,42 @@ export async function POST(request: NextRequest) {
 
     await supabase.from('portfolios').delete().eq('user_id', user.id);
 
-    // Get all accounts with vertical field to filter by product (active only)
+    // Get all accounts with products and vertical fields (active only)
     const { data: allAccounts } = await supabase
       .from('accounts')
-      .select('id, vertical, arr')
+      .select('id, vertical, products, arr')
       .eq('user_id', user.id)
       .eq('status', 'active')
       .not('arr', 'is', null)
       .order('arr', { ascending: false });
 
-    // Top 25 EDGE Accounts (must have EDGE software)
-    const edgeAccounts = allAccounts?.filter(a =>
-      a.vertical && a.vertical.includes('EDGE')
+    // Top 25 Storage Accounts (EDGE + SiteLink)
+    const storageAccounts = allAccounts?.filter(a =>
+      a.vertical === 'storage' && a.products && (a.products.includes('EDGE') || a.products.includes('SiteLink'))
     ).slice(0, 25);
 
-    if (edgeAccounts && edgeAccounts.length > 0) {
+    if (storageAccounts && storageAccounts.length > 0) {
       await supabase.from('portfolios').insert({
         user_id: user.id,
-        name: 'Top 25 EDGE Accounts',
-        portfolio_type: 'top_25_edge',
-        criteria: { type: 'top_mrr_edge', limit: 25, product: 'EDGE' },
-        account_ids: edgeAccounts.map(a => a.id),
+        name: 'Top 25 Storage Accounts',
+        portfolio_type: 'top_25_edge', // Keep same type for backwards compatibility
+        criteria: { type: 'top_mrr_storage', limit: 25, vertical: 'storage' },
+        account_ids: storageAccounts.map(a => a.id),
       });
     }
 
-    // Top 25 SiteLink Accounts (must have SiteLink software)
-    const sitelinkAccounts = allAccounts?.filter(a =>
-      a.vertical && a.vertical.includes('SiteLink')
+    // Top 25 Marine Accounts
+    const marineAccounts = allAccounts?.filter(a =>
+      a.vertical === 'marine'
     ).slice(0, 25);
 
-    if (sitelinkAccounts && sitelinkAccounts.length > 0) {
+    if (marineAccounts && marineAccounts.length > 0) {
       await supabase.from('portfolios').insert({
         user_id: user.id,
-        name: 'Top 25 SiteLink Accounts',
-        portfolio_type: 'top_25_sitelink',
-        criteria: { type: 'top_mrr_sitelink', limit: 25, product: 'SiteLink' },
-        account_ids: sitelinkAccounts.map(a => a.id),
+        name: 'Top 25 Marine Accounts',
+        portfolio_type: 'top_25_marine',
+        criteria: { type: 'top_mrr_marine', limit: 25, vertical: 'marine' },
+        account_ids: marineAccounts.map(a => a.id),
       });
     }
 
@@ -304,8 +304,8 @@ export async function POST(request: NextRequest) {
       success: true,
       synced: upsertedAccounts?.length || 0,
       portfolios: {
-        edge: edgeAccounts?.length || 0,
-        sitelink: sitelinkAccounts?.length || 0,
+        storage: storageAccounts?.length || 0,
+        marine: marineAccounts?.length || 0,
       },
       message
     });
