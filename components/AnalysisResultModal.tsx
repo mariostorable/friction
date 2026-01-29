@@ -30,13 +30,18 @@ export default function AnalysisResultModal({
 
   if (!isOpen) return null;
 
+  // Calculate total and processed
+  const totalCases = analyzed + (remaining || 0);
+  const processedCount = analyzed;
+  const progressPercentage = totalCases > 0 ? Math.round((processedCount / totalCases) * 100) : 0;
+
   const resultText = `✅ Analysis Complete!
 
 Account: ${accountName}
 Account ID: ${accountId}
 
-Synced: ${synced} cases
-Analyzed: ${analyzed} friction points
+${synced > 0 ? `New cases synced: ${synced}\n` : ''}Analyzed this batch: ${analyzed} friction points
+Progress: ${processedCount} of ${totalCases} cases (${progressPercentage}%)
 OFI Score: ${ofiScore}
 High Severity: ${highSeverity}${remaining ? `\n\n⚠️ ${remaining} cases remaining - click Analyze again to continue` : ''}`;
 
@@ -76,14 +81,21 @@ High Severity: ${highSeverity}${remaining ? `\n\n⚠️ ${remaining} cases remai
           {/* Results */}
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 select-text">
             <div className="space-y-2 text-sm font-mono">
+              {synced > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">New cases synced:</span>
+                  <span className="font-semibold text-gray-900">{synced}</span>
+                </div>
+              )}
               <div className="flex justify-between">
-                <span className="text-gray-600">Synced:</span>
-                <span className="font-semibold text-gray-900">{synced} cases</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Analyzed:</span>
+                <span className="text-gray-600">Analyzed this batch:</span>
                 <span className="font-semibold text-gray-900">{analyzed} friction points</span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Progress:</span>
+                <span className="font-semibold text-gray-900">{processedCount} of {totalCases} cases ({progressPercentage}%)</span>
+              </div>
+              <div className="pt-2 mt-2 border-t border-gray-200"></div>
               <div className="flex justify-between">
                 <span className="text-gray-600">OFI Score:</span>
                 <span className="font-semibold text-gray-900">{ofiScore}</span>
@@ -94,6 +106,21 @@ High Severity: ${highSeverity}${remaining ? `\n\n⚠️ ${remaining} cases remai
               </div>
             </div>
           </div>
+
+          {/* Progress Bar */}
+          {totalCases > 0 && (
+            <div className="mt-4">
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div
+                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                  style={{ width: `${progressPercentage}%` }}
+                ></div>
+              </div>
+              <p className="text-xs text-gray-500 mt-1 text-center">
+                {progressPercentage}% complete
+              </p>
+            </div>
+          )}
 
           {remaining && remaining > 0 && (
             <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
