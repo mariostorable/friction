@@ -490,7 +490,8 @@ export default function Dashboard() {
   const getTrendIcon = (direction?: string) => {
     if (direction === 'worsening') return <TrendingUp className="w-4 h-4 text-red-500" />;
     if (direction === 'improving') return <TrendingDown className="w-4 h-4 text-green-500" />;
-    return <Minus className="w-4 h-4 text-gray-400" />;
+    if (direction === 'stable') return <span className="text-gray-500 text-xs">Stable</span>;
+    return <span className="text-gray-400 text-xs">—</span>;
   };
 
   // Determine primary software provider for an account

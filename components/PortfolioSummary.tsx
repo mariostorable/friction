@@ -112,14 +112,22 @@ export default function PortfolioSummary({ top25, singleOperator }: PortfolioSum
         const Icon = stat.icon;
         const isFrictionScore = stat.name === 'Avg. Friction Score';
         const isAbnormalVolume = stat.name === 'Abnormal Volume';
-        const isClickable = isAbnormalVolume && abnormalVolumeAccountsList.length > 0;
+        const isActiveAlerts = stat.name === 'Active Alerts';
+        const isClickable = (isAbnormalVolume && abnormalVolumeAccountsList.length > 0) || (isActiveAlerts && totalAlerts > 0);
 
         return (
           <div
             key={stat.name}
             className={`bg-white rounded-lg border border-gray-200 relative ${isClickable ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
             style={{ overflow: 'visible' }}
-            onClick={() => isClickable && setShowAbnormalVolumeModal(true)}
+            onClick={() => {
+              if (isAbnormalVolume && abnormalVolumeAccountsList.length > 0) {
+                setShowAbnormalVolumeModal(true);
+              }
+              if (isActiveAlerts && totalAlerts > 0) {
+                router.push('/dashboard');
+              }
+            }}
             onMouseEnter={() => setHoveredStat(stat.name)}
             onMouseLeave={() => setHoveredStat(null)}
           >
