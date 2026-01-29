@@ -12,7 +12,7 @@ export interface Profile {
 export interface Integration {
   id: string;
   user_id: string;
-  integration_type: 'salesforce' | 'zendesk' | 'gong' | 'slack';
+  integration_type: 'salesforce' | 'zendesk' | 'gong' | 'slack' | 'jira';
   status: 'active' | 'expired' | 'error';
   instance_url: string | null;
   metadata: Record<string, any>;
@@ -245,4 +245,54 @@ export interface SalesforceCase {
     CommentBody: string;
     CreatedDate: string;
   }>;
+}
+
+// Jira types
+
+export interface JiraIssue {
+  id: string;
+  user_id: string;
+  integration_id: string;
+  jira_id: string;
+  jira_key: string;
+  summary: string;
+  description: string | null;
+  status: string;
+  priority: string | null;
+  assignee_name: string | null;
+  assignee_email: string | null;
+  sprint_name: string | null;
+  labels: string[];
+  created_date: string;
+  updated_date: string;
+  resolution_date: string | null;
+  issue_url: string;
+  metadata: Record<string, any>;
+  last_synced_at: string;
+  created_at: string;
+}
+
+export interface ThemeJiraLink {
+  id: string;
+  user_id: string;
+  jira_issue_id: string;
+  theme_key: string;
+  match_type: 'label' | 'keyword' | 'manual';
+  match_confidence: number; // 0.0 to 1.0
+  created_at: string;
+
+  // Optional joined data
+  jira_issue?: JiraIssue;
+}
+
+export interface ThemeWithJiraStatus {
+  theme_key: string;
+  label: string;
+  jira_tickets: {
+    todo: number;
+    in_progress: number;
+    done: number;
+    total: number;
+  };
+  has_tickets: boolean;
 }

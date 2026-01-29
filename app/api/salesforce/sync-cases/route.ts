@@ -226,24 +226,38 @@ export async function POST(request: NextRequest) {
       console.log(`Incremental sync - adding ${casesData.records.length} new cases to existing data`);
     }
 
-    const rawInputs = casesData.records.map((sfCase: any) => ({
-      user_id: user.id,
-      account_id: accountId,
-      source_type: 'salesforce_case',
-      source_id: sfCase.Id,
-      source_url: `${integration.instance_url}/${sfCase.Id}`,
-      text_content: `Case #${sfCase.CaseNumber}: ${sfCase.Subject}\n\n${sfCase.Description || 'No description'}\n\nStatus: ${sfCase.Status}\nPriority: ${sfCase.Priority}\nOrigin: ${sfCase.Origin}`,
-      metadata: {
-        case_number: sfCase.CaseNumber,
-        subject: sfCase.Subject,
-        status: sfCase.Status,
-        priority: sfCase.Priority,
-        origin: sfCase.Origin,
-        created_date: sfCase.CreatedDate,
-        closed_date: sfCase.ClosedDate,
-      },
-      processed: false,
-    }));
+    // Log first case to debug Origin field
+    if (casesData.records.length > 0) {
+      console.log('Sample case data from Salesforce:', {
+        CaseNumber: casesData.records[0].CaseNumber,
+        Origin: casesData.records[0].Origin,
+        allFields: Object.keys(casesData.records[0])
+      });
+    }
+
+    const rawInputs = casesData.records.map((sfCase: any) => {
+      // Handle Origin field - try multiple possible field names
+      const origin = sfCase.Origin || sfCase.origin || sfCase.CaseOrigin || 'Unknown';
+
+      return {
+        user_id: user.id,
+        account_id: accountId,
+        source_type: 'salesforce_case',
+        source_id: sfCase.Id,
+        source_url: `${integration.instance_url}/${sfCase.Id}`,
+        text_content: `Case #${sfCase.CaseNumber}: ${sfCase.Subject}\n\n${sfCase.Description || 'No description'}\n\nStatus: ${sfCase.Status}\nPriority: ${sfCase.Priority}\nOrigin: ${origin}`,
+        metadata: {
+          case_number: sfCase.CaseNumber,
+          subject: sfCase.Subject,
+          status: sfCase.Status,
+          priority: sfCase.Priority,
+          origin: origin,
+          created_date: sfCase.CreatedDate,
+          closed_date: sfCase.ClosedDate,
+        },
+        processed: false,
+      };
+    });
 
     const { data: insertedInputs, error: insertError } = await supabase
       .from('raw_inputs')

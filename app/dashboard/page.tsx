@@ -7,7 +7,7 @@ import { TrendingUp, TrendingDown, Minus, Settings, ArrowUpDown, ArrowUp, ArrowD
 import { AccountWithMetrics } from '@/types';
 import PortfolioSummary from '@/components/PortfolioSummary';
 import FavoritesTab from '@/components/FavoritesTab';
-import CustomReports from '@/components/CustomReports';
+import ReportsHub from '@/components/ReportsHub';
 import ThemesTab from '@/components/ThemesTab';
 
 export default function Dashboard() {
@@ -1041,7 +1041,7 @@ export default function Dashboard() {
         )}
 
         {activeTab === 'reports' && (
-          <CustomReports
+          <ReportsHub
             allAccounts={filterAccountsByBusinessUnit(top25)}
           />
         )}
