@@ -77,9 +77,16 @@ export async function POST(request: NextRequest) {
 async function generateBriefingWithClaude(data: any) {
   const { account, snapshot, frictionCards, rawInputs, briefingType } = data;
 
-  const prompt = briefingType === 'quick' 
+  const prompt = briefingType === 'quick'
     ? generateQuickBriefingPrompt(account, snapshot, frictionCards)
     : generateDeepBriefingPrompt(account, snapshot, frictionCards, rawInputs);
+
+  // Use different models and token limits based on briefing type
+  const model = briefingType === 'quick'
+    ? 'claude-3-haiku-20240307'      // Fast, cost-effective for quick briefings
+    : 'claude-opus-4-20250514';       // Most powerful for deep analysis
+
+  const maxTokens = briefingType === 'quick' ? 2000 : 8000;  // More tokens for deep analysis
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -89,8 +96,8 @@ async function generateBriefingWithClaude(data: any) {
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-3-haiku-20240307',
-      max_tokens: briefingType === 'quick' ? 2000 : 4000,
+      model,
+      max_tokens: maxTokens,
       messages: [
         {
           role: 'user',
@@ -197,49 +204,101 @@ function generateDeepBriefingPrompt(account: any, snapshot: any, frictionCards: 
   const quickPrompt = generateQuickBriefingPrompt(account, snapshot, frictionCards);
 
   const recentInputsSummary = rawInputs
-    .slice(0, 10)
-    .map(input => `[${new Date(input.created_at).toLocaleDateString()}] ${input.text_content.substring(0, 200)}...`)
+    .slice(0, 15)
+    .map(input => `[${new Date(input.created_at).toLocaleDateString()}] ${input.text_content.substring(0, 300)}...`)
     .join('\n\n');
 
   return quickPrompt + `
 
-RECENT INTERACTIONS (Raw data for context):
+RECENT INTERACTIONS (Raw data for deep analysis):
 ${recentInputsSummary || 'No recent interactions available'}
 
-Generate a DEEP customer visit briefing (10 minute read) with the same fields as above, PLUS add a "detailed_analysis" object:
+You are Claude Opus, the most advanced AI assistant. Generate a COMPREHENSIVE customer visit briefing (15-20 minute read) that demonstrates deep understanding and strategic insight.
+
+Your analysis should be:
+1. Data-driven: Base every claim on specific evidence from the friction signals and interactions
+2. Pattern-seeking: Identify underlying patterns and root causes, not just surface symptoms
+3. Strategic: Connect tactical issues to broader business implications
+4. Forward-looking: Anticipate future risks and opportunities
+5. Actionable: Provide specific, implementable recommendations
+
+Generate a DEEP customer visit briefing with the same fields as above, PLUS add a "detailed_analysis" object:
 
 {
   // ... all quick briefing fields ...
   "detailed_analysis": {
-    "history": "2-3 paragraph narrative about the customer journey, growth trajectory, key milestones, relationship evolution",
+    "executive_summary": "3-4 sentence high-level assessment of account health, key concerns, and strategic recommendations. This should synthesize the entire briefing into a C-suite-ready summary.",
+    "history": "3-4 paragraph narrative about the customer journey, growth trajectory, key milestones, relationship evolution. Include specific dates, ARR changes, product adoptions, and significant events. Tell the story of this relationship.",
     "friction_breakdown": [
       {
-        "theme": "Theme name from the friction cards",
-        "evidence": ["Direct quote 1", "Direct quote 2", "Direct quote 3"],
-        "root_cause": "Detailed hypothesis about what's causing this",
-        "recommendation": "Specific recommended solution or action"
+        "theme": "Theme name from the friction cards (e.g., 'Data Import Issues', 'Performance Problems')",
+        "frequency": "How often this appears (number of cases)",
+        "severity_trend": "Is this getting better, worse, or staying the same?",
+        "evidence": ["Direct quote 1 with date", "Direct quote 2 with date", "Direct quote 3 with date"],
+        "root_cause": "Deep hypothesis about what's causing this. Connect to product gaps, training issues, implementation problems, or business process mismatches. Be specific.",
+        "business_impact": "How does this affect their operations? What does it cost them? Why do they care?",
+        "recommendation": "Specific 3-5 step action plan to resolve this. Include who should do what, timeline, and expected outcome.",
+        "quick_wins": "Immediate tactical fixes that could provide relief while longer-term solution is implemented"
       }
-      // One for each major theme that appears multiple times
+      // One for each major theme (include ALL themes with 2+ occurrences)
     ],
+    "health_indicators": {
+      "positive_signals": ["Specific evidence of satisfaction, adoption, engagement - with dates and context"],
+      "warning_signs": ["Specific red flags with evidence - usage drops, escalations, executive involvement"],
+      "engagement_level": "Detailed assessment of how engaged they are: ticket volume trends, response times, stakeholder involvement",
+      "satisfaction_trajectory": "Is satisfaction improving or declining? What's the trend based on case sentiment and friction patterns?"
+    },
     "recent_interactions": [
-      "Summary of interaction 1 with date and outcome",
-      "Summary of interaction 2 with date and outcome"
-      // 5-7 most recent significant interactions
+      "Detailed summary of interaction with date, participants, topic, outcome, and follow-up status"
+      // 7-10 most recent significant interactions with full context
     ],
+    "strategic_insights": {
+      "account_priorities": ["What matters most to this customer right now based on their case patterns and interactions"],
+      "decision_makers": ["Key stakeholders and their concerns based on who's involved in cases"],
+      "buying_signals": ["Evidence of expansion interest or renewal concerns"],
+      "competitive_landscape": ["Any mentions of competitors or alternative solutions"],
+      "organizational_changes": ["Leadership changes, mergers, growth, restructuring that affect our relationship"]
+    },
     "opportunities": [
-      "Upsell opportunity based on usage patterns",
-      "Reference/case study potential",
-      "Feature requests that align with roadmap"
-      // 3-5 strategic opportunities
+      {
+        "type": "upsell|expansion|reference|advocacy",
+        "description": "Specific opportunity with clear business case",
+        "evidence": "What signals indicate this opportunity exists",
+        "timing": "When to act and why",
+        "approach": "How to position and who to engage"
+      }
+      // 3-5 strategic opportunities with full context
     ],
     "risks": [
-      "Specific churn indicator with evidence",
-      "Budget concern with context",
-      "Competitive threat with details"
-      // Only include real risks with evidence, not generic ones
-    ]
+      {
+        "type": "churn|contraction|satisfaction|competitive",
+        "severity": "critical|high|medium|low",
+        "description": "Specific risk with clear evidence",
+        "evidence": ["Direct quotes or data points supporting this risk"],
+        "probability": "Likelihood assessment with reasoning",
+        "mitigation": "Specific steps to address this risk",
+        "timeline": "How urgent is this? When might it materialize?"
+      }
+      // Include ALL real risks with evidence - don't hold back, but be honest if evidence is weak
+    ],
+    "visit_strategy": {
+      "primary_objectives": ["Top 3 goals for this visit - what must be accomplished"],
+      "key_messages": ["Core messages to deliver - positioning, value, commitment"],
+      "tough_conversations": ["Difficult topics that need to be addressed and how to approach them"],
+      "success_criteria": ["How we'll know this visit was successful"],
+      "follow_up_plan": ["Specific commitments and next steps to confirm during the visit"]
+    }
   }
 }
 
-Make this briefing actionable and specific. Use real data from the friction signals and interactions. If you don't have enough data for a section, be honest about it rather than making up generic content.`;
+CRITICAL INSTRUCTIONS:
+- Be exhaustive and comprehensive - this is a strategic document that justifies the Opus model
+- Every statement must be grounded in specific evidence from the friction signals or interactions
+- Include dates, numbers, quotes, and specific details throughout
+- Connect tactical issues to strategic implications
+- Identify patterns across multiple friction signals
+- Be honest about gaps in data rather than speculating
+- Make this briefing significantly more valuable than the quick version
+- Think like a management consultant preparing for a high-stakes client meeting
+- Quality over speed - take the time to analyze deeply and synthesize insights`;
 }
