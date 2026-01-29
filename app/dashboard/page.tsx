@@ -160,20 +160,18 @@ export default function Dashboard() {
             .in('account_id', accountIds)
             .eq('dismissed', false);
 
-          if (alerts && alerts.length > 0) {
-            // Count alerts per account
-            const alertCounts = alerts.reduce((acc: any, alert: any) => {
-              acc[alert.account_id] = (acc[alert.account_id] || 0) + 1;
-              return acc;
-            }, {});
+          // Count alerts per account (even if 0)
+          const alertCounts = (alerts || []).reduce((acc: any, alert: any) => {
+            acc[alert.account_id] = (acc[alert.account_id] || 0) + 1;
+            return acc;
+          }, {});
 
-            // Add alert counts to accounts
-            const accountsWithAlerts = accountsWithSnapshot.map(acc => ({
-              ...acc,
-              alert_count: alertCounts[acc.id] || 0
-            }));
-            setTop25(accountsWithAlerts);
-          }
+          // Add alert counts to accounts (always, even if all are 0)
+          const accountsWithAlerts = accountsWithSnapshot.map(acc => ({
+            ...acc,
+            alert_count: alertCounts[acc.id] || 0
+          }));
+          setTop25(accountsWithAlerts);
         }
       }
 
