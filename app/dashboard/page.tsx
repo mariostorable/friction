@@ -827,21 +827,29 @@ export default function Dashboard() {
 
             <section className="mt-12">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Software Accounts (EDGE & SiteLink)</h2>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {businessUnit === 'storage' && 'Storage Accounts (EDGE & SiteLink)'}
+                  {businessUnit === 'marine' && 'Marine Accounts'}
+                  {businessUnit === 'all' && 'All Accounts'}
+                </h2>
                 <div className="flex items-center gap-2">
-                  <label htmlFor="software-filter" className="text-sm font-medium text-gray-700">
-                    Filter by:
-                  </label>
-                  <select
-                    id="software-filter"
-                    value={softwareFilter}
-                    onChange={(e) => setSoftwareFilter(e.target.value as 'all' | 'edge' | 'sitelink')}
-                    className="block w-40 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="all">All Software</option>
-                    <option value="edge">EDGE Only</option>
-                    <option value="sitelink">SiteLink Only</option>
-                  </select>
+                  {businessUnit !== 'marine' && (
+                    <>
+                      <label htmlFor="software-filter" className="text-sm font-medium text-gray-700">
+                        Filter by:
+                      </label>
+                      <select
+                        id="software-filter"
+                        value={softwareFilter}
+                        onChange={(e) => setSoftwareFilter(e.target.value as 'all' | 'edge' | 'sitelink')}
+                        className="block w-40 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="all">All Software</option>
+                        <option value="edge">EDGE Only</option>
+                        <option value="sitelink">SiteLink Only</option>
+                      </select>
+                    </>
+                  )}
                   <span className="text-sm text-gray-600">
                     Showing {filterAccountsBySoftware(filterAccountsByBusinessUnit(top25)).length} of {top25.length} accounts
                   </span>
