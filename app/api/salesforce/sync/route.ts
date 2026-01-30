@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
+import { getDecryptedToken, updateEncryptedAccessToken } from '@/lib/encryption';
 
 export async function POST(request: NextRequest) {
   const debugInfo: any = {};
@@ -37,11 +38,17 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    const { data: tokens } = await supabaseAdmin
-      .from('oauth_tokens')
-      .select('*')
-      .eq('integration_id', integration.id)
-      .single();
+    // Retrieve and decrypt tokens
+    let tokens;
+    try {
+      tokens = await getDecryptedToken(supabaseAdmin, integration.id);
+    } catch (error) {
+      console.error('Failed to decrypt tokens:', error);
+      return NextResponse.json({
+        error: 'Failed to access credentials',
+        details: 'Please reconnect Salesforce'
+      }, { status: 500 });
+    }
 
     if (!tokens) {
       return NextResponse.json({ error: 'No tokens found' }, { status: 400 });
@@ -77,14 +84,13 @@ export async function POST(request: NextRequest) {
       const refreshData = await refreshResponse.json();
       console.log('Token refreshed successfully');
 
-      // Update tokens in database
-      await supabaseAdmin
-        .from('oauth_tokens')
-        .update({
-          access_token: refreshData.access_token,
-          expires_at: new Date(Date.now() + 7200000).toISOString(), // 2 hours from now
-        })
-        .eq('id', tokens.id);
+      // Update encrypted token in database
+      await updateEncryptedAccessToken(
+        supabaseAdmin,
+        tokens.id,
+        refreshData.access_token,
+        new Date(Date.now() + 7200000).toISOString() // 2 hours from now
+      );
 
       return refreshData.access_token;
     };

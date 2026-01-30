@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
+import { upsertEncryptedToken } from '@/lib/encryption';
 
 export async function POST(request: NextRequest) {
   try {
@@ -80,24 +81,21 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    const { error: tokenError } = await supabaseAdmin
-      .from('oauth_tokens')
-      .upsert({
+    // Store encrypted API token
+    try {
+      const tokenId = await upsertEncryptedToken(supabaseAdmin, {
         integration_id: integration.id,
         access_token: apiToken, // Store API token
         refresh_token: null, // Jira tokens don't expire
         token_type: 'api_token',
         expires_at: null, // No expiration
-      })
-      .select()
-      .single();
+      });
 
-    if (tokenError) {
-      console.error('Failed to store API token:', tokenError);
-      throw new Error(`Token storage failed: ${tokenError.message}`);
+      console.log('Jira integration and encrypted token stored successfully:', tokenId);
+    } catch (tokenError) {
+      console.error('Failed to store encrypted API token:', tokenError);
+      throw new Error(`Token storage failed: ${tokenError instanceof Error ? tokenError.message : 'Unknown error'}`);
     }
-
-    console.log('Jira integration stored successfully');
 
     return NextResponse.json({
       success: true,

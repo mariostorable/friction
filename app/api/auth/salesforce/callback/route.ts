@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
+import { upsertEncryptedToken } from '@/lib/encryption';
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
@@ -115,27 +116,23 @@ export async function GET(request: NextRequest) {
 
     console.log('Integration stored:', integration.id);
 
-    // Use ADMIN client for tokens (RLS blocks direct access)
-    const { data: tokenRecord, error: tokenError } = await supabaseAdmin
-      .from('oauth_tokens')
-      .upsert({
+    // Store encrypted tokens using admin client
+    try {
+      const tokenId = await upsertEncryptedToken(supabaseAdmin, {
         integration_id: integration.id,
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token || null,
         token_type: 'Bearer',
-        expires_at: tokenData.issued_at 
+        expires_at: tokenData.issued_at
           ? new Date(parseInt(tokenData.issued_at) + 7200000).toISOString()
           : new Date(Date.now() + 7200000).toISOString(),
-      })
-      .select()
-      .single();
+      });
 
-    if (tokenError) {
-      console.error('Failed to store tokens:', tokenError);
-      throw new Error(`Token storage failed: ${tokenError.message}`);
+      console.log('Tokens stored successfully (encrypted)!', tokenId);
+    } catch (tokenError) {
+      console.error('Failed to store encrypted tokens:', tokenError);
+      throw new Error(`Token storage failed: ${tokenError instanceof Error ? tokenError.message : 'Unknown error'}`);
     }
-
-    console.log('Tokens stored successfully!', tokenRecord.id);
     console.log('=== Salesforce OAuth Callback Complete ===');
 
     return NextResponse.redirect(`${requestUrl.origin}/dashboard?salesforce=connected`);

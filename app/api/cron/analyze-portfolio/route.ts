@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getDecryptedToken, updateEncryptedAccessToken } from '@/lib/encryption';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 minutes (Vercel Hobby plan limit)
@@ -75,7 +76,7 @@ export async function GET(request: NextRequest) {
 
     const results = [];
     let accountsAnalyzed = 0;
-    const MAX_ANALYSES_PER_RUN = 3; // Process 3 accounts per run (every 10 minutes)
+    const MAX_ANALYSES_PER_RUN = 10; // Process 10 accounts per run (every 10 minutes)
 
     for (const portfolio of portfolios) {
       for (const accountId of portfolio.account_ids) {
@@ -138,14 +139,19 @@ export async function GET(request: NextRequest) {
 
           if (!integration) continue;
 
-          // Get tokens
-          const { data: tokens } = await supabase
-            .from('oauth_tokens')
-            .select('*')
-            .eq('integration_id', integration.id)
-            .single();
+          // Retrieve and decrypt tokens
+          let tokens;
+          try {
+            tokens = await getDecryptedToken(supabase, integration.id);
+          } catch (error) {
+            console.error(`Failed to decrypt tokens for user ${portfolio.user_id}:`, error);
+            continue;
+          }
 
-          if (!tokens) continue;
+          if (!tokens) {
+            console.log(`No tokens found for integration ${integration.id}`);
+            continue;
+          }
 
           // Helper function to refresh Salesforce token
           const refreshSalesforceToken = async () => {
@@ -172,14 +178,13 @@ export async function GET(request: NextRequest) {
 
             const refreshData = await refreshResponse.json();
 
-            // Update tokens in database
-            await supabase
-              .from('oauth_tokens')
-              .update({
-                access_token: refreshData.access_token,
-                expires_at: new Date(Date.now() + 7200000).toISOString(),
-              })
-              .eq('id', tokens.id);
+            // Update encrypted token in database
+            await updateEncryptedAccessToken(
+              supabase,
+              tokens.id,
+              refreshData.access_token,
+              new Date(Date.now() + 7200000).toISOString()
+            );
 
             return refreshData.access_token;
           };

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
+import { getDecryptedToken } from '@/lib/encryption';
 
 export const maxDuration = 60;
 
@@ -57,11 +58,17 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    const { data: tokens } = await supabaseAdmin
-      .from('oauth_tokens')
-      .select('*')
-      .eq('integration_id', integration.id)
-      .single();
+    // Retrieve and decrypt API token
+    let tokens;
+    try {
+      tokens = await getDecryptedToken(supabaseAdmin, integration.id);
+    } catch (error) {
+      console.error('Failed to decrypt Jira token:', error);
+      return NextResponse.json({
+        error: 'Failed to access credentials',
+        details: 'Please reconnect Jira'
+      }, { status: 500 });
+    }
 
     if (!tokens) {
       return NextResponse.json({ error: 'No API token found. Please reconnect Jira.' }, { status: 400 });

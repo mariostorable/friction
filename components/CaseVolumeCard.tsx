@@ -115,66 +115,98 @@ export default function CaseVolumeCard({
         {getStatusDescription()}
       </p>
 
-      <div className={`grid ${facilityCount && facilityCount > 0 ? 'grid-cols-3' : 'grid-cols-2'} gap-4`}>
-        <div className="bg-white rounded-lg p-4 border border-gray-200">
-          <div className="text-xs text-gray-600 uppercase tracking-wide mb-1">
-            Weekly Baseline
-          </div>
-          <div className="flex items-baseline gap-2">
-            <div className="text-2xl font-bold text-gray-900">
-              {accountWeeklyBaseline.toFixed(1)}
-            </div>
-            <div className="text-xs text-gray-500">cases/week</div>
-          </div>
-          <div className="text-xs text-gray-500 mt-1">
-            {currentVolume} total in last 90 days
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg p-4 border border-gray-200">
-          <div className="text-xs text-gray-600 uppercase tracking-wide mb-1">
-            Last 7 Days
-          </div>
-          <div className="flex items-baseline gap-2">
-            <div className="text-2xl font-bold text-gray-900">
-              {last7Days}
-            </div>
-            <div className="text-xs text-gray-500">cases</div>
-          </div>
-          <div className="text-xs text-gray-500 mt-0.5">
-            {(last7Days / 7).toFixed(1)} avg cases/day
-          </div>
-          <div className={`text-xs font-medium mt-1 ${
-            vs7DayBaseline > 20 ? 'text-red-600' :
-            vs7DayBaseline < -20 ? 'text-yellow-600' :
-            'text-gray-600'
-          }`}>
-            {Math.abs(vs7DayBaseline) < 10 ? 'Normal week' :
-             vs7DayBaseline > 0 ? `${vs7DayBaseline.toFixed(0)}% above baseline` :
-             `${Math.abs(vs7DayBaseline).toFixed(0)}% below baseline`}
-          </div>
-        </div>
-
-        {facilityCount && facilityCount > 0 && (
+      {/* Account Metrics */}
+      <div className="mb-3">
+        <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
+          Account Metrics
+        </h4>
+        <div className="grid grid-cols-2 gap-4">
           <div className="bg-white rounded-lg p-4 border border-gray-200">
             <div className="text-xs text-gray-600 uppercase tracking-wide mb-1">
-              Per Location
+              Weekly Baseline
             </div>
             <div className="flex items-baseline gap-2">
               <div className="text-2xl font-bold text-gray-900">
-                {(currentVolume / facilityCount).toFixed(1)}
+                {accountWeeklyBaseline.toFixed(1)}
               </div>
-              <div className="text-xs text-gray-500">cases/loc</div>
+              <div className="text-xs text-gray-500">cases/week</div>
             </div>
-            <div className="text-xs text-gray-500 mt-0.5">
-              90-day average per facility
-            </div>
-            <div className="text-xs text-gray-600 mt-1">
-              {facilityCount} location{facilityCount === 1 ? '' : 's'} total
+            <div className="text-xs text-gray-500 mt-1">
+              {currentVolume} total in last 90 days
             </div>
           </div>
-        )}
+
+          <div className="bg-white rounded-lg p-4 border border-gray-200">
+            <div className="text-xs text-gray-600 uppercase tracking-wide mb-1">
+              Last 7 Days
+            </div>
+            <div className="flex items-baseline gap-2">
+              <div className="text-2xl font-bold text-gray-900">
+                {last7Days}
+              </div>
+              <div className="text-xs text-gray-500">cases</div>
+            </div>
+            <div className="text-xs text-gray-500 mt-0.5">
+              {(last7Days / 7).toFixed(1)} avg cases/day
+            </div>
+            <div className={`text-xs font-medium mt-1 ${
+              vs7DayBaseline > 20 ? 'text-red-600' :
+              vs7DayBaseline < -20 ? 'text-yellow-600' :
+              'text-gray-600'
+            }`}>
+              {Math.abs(vs7DayBaseline) < 10 ? 'Normal week' :
+               vs7DayBaseline > 0 ? `${vs7DayBaseline.toFixed(0)}% above baseline` :
+               `${Math.abs(vs7DayBaseline).toFixed(0)}% below baseline`}
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Facility Metrics */}
+      {facilityCount && facilityCount > 0 && (
+        <div>
+          <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
+            Per Facility Metrics
+          </h4>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-white rounded-lg p-4 border border-gray-200">
+              <div className="text-xs text-gray-600 uppercase tracking-wide mb-1">
+                90-Day Average
+              </div>
+              <div className="flex items-baseline gap-2">
+                <div className="text-2xl font-bold text-gray-900">
+                  {(currentVolume / facilityCount).toFixed(1)}
+                </div>
+                <div className="text-xs text-gray-500">cases/loc</div>
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5">
+                per facility (90 days)
+              </div>
+              <div className="text-xs text-gray-600 mt-1">
+                {facilityCount} location{facilityCount === 1 ? '' : 's'} total
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg p-4 border border-gray-200">
+              <div className="text-xs text-gray-600 uppercase tracking-wide mb-1">
+                Last 7 Days
+              </div>
+              <div className="flex items-baseline gap-2">
+                <div className="text-2xl font-bold text-gray-900">
+                  {(last7Days / facilityCount).toFixed(1)}
+                </div>
+                <div className="text-xs text-gray-500">cases/loc</div>
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5">
+                per facility (last week)
+              </div>
+              <div className="text-xs text-gray-600 mt-1">
+                {last7Days} total cases / {facilityCount} locations
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-4 pt-3 border-t border-gray-200">
         <p className="text-xs text-gray-600 font-medium mb-1">✓ Confirmed: All cases belong to {accountName}</p>

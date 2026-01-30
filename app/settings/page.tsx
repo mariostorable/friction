@@ -3,7 +3,7 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { LogOut, User, HelpCircle, Target, TrendingDown, BarChart3, AlertTriangle, CheckCircle, Link as LinkIcon } from 'lucide-react';
+import { LogOut, User, HelpCircle, Target, TrendingDown, BarChart3, AlertTriangle, CheckCircle, Link as LinkIcon, Shield, Lock } from 'lucide-react';
 import SalesforceConnector from '@/components/SalesforceConnector';
 import JiraConnector from '@/components/JiraConnector';
 
@@ -222,6 +222,33 @@ export default function SettingsPage() {
                   <span><strong>Investigate Spikes:</strong> Sudden volume increases often indicate recent issues</span>
                 </li>
               </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* Security & Compliance Section */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Shield className="w-6 h-6 text-green-600" />
+            <h2 className="text-xl font-semibold text-gray-900">Security & Compliance</h2>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Lock className="w-5 h-5 text-green-600" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Database Encryption</p>
+                  <p className="text-xs text-gray-600 mt-0.5">All OAuth tokens and API keys are encrypted at rest using pgcrypto (AES-128)</p>
+                </div>
+              </div>
+              <CheckCircle className="w-5 h-5 text-green-600" />
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-xs text-gray-700">
+                <strong className="text-blue-900">What's encrypted:</strong> Salesforce OAuth tokens (access & refresh), Jira API tokens, and other integration credentials are encrypted using industry-standard AES-128 encryption before being stored in the database.
+              </p>
             </div>
           </div>
         </div>

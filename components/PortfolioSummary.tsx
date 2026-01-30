@@ -13,6 +13,7 @@ interface PortfolioSummaryProps {
 export default function PortfolioSummary({ top25, singleOperator }: PortfolioSummaryProps) {
   const [showFrictionTooltip, setShowFrictionTooltip] = useState(false);
   const [showAbnormalVolumeModal, setShowAbnormalVolumeModal] = useState(false);
+  const [showActiveAlertsModal, setShowActiveAlertsModal] = useState(false);
   const [hoveredStat, setHoveredStat] = useState<string | null>(null);
   const router = useRouter();
 
@@ -30,6 +31,11 @@ export default function PortfolioSummary({ top25, singleOperator }: PortfolioSum
   
   const totalAlerts = allAccounts.reduce((sum, acc) =>
     sum + (acc.alert_count || 0), 0);
+
+  // Get list of accounts with alerts
+  const accountsWithAlerts = allAccounts
+    .filter(acc => (acc.alert_count || 0) > 0)
+    .sort((a, b) => (b.alert_count || 0) - (a.alert_count || 0));
 
   // Calculate case volume anomalies
   const accountsWithVolume = allAccounts.filter(acc => acc.current_snapshot?.case_volume !== undefined);
@@ -125,7 +131,7 @@ export default function PortfolioSummary({ top25, singleOperator }: PortfolioSum
                 setShowAbnormalVolumeModal(true);
               }
               if (isActiveAlerts && totalAlerts > 0) {
-                router.push('/dashboard');
+                setShowActiveAlertsModal(true);
               }
             }}
             onMouseEnter={() => setHoveredStat(stat.name)}
@@ -205,6 +211,67 @@ export default function PortfolioSummary({ top25, singleOperator }: PortfolioSum
         );
       })}
     </div>
+
+    {/* Active Alerts Modal */}
+    {showActiveAlertsModal && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowActiveAlertsModal(false)}>
+        <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+          <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Active Alerts</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Accounts with active alerts requiring attention
+              </p>
+            </div>
+            <button
+              onClick={() => setShowActiveAlertsModal(false)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+          <div className="p-6 overflow-y-auto max-h-[calc(80vh-120px)]">
+            <div className="space-y-4">
+              {accountsWithAlerts.map((account) => (
+                <div
+                  key={account.id}
+                  className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                  onClick={() => {
+                    setShowActiveAlertsModal(false);
+                    router.push(`/account/${account.id}`);
+                  }}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900">{account.name}</h3>
+                      <p className="text-sm text-gray-600 mt-1">
+                        ${(account.arr || 0).toLocaleString()} ARR • {account.products || 'N/A'}
+                      </p>
+                    </div>
+                    <div className="text-right ml-4">
+                      <div className="text-2xl font-bold text-yellow-600">
+                        {account.alert_count || 0}
+                      </div>
+                      <div className="text-sm text-gray-600">active {account.alert_count === 1 ? 'alert' : 'alerts'}</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                      ⚠️ Needs Attention
+                    </span>
+                    {account.current_snapshot?.ofi_score && (
+                      <span className="text-sm text-gray-600">
+                        OFI Score: {account.current_snapshot.ofi_score}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* Abnormal Volume Modal */}
     {showAbnormalVolumeModal && (

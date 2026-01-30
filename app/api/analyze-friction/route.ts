@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
 export const maxDuration = 300; // 5 minutes to handle up to 50 cases
@@ -195,7 +196,13 @@ Return a single JSON object with these fields:
     const inputIds = rawInputs.map(r => r.id);
     console.log(`Marking ${inputIds.length} inputs as processed (including ${parseErrorCount + apiErrorCount} failed):`, inputIds);
 
-    const { error: updateError } = await supabase
+    // Use admin client to bypass RLS and ensure the update succeeds
+    const adminClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { error: updateError } = await adminClient
       .from('raw_inputs')
       .update({ processed: true })
       .in('id', inputIds);
