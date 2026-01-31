@@ -110,15 +110,19 @@ export async function POST(request: NextRequest) {
       const jiraData = await jiraResponse.json();
 
       // Log the full response structure to debug total count
-      console.log('Full Jira API response structure:', JSON.stringify({
+      console.log('Full Jira API response (first 500 chars):', JSON.stringify(jiraData).substring(0, 500));
+      console.log('All top-level keys:', Object.keys(jiraData));
+      console.log('Looking for total in different fields:', {
         total: jiraData.total,
+        totalResults: jiraData.totalResults,
+        count: jiraData.count,
+        size: jiraData.size,
         maxResults: jiraData.maxResults,
         startAt: jiraData.startAt,
-        issuesCount: jiraData.issues?.length,
-        allKeys: Object.keys(jiraData)
-      }, null, 2));
+        issuesLength: jiraData.issues?.length
+      });
 
-      totalIssues = jiraData.total || 0;
+      totalIssues = jiraData.total || jiraData.totalResults || jiraData.count || 0;
 
       if (jiraData.issues && jiraData.issues.length > 0) {
         allIssues = allIssues.concat(jiraData.issues);
