@@ -77,35 +77,52 @@ export async function POST(request: NextRequest) {
     const email = integration.metadata?.email;
     const authHeader = `Basic ${Buffer.from(`${email}:${tokens.access_token}`).toString('base64')}`;
 
-    // Fetch issues from Jira (last 90 days, updated recently)
+    // Fetch ALL issues from Jira (last 90 days, updated recently) with pagination
     const jql = `updated >= -90d ORDER BY updated DESC`;
-    const maxResults = 100;
+    const maxResults = 100; // Jira's max per request
+    let startAt = 0;
+    let allIssues: any[] = [];
+    let totalIssues = 0;
 
     console.log(`Fetching Jira issues with JQL: ${jql}`);
 
-    const jiraResponse = await fetch(
-      `${integration.instance_url}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&maxResults=${maxResults}&fields=summary,description,status,priority,assignee,labels,created,updated,resolutiondate,comment,sprint`,
-      {
-        headers: {
-          'Authorization': authHeader,
-          'Accept': 'application/json',
-        },
+    // Paginate through all results
+    do {
+      const jiraResponse = await fetch(
+        `${integration.instance_url}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&startAt=${startAt}&maxResults=${maxResults}&fields=summary,description,status,priority,assignee,labels,created,updated,resolutiondate,comment,sprint`,
+        {
+          headers: {
+            'Authorization': authHeader,
+            'Accept': 'application/json',
+          },
+        }
+      );
+
+      if (!jiraResponse.ok) {
+        const errorText = await jiraResponse.text();
+        console.error('Jira API error:', errorText);
+        return NextResponse.json({
+          error: 'Failed to fetch issues from Jira',
+          details: errorText
+        }, { status: 500 });
       }
-    );
 
-    if (!jiraResponse.ok) {
-      const errorText = await jiraResponse.text();
-      console.error('Jira API error:', errorText);
-      return NextResponse.json({
-        error: 'Failed to fetch issues from Jira',
-        details: errorText
-      }, { status: 500 });
-    }
+      const jiraData = await jiraResponse.json();
+      totalIssues = jiraData.total || 0;
 
-    const jiraData = await jiraResponse.json();
-    console.log(`Fetched ${jiraData.issues?.length || 0} Jira issues`);
+      if (jiraData.issues && jiraData.issues.length > 0) {
+        allIssues = allIssues.concat(jiraData.issues);
+        console.log(`Fetched ${allIssues.length} of ${totalIssues} total Jira issues`);
+      }
 
-    if (!jiraData.issues || jiraData.issues.length === 0) {
+      startAt += maxResults;
+
+      // Continue if there are more results
+    } while (allIssues.length < totalIssues);
+
+    console.log(`Finished fetching ${allIssues.length} Jira issues`);
+
+    if (allIssues.length === 0) {
       return NextResponse.json({
         success: true,
         synced: 0,
@@ -115,7 +132,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Transform and store Jira issues
-    const jiraIssues = jiraData.issues.map((issue: any) => ({
+    const jiraIssues = allIssues.map((issue: any) => ({
       user_id: user.id,
       integration_id: integration.id,
       jira_id: issue.id,
