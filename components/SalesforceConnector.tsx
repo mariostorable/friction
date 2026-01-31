@@ -3,11 +3,18 @@
 import { useEffect, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { ExternalLink, CheckCircle, X } from 'lucide-react';
+import ErrorToast from './ErrorToast';
+import SuccessToast from './SuccessToast';
 
 export default function SalesforceConnector() {
   const [integration, setIntegration] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+
+  // Toast state
+  const [error, setError] = useState<{ title: string; message: string; details?: string } | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
   const supabase = createClientComponentClient();
 
   useEffect(() => {
@@ -34,11 +41,15 @@ export default function SalesforceConnector() {
     try {
       await supabase.from('oauth_tokens').delete().eq('integration_id', integration.id);
       await supabase.from('integrations').delete().eq('id', integration.id);
-      alert('Salesforce disconnected successfully');
+      setSuccess('Salesforce disconnected successfully');
       setIntegration(null);
     } catch (error) {
       console.error('Disconnect error:', error);
-      alert('Failed to disconnect');
+      setError({
+        title: 'Disconnect Error',
+        message: 'Failed to disconnect from Salesforce',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   }
 
@@ -52,25 +63,26 @@ export default function SalesforceConnector() {
       const result = await response.json();
       
       if (response.ok) {
-        let message = `Successfully synced ${result.synced} accounts!\nTop 25: ${result.portfolios.top25}\nRandom Sample: ${result.portfolios.randomSample}`;
-        
-        if (result.debug) {
-          message += '\n\nDEBUG INFO:\n' + JSON.stringify(result.debug, null, 2);
-        }
-        
-        alert(message);
+        let message = `Successfully synced ${result.synced} accounts! Top 25: ${result.portfolios.top25}, Random Sample: ${result.portfolios.randomSample}`;
+        let details = result.debug ? JSON.stringify(result.debug, null, 2) : undefined;
+
+        setSuccess(message);
         await checkIntegration();
-        window.location.reload();
+        setTimeout(() => window.location.reload(), 1000);
       } else {
-        let errorMessage = `Sync failed: ${result.error}`;
-        if (result.debug) {
-          errorMessage += '\n\nDEBUG:\n' + JSON.stringify(result.debug, null, 2);
-        }
-        alert(errorMessage);
+        setError({
+          title: 'Sync Failed',
+          message: result.error || 'Failed to sync Salesforce data',
+          details: result.debug ? JSON.stringify(result.debug, null, 2) : undefined
+        });
       }
     } catch (error) {
       console.error('Sync error:', error);
-      alert('Failed to sync');
+      setError({
+        title: 'Sync Error',
+        message: 'Failed to sync Salesforce data',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
     } finally {
       setSyncing(false);
     }
@@ -95,61 +107,93 @@ export default function SalesforceConnector() {
 
   if (integration) {
     return (
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-        <div className="flex items-start gap-3">
-          <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <h3 className="font-semibold text-green-900">Salesforce Connected</h3>
-            <p className="text-sm text-green-700 mt-1">{integration.instance_url}</p>
-            <p className="text-xs text-green-600 mt-1">
-              Last synced: {integration.last_synced_at
-                ? new Date(integration.last_synced_at).toLocaleString()
-                : 'Never'}
-            </p>
-            <div className="flex items-center gap-1 mt-2">
-              <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-              </svg>
-              <span className="text-xs text-green-700 font-medium">Encrypted</span>
+      <>
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-green-900">Salesforce Connected</h3>
+              <p className="text-sm text-green-700 mt-1">{integration.instance_url}</p>
+              <p className="text-xs text-green-600 mt-1">
+                Last synced: {integration.last_synced_at
+                  ? new Date(integration.last_synced_at).toLocaleString()
+                  : 'Never'}
+              </p>
+              <div className="flex items-center gap-1 mt-2">
+                <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                </svg>
+                <span className="text-xs text-green-700 font-medium">Encrypted</span>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={syncNow}
+                disabled={syncing}
+                className="px-4 py-2 text-sm font-medium text-green-700 bg-green-100 rounded-lg hover:bg-green-200 disabled:opacity-50"
+              >
+                {syncing ? 'Syncing...' : 'Sync Now'}
+              </button>
+              <button
+                onClick={disconnect}
+                className="px-3 py-2 text-sm font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={syncNow}
-              disabled={syncing}
-              className="px-4 py-2 text-sm font-medium text-green-700 bg-green-100 rounded-lg hover:bg-green-200 disabled:opacity-50"
-            >
-              {syncing ? 'Syncing...' : 'Sync Now'}
-            </button>
-            <button
-              onClick={disconnect}
-              className="px-3 py-2 text-sm font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
         </div>
-      </div>
+        {error && (
+          <ErrorToast
+            title={error.title}
+            message={error.message}
+            details={error.details}
+            onClose={() => setError(null)}
+          />
+        )}
+        {success && (
+          <SuccessToast
+            message={success}
+            onClose={() => setSuccess(null)}
+          />
+        )}
+      </>
     );
   }
 
   return (
-    <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-      <div className="flex items-start gap-4">
-        <div className="flex-1">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Connect Salesforce</h3>
-          <p className="text-sm text-gray-600 mb-4">
-            Connect your Salesforce account to start tracking friction
-          </p>
-          <button
-            onClick={connectSalesforce}
-            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            <ExternalLink className="w-5 h-5" />
-            Connect to Salesforce
-          </button>
+    <>
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <div className="flex items-start gap-4">
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Connect Salesforce</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Connect your Salesforce account to start tracking friction
+            </p>
+            <button
+              onClick={connectSalesforce}
+              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              <ExternalLink className="w-5 h-5" />
+              Connect to Salesforce
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+      {error && (
+        <ErrorToast
+          title={error.title}
+          message={error.message}
+          details={error.details}
+          onClose={() => setError(null)}
+        />
+      )}
+      {success && (
+        <SuccessToast
+          message={success}
+          onClose={() => setSuccess(null)}
+        />
+      )}
+    </>
   );
 }

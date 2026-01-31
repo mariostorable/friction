@@ -1,15 +1,4 @@
 {
-  "/_not-found": "app/_not-found.js",
-  "/account/[id]/page": "app/account/[id]/page.js",
-  "/api/auth/salesforce/callback/route": "app/api/auth/salesforce/callback/route.js",
-  "/api/calculate-ofi/route": "app/api/calculate-ofi/route.js",
-  "/api/briefing/generate/route": "app/api/briefing/generate/route.js",
-  "/api/salesforce/sync/route": "app/api/salesforce/sync/route.js",
-  "/dashboard/page": "app/dashboard/page.js",
   "/page": "app/page.js",
-  "/settings/page": "app/settings/page.js",
-  "/api/analyze-all/route": "app/api/analyze-all/route.js",
-  "/api/analyze-friction/route": "app/api/analyze-friction/route.js",
-  "/api/salesforce/sync-cases/route": "app/api/salesforce/sync-cases/route.js",
-  "/api/cron/analyze-portfolio/route": "app/api/cron/analyze-portfolio/route.js"
+  "/settings/page": "app/settings/page.js"
 }

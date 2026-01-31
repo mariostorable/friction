@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { ExternalLink, CheckCircle, X, Eye, EyeOff } from 'lucide-react';
+import ErrorToast from './ErrorToast';
+import SuccessToast from './SuccessToast';
 
 export default function JiraConnector() {
   const [integration, setIntegration] = useState<any>(null);
@@ -15,6 +17,10 @@ export default function JiraConnector() {
   const [email, setEmail] = useState('');
   const [apiToken, setApiToken] = useState('');
   const [showToken, setShowToken] = useState(false);
+
+  // Toast state
+  const [error, setError] = useState<{ title: string; message: string; details?: string } | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const supabase = createClientComponentClient();
 
@@ -46,18 +52,26 @@ export default function JiraConnector() {
       const result = await response.json();
 
       if (response.ok) {
-        alert('Successfully connected to Jira!');
+        setSuccess('Successfully connected to Jira!');
         await checkIntegration();
         // Clear form
         setJiraUrl('');
         setEmail('');
         setApiToken('');
       } else {
-        alert(`Failed to connect: ${result.error}${result.details ? '\n\nDetails: ' + result.details : ''}`);
+        setError({
+          title: 'Failed to connect',
+          message: result.error || 'Unknown error occurred',
+          details: result.details
+        });
       }
     } catch (error) {
       console.error('Connect error:', error);
-      alert('Failed to connect to Jira');
+      setError({
+        title: 'Connection Error',
+        message: 'Failed to connect to Jira',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
     } finally {
       setConnecting(false);
     }
@@ -74,14 +88,21 @@ export default function JiraConnector() {
       });
 
       if (response.ok) {
-        alert('Jira disconnected successfully');
+        setSuccess('Jira disconnected successfully');
         setIntegration(null);
       } else {
-        alert('Failed to disconnect');
+        setError({
+          title: 'Disconnect Failed',
+          message: 'Failed to disconnect from Jira'
+        });
       }
     } catch (error) {
       console.error('Disconnect error:', error);
-      alert('Failed to disconnect');
+      setError({
+        title: 'Disconnect Error',
+        message: 'Failed to disconnect from Jira',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   }
 
@@ -95,14 +116,22 @@ export default function JiraConnector() {
       const result = await response.json();
 
       if (response.ok) {
-        alert(`Successfully synced ${result.synced} Jira issues!\nTheme links created: ${result.links_created}`);
+        setSuccess(`Successfully synced ${result.synced} Jira issues! Theme links created: ${result.links_created}`);
         await checkIntegration();
       } else {
-        alert(`Sync failed: ${result.error}`);
+        setError({
+          title: 'Sync Failed',
+          message: result.error || 'Failed to sync Jira issues',
+          details: result.details
+        });
       }
     } catch (error) {
       console.error('Sync error:', error);
-      alert('Failed to sync');
+      setError({
+        title: 'Sync Error',
+        message: 'Failed to sync Jira issues',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
     } finally {
       setSyncing(false);
     }
@@ -251,6 +280,21 @@ export default function JiraConnector() {
           )}
         </button>
       </div>
+
+      {error && (
+        <ErrorToast
+          title={error.title}
+          message={error.message}
+          details={error.details}
+          onClose={() => setError(null)}
+        />
+      )}
+      {success && (
+        <SuccessToast
+          message={success}
+          onClose={() => setSuccess(null)}
+        />
+      )}
     </div>
   );
 }
