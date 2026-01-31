@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
     console.log(`Fetching Jira issues with JQL: ${jql}`);
 
     const jiraResponse = await fetch(
-      `${integration.instance_url}/rest/api/3/search?jql=${encodeURIComponent(jql)}&maxResults=${maxResults}&fields=summary,description,status,priority,assignee,labels,created,updated,resolutiondate,comment,sprint`,
+      `${integration.instance_url}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&maxResults=${maxResults}&fields=summary,description,status,priority,assignee,labels,created,updated,resolutiondate,comment,sprint`,
       {
         headers: {
           'Authorization': authHeader,
