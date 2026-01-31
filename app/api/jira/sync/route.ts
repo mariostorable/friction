@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
     // Paginate through all results
     do {
       const jiraResponse = await fetch(
-        `${integration.instance_url}/rest/api/3/search?jql=${encodeURIComponent(jql)}&startAt=${startAt}&maxResults=${maxResults}&fields=summary,description,status,priority,assignee,labels,created,updated,resolutiondate,comment,sprint`,
+        `${integration.instance_url}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&startAt=${startAt}&maxResults=${maxResults}&fields=summary,description,status,priority,assignee,labels,created,updated,resolutiondate,comment,sprint`,
         {
           headers: {
             'Authorization': authHeader,
