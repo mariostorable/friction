@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
 
     const results = [];
     let accountsAnalyzed = 0;
-    const MAX_ANALYSES_PER_RUN = 10; // Process 10 accounts per run (every 10 minutes)
+    const MAX_ANALYSES_PER_RUN = 50; // Process up to 50 accounts per run (limited by 5-min timeout)
 
     for (const portfolio of portfolios) {
       for (const accountId of portfolio.account_ids) {
@@ -231,6 +231,16 @@ export async function GET(request: NextRequest) {
           const casesData = await casesResponse.json();
           console.log(`Found ${casesData.records?.length || 0} cases for ${account.name}`);
 
+          // Get existing raw_inputs to avoid re-analyzing cases we already processed
+          const { data: existingInputs } = await supabase
+            .from('raw_inputs')
+            .select('source_id')
+            .eq('account_id', accountId)
+            .eq('source_type', 'salesforce_case');
+
+          const existingCaseIds = new Set(existingInputs?.map(i => i.source_id) || []);
+          console.log(`Account has ${existingCaseIds.size} existing analyzed cases`);
+
           if (!casesData.records || casesData.records.length === 0) {
             // Get previous snapshot to calculate trend (even for zero cases)
             const { data: previousSnapshot } = await supabase
@@ -285,35 +295,147 @@ export async function GET(request: NextRequest) {
             continue;
           }
 
-          // Delete old data for this account to ensure we only work with fresh 90-day data
-          console.log(`Cleaning up old data for ${account.name}...`);
+          // Filter to only NEW cases (ones we haven't analyzed yet)
+          const newCases = casesData.records.filter((sfCase: any) => !existingCaseIds.has(sfCase.Id));
+          console.log(`${newCases.length} new cases to analyze (${existingCaseIds.size} already analyzed)`);
 
-          // Delete old friction cards
-          const { error: cardsDeleteError } = await supabase
-            .from('friction_cards')
-            .delete()
-            .eq('account_id', accountId)
-            .eq('user_id', portfolio.user_id);
+          if (newCases.length === 0) {
+            // No new cases, but recalculate OFI from existing cards
+            console.log(`No new cases for ${account.name}, recalculating OFI from existing cards...`);
 
-          if (cardsDeleteError) {
-            console.error(`Error deleting old friction_cards for ${account.name}:`, cardsDeleteError);
+            // Get ALL friction cards for this account
+            const { data: existingCards } = await supabase
+              .from('friction_cards')
+              .select('*')
+              .eq('account_id', accountId);
+
+            if (!existingCards || existingCards.length === 0) {
+              // No cards at all, create OFI 0 snapshot
+              const { data: previousSnapshot } = await supabase
+                .from('account_snapshots')
+                .select('ofi_score')
+                .eq('account_id', accountId)
+                .order('snapshot_date', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+              let trendVsPriorPeriod = null;
+              let trendDirection: 'improving' | 'stable' | 'worsening' = 'stable';
+
+              if (previousSnapshot && previousSnapshot.ofi_score !== null) {
+                trendVsPriorPeriod = 0 - previousSnapshot.ofi_score;
+                if (trendVsPriorPeriod < -5) {
+                  trendDirection = 'improving';
+                } else if (Math.abs(trendVsPriorPeriod) <= 5) {
+                  trendDirection = 'stable';
+                }
+              }
+
+              await supabase.from('account_snapshots').insert({
+                account_id: accountId,
+                snapshot_date: new Date().toISOString().split('T')[0],
+                ofi_score: 0,
+                friction_card_count: 0,
+                high_severity_count: 0,
+                case_volume: casesData.records.length,
+                top_themes: [],
+                score_breakdown: {
+                  base_score: 0,
+                  friction_density: 0,
+                  density_multiplier: 0,
+                  high_severity_boost: 0,
+                  severity_weighted: 0,
+                  card_count: 0
+                },
+                trend_vs_prior_period: trendVsPriorPeriod,
+                trend_direction: trendDirection
+              });
+
+              console.log(`✓ Snapshot created for ${account.name} with OFI 0 (no friction cards)`);
+              results.push({ accountId, account: account.name, status: 'no_new_cases', cases: 0, ofi: 0 });
+              accountsAnalyzed++;
+              continue;
+            }
+
+            // Calculate OFI from existing cards
+            const highSeverityCount = existingCards.filter(c => c.severity >= 4).length;
+            const severityWeights: any = { 1: 1, 2: 2, 3: 4, 4: 8, 5: 16 };
+            const weightedScore = existingCards.reduce((sum, card) => sum + (severityWeights[card.severity] || 1), 0);
+            const totalCases = casesData.records.length || 1;
+            const frictionDensity = (existingCards.length / totalCases) * 100;
+            const baseScore = Math.log10(weightedScore + 1) * 20;
+            const densityMultiplier = Math.min(2, Math.max(0.5, frictionDensity / 5));
+            const highSeverityBoost = Math.min(20, highSeverityCount * 2);
+            let ofiScore = Math.round(baseScore * densityMultiplier + highSeverityBoost);
+            ofiScore = Math.min(100, Math.max(0, ofiScore));
+
+            // Calculate top themes
+            const themeMap = new Map<string, { count: number, totalSeverity: number }>();
+            existingCards.forEach(card => {
+              const existing = themeMap.get(card.theme_key) || { count: 0, totalSeverity: 0 };
+              existing.count++;
+              existing.totalSeverity += card.severity;
+              themeMap.set(card.theme_key, existing);
+            });
+
+            const topThemes = Array.from(themeMap.entries())
+              .map(([theme_key, data]) => ({
+                theme_key,
+                count: data.count,
+                avg_severity: data.totalSeverity / data.count
+              }))
+              .sort((a, b) => b.count - a.count)
+              .slice(0, 5);
+
+            // Get previous snapshot for trend
+            const { data: previousSnapshot } = await supabase
+              .from('account_snapshots')
+              .select('ofi_score')
+              .eq('account_id', accountId)
+              .order('snapshot_date', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            let trendVsPriorPeriod = null;
+            let trendDirection: 'improving' | 'stable' | 'worsening' = 'stable';
+
+            if (previousSnapshot && previousSnapshot.ofi_score !== null) {
+              trendVsPriorPeriod = ofiScore - previousSnapshot.ofi_score;
+              if (trendVsPriorPeriod > 5) {
+                trendDirection = 'worsening';
+              } else if (trendVsPriorPeriod < -5) {
+                trendDirection = 'improving';
+              }
+            }
+
+            await supabase.from('account_snapshots').insert({
+              account_id: accountId,
+              snapshot_date: new Date().toISOString().split('T')[0],
+              ofi_score: ofiScore,
+              friction_card_count: existingCards.length,
+              high_severity_count: highSeverityCount,
+              case_volume: totalCases,
+              top_themes: topThemes,
+              score_breakdown: {
+                base_score: Math.round(baseScore * 10) / 10,
+                friction_density: Math.round(frictionDensity * 10) / 10,
+                density_multiplier: Math.round(densityMultiplier * 100) / 100,
+                high_severity_boost: highSeverityBoost,
+                severity_weighted: weightedScore,
+                card_count: existingCards.length
+              },
+              trend_vs_prior_period: trendVsPriorPeriod,
+              trend_direction: trendDirection
+            });
+
+            console.log(`✓ Snapshot created for ${account.name} with OFI ${ofiScore} (recalculated from ${existingCards.length} existing cards)`);
+            results.push({ accountId, account: account.name, status: 'no_new_cases', cases: 0, ofi: ofiScore });
+            accountsAnalyzed++;
+            continue;
           }
 
-          // Delete old raw_inputs
-          const { error: inputsDeleteError } = await supabase
-            .from('raw_inputs')
-            .delete()
-            .eq('account_id', accountId)
-            .eq('user_id', portfolio.user_id);
-
-          if (inputsDeleteError) {
-            console.error(`Error deleting old raw_inputs for ${account.name}:`, inputsDeleteError);
-          }
-
-          console.log(`Old data cleaned up successfully for ${account.name}`);
-
-          // Store raw inputs
-          const rawInputs = casesData.records.map((sfCase: any) => ({
+          // Store raw inputs for NEW cases only
+          const rawInputs = newCases.map((sfCase: any) => ({
             user_id: portfolio.user_id,
             account_id: accountId,
             source_type: 'salesforce_case',
@@ -427,15 +549,29 @@ Return ONLY the JSON object, nothing else.`;
             } else {
               console.log(`Successfully marked ${inputIds.length} inputs as processed`);
             }
+          }
 
-            // Calculate OFI with improved algorithm (matches /api/calculate-ofi)
-            const highSeverityCount = frictionCards.filter(c => c.severity >= 4).length;
-            const severityWeights: any = { 1: 1, 2: 2, 3: 4, 4: 8, 5: 16 };
-            const weightedScore = frictionCards.reduce((sum, card) => sum + (severityWeights[card.severity] || 1), 0);
+          // Get ALL friction cards for this account (old + new) to calculate OFI
+          const { data: allFrictionCards } = await supabase
+            .from('friction_cards')
+            .select('*')
+            .eq('account_id', accountId);
 
-            // Normalize by case volume to get friction density
-            const totalCases = casesData.records.length || 1;
-            const frictionDensity = (frictionCards.length / totalCases) * 100;
+          if (!allFrictionCards || allFrictionCards.length === 0) {
+            console.log(`No friction cards found for ${account.name} after analysis`);
+            continue;
+          }
+
+          console.log(`Calculating OFI from ${allFrictionCards.length} total friction cards (${frictionCards.length} new + ${allFrictionCards.length - frictionCards.length} existing)`);
+
+          // Calculate OFI with improved algorithm (matches /api/calculate-ofi)
+          const highSeverityCount = allFrictionCards.filter(c => c.severity >= 4).length;
+          const severityWeights: any = { 1: 1, 2: 2, 3: 4, 4: 8, 5: 16 };
+          const weightedScore = allFrictionCards.reduce((sum, card) => sum + (severityWeights[card.severity] || 1), 0);
+
+          // Normalize by case volume to get friction density
+          const totalCases = casesData.records.length || 1;
+          const frictionDensity = (allFrictionCards.length / totalCases) * 100;
 
             // Base score from weighted severity (logarithmic scale)
             const baseScore = Math.log10(weightedScore + 1) * 20;
@@ -446,167 +582,166 @@ Return ONLY the JSON object, nothing else.`;
             // High severity boost
             const highSeverityBoost = Math.min(20, highSeverityCount * 2);
 
-            // Final OFI Score
-            let ofiScore = Math.round(baseScore * densityMultiplier + highSeverityBoost);
-            ofiScore = Math.min(100, Math.max(0, ofiScore));
+          // Final OFI Score
+          let ofiScore = Math.round(baseScore * densityMultiplier + highSeverityBoost);
+          ofiScore = Math.min(100, Math.max(0, ofiScore));
 
-            console.log(`OFI Calculation for ${account.name}:`, {
-              frictionCards: frictionCards.length,
-              highSeverityCount,
-              totalCases,
-              weightedScore,
-              baseScore: baseScore.toFixed(1),
-              frictionDensity: frictionDensity.toFixed(2) + '%',
-              densityMultiplier: densityMultiplier.toFixed(2),
-              highSeverityBoost,
-              finalOfiScore: ofiScore
-            });
+          console.log(`OFI Calculation for ${account.name}:`, {
+            totalFrictionCards: allFrictionCards.length,
+            newCards: frictionCards.length,
+            highSeverityCount,
+            totalCases,
+            weightedScore,
+            baseScore: baseScore.toFixed(1),
+            frictionDensity: frictionDensity.toFixed(2) + '%',
+            densityMultiplier: densityMultiplier.toFixed(2),
+            highSeverityBoost,
+            finalOfiScore: ofiScore
+          });
 
-            // Calculate top themes from friction cards
-            const themeMap = new Map<string, { count: number, totalSeverity: number }>();
-            frictionCards.forEach(card => {
-              const existing = themeMap.get(card.theme_key) || { count: 0, totalSeverity: 0 };
-              existing.count++;
-              existing.totalSeverity += card.severity;
-              themeMap.set(card.theme_key, existing);
-            });
+          // Calculate top themes from ALL friction cards
+          const themeMap = new Map<string, { count: number, totalSeverity: number }>();
+          allFrictionCards.forEach(card => {
+            const existing = themeMap.get(card.theme_key) || { count: 0, totalSeverity: 0 };
+            existing.count++;
+            existing.totalSeverity += card.severity;
+            themeMap.set(card.theme_key, existing);
+          });
 
-            const topThemes = Array.from(themeMap.entries())
-              .map(([theme_key, data]) => ({
-                theme_key,
-                count: data.count,
-                avg_severity: data.totalSeverity / data.count
-              }))
-              .sort((a, b) => b.count - a.count)
-              .slice(0, 5); // Top 5 themes
+          const topThemes = Array.from(themeMap.entries())
+            .map(([theme_key, data]) => ({
+              theme_key,
+              count: data.count,
+              avg_severity: data.totalSeverity / data.count
+            }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5); // Top 5 themes
 
-            // Get previous snapshot to calculate trend
-            const { data: previousSnapshot } = await supabase
-              .from('account_snapshots')
-              .select('ofi_score, snapshot_date')
-              .eq('account_id', accountId)
-              .order('snapshot_date', { ascending: false })
-              .limit(1)
-              .maybeSingle();
+          // Get previous snapshot to calculate trend
+          const { data: previousSnapshot } = await supabase
+            .from('account_snapshots')
+            .select('ofi_score, snapshot_date')
+            .eq('account_id', accountId)
+            .order('snapshot_date', { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
-            let trendVsPriorPeriod = null;
-            let trendDirection: 'improving' | 'stable' | 'worsening' = 'stable';
+          let trendVsPriorPeriod = null;
+          let trendDirection: 'improving' | 'stable' | 'worsening' = 'stable';
 
-            if (previousSnapshot && previousSnapshot.ofi_score !== null) {
-              trendVsPriorPeriod = ofiScore - previousSnapshot.ofi_score;
+          if (previousSnapshot && previousSnapshot.ofi_score !== null) {
+            trendVsPriorPeriod = ofiScore - previousSnapshot.ofi_score;
 
-              // Determine trend direction (threshold: ±5 points)
-              if (trendVsPriorPeriod > 5) {
-                trendDirection = 'worsening'; // Score going up = more friction = worse
-              } else if (trendVsPriorPeriod < -5) {
-                trendDirection = 'improving'; // Score going down = less friction = better
-              } else {
-                trendDirection = 'stable';
-              }
-            }
-
-            console.log(`Creating snapshot for ${account.name}: OFI ${ofiScore}, ${frictionCards.length} cards, trend: ${trendDirection}`);
-
-            const { error: snapshotError } = await supabase.from('account_snapshots').insert({
-              account_id: accountId,
-              snapshot_date: new Date().toISOString().split('T')[0],
-              ofi_score: ofiScore,
-              friction_card_count: frictionCards.length,
-              high_severity_count: frictionCards.filter(c => c.severity >= 4).length,
-              case_volume: casesData.records.length,
-              top_themes: topThemes,
-              score_breakdown: {
-                base_score: Math.round(baseScore * 10) / 10,
-                friction_density: Math.round(frictionDensity * 10) / 10,
-                density_multiplier: Math.round(densityMultiplier * 100) / 100,
-                high_severity_boost: highSeverityBoost,
-                severity_weighted: weightedScore,
-                card_count: frictionCards.length
-              },
-              trend_vs_prior_period: trendVsPriorPeriod,
-              trend_direction: trendDirection
-            }).select();
-
-            if (snapshotError) {
-              console.error(`Error creating snapshot for ${account.name}:`, snapshotError);
-              results.push({ accountId, account: account.name, status: 'snapshot_error', error: snapshotError.message });
-              accountsAnalyzed++; // Count snapshot errors too
+            // Determine trend direction (threshold: ±5 points)
+            if (trendVsPriorPeriod > 5) {
+              trendDirection = 'worsening'; // Score going up = more friction = worse
+            } else if (trendVsPriorPeriod < -5) {
+              trendDirection = 'improving'; // Score going down = less friction = better
             } else {
-              console.log(`✓ Snapshot created successfully for ${account.name}`);
-
-              // Generate alerts based on the analysis
-              const alerts = [];
-
-              // Alert 1: High Friction (OFI > 70)
-              if (ofiScore >= 70) {
-                alerts.push({
-                  user_id: portfolio.user_id,
-                  account_id: accountId,
-                  alert_type: 'high_friction',
-                  severity: 'high',
-                  title: `High Friction: ${account.name}`,
-                  message: `OFI score is ${ofiScore}, indicating significant customer friction. ${highSeverityCount} high-severity issues detected.`,
-                  evidence: {
-                    ofi_score: ofiScore,
-                    high_severity_count: highSeverityCount,
-                    friction_card_count: frictionCards.length,
-                    case_volume: casesData.records.length
-                  },
-                  expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
-                });
-              }
-
-              // Alert 2: Critical Severity Issues (3+ high-severity cards)
-              if (highSeverityCount >= 3) {
-                alerts.push({
-                  user_id: portfolio.user_id,
-                  account_id: accountId,
-                  alert_type: 'critical_severity',
-                  severity: 'critical',
-                  title: `Critical Issues: ${account.name}`,
-                  message: `${highSeverityCount} critical severity issues detected in recent cases.`,
-                  evidence: {
-                    high_severity_count: highSeverityCount,
-                    ofi_score: ofiScore
-                  },
-                  expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-                });
-              }
-
-              // Alert 3: Trending Worse (OFI increasing by >10 points)
-              if (trendDirection === 'worsening' && trendVsPriorPeriod && trendVsPriorPeriod > 10) {
-                alerts.push({
-                  user_id: portfolio.user_id,
-                  account_id: accountId,
-                  alert_type: 'trending_worse',
-                  severity: 'medium',
-                  title: `Friction Increasing: ${account.name}`,
-                  message: `OFI score increased by ${Math.round(trendVsPriorPeriod)} points, from ${previousSnapshot?.ofi_score} to ${ofiScore}.`,
-                  evidence: {
-                    ofi_score: ofiScore,
-                    previous_ofi_score: previousSnapshot?.ofi_score,
-                    change: trendVsPriorPeriod,
-                    trend_direction: trendDirection
-                  },
-                  expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-                });
-              }
-
-              // Insert alerts if any were generated
-              if (alerts.length > 0) {
-                const { error: alertError } = await supabase.from('alerts').insert(alerts);
-                if (alertError) {
-                  console.error(`Error creating alerts for ${account.name}:`, alertError);
-                } else {
-                  console.log(`✓ Created ${alerts.length} alert(s) for ${account.name}`);
-                }
-              }
-
-              results.push({ accountId, account: account.name, status: 'success', cases: casesData.records.length, analyzed: frictionCards.length, ofi: ofiScore });
-              accountsAnalyzed++; // Increment counter after successful processing
+              trendDirection = 'stable';
             }
           }
 
+          console.log(`Creating snapshot for ${account.name}: OFI ${ofiScore}, ${allFrictionCards.length} total cards (${frictionCards.length} new), trend: ${trendDirection}`);
+
+          const { error: snapshotError } = await supabase.from('account_snapshots').insert({
+            account_id: accountId,
+            snapshot_date: new Date().toISOString().split('T')[0],
+            ofi_score: ofiScore,
+            friction_card_count: allFrictionCards.length,
+            high_severity_count: allFrictionCards.filter(c => c.severity >= 4).length,
+            case_volume: casesData.records.length,
+            top_themes: topThemes,
+            score_breakdown: {
+              base_score: Math.round(baseScore * 10) / 10,
+              friction_density: Math.round(frictionDensity * 10) / 10,
+              density_multiplier: Math.round(densityMultiplier * 100) / 100,
+              high_severity_boost: highSeverityBoost,
+              severity_weighted: weightedScore,
+              card_count: allFrictionCards.length
+            },
+            trend_vs_prior_period: trendVsPriorPeriod,
+            trend_direction: trendDirection
+          }).select();
+
+          if (snapshotError) {
+            console.error(`Error creating snapshot for ${account.name}:`, snapshotError);
+            results.push({ accountId, account: account.name, status: 'snapshot_error', error: snapshotError.message });
+            accountsAnalyzed++; // Count snapshot errors too
+          } else {
+            console.log(`✓ Snapshot created successfully for ${account.name}`);
+
+            // Generate alerts based on the analysis
+            const alerts = [];
+
+            // Alert 1: High Friction (OFI > 70)
+            if (ofiScore >= 70) {
+              alerts.push({
+                user_id: portfolio.user_id,
+                account_id: accountId,
+                alert_type: 'high_friction',
+                severity: 'high',
+                title: `High Friction: ${account.name}`,
+                message: `OFI score is ${ofiScore}, indicating significant customer friction. ${highSeverityCount} high-severity issues detected.`,
+                evidence: {
+                  ofi_score: ofiScore,
+                  high_severity_count: highSeverityCount,
+                  friction_card_count: allFrictionCards.length,
+                  case_volume: casesData.records.length
+                },
+                expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
+              });
+            }
+
+            // Alert 2: Critical Severity Issues (3+ high-severity cards)
+            if (highSeverityCount >= 3) {
+              alerts.push({
+                user_id: portfolio.user_id,
+                account_id: accountId,
+                alert_type: 'critical_severity',
+                severity: 'critical',
+                title: `Critical Issues: ${account.name}`,
+                message: `${highSeverityCount} critical severity issues detected in recent cases.`,
+                evidence: {
+                  high_severity_count: highSeverityCount,
+                  ofi_score: ofiScore
+                },
+                expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+              });
+            }
+
+            // Alert 3: Trending Worse (OFI increasing by >10 points)
+            if (trendDirection === 'worsening' && trendVsPriorPeriod && trendVsPriorPeriod > 10) {
+              alerts.push({
+                user_id: portfolio.user_id,
+                account_id: accountId,
+                alert_type: 'trending_worse',
+                severity: 'medium',
+                title: `Friction Increasing: ${account.name}`,
+                message: `OFI score increased by ${Math.round(trendVsPriorPeriod)} points, from ${previousSnapshot?.ofi_score} to ${ofiScore}.`,
+                evidence: {
+                  ofi_score: ofiScore,
+                  previous_ofi_score: previousSnapshot?.ofi_score,
+                  change: trendVsPriorPeriod,
+                  trend_direction: trendDirection
+                },
+                expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+              });
+            }
+
+            // Insert alerts if any were generated
+            if (alerts.length > 0) {
+              const { error: alertError } = await supabase.from('alerts').insert(alerts);
+              if (alertError) {
+                console.error(`Error creating alerts for ${account.name}:`, alertError);
+              } else {
+                console.log(`✓ Created ${alerts.length} alert(s) for ${account.name}`);
+              }
+            }
+
+            results.push({ accountId, account: account.name, status: 'success', cases: casesData.records.length, analyzed: frictionCards.length, ofi: ofiScore });
+            accountsAnalyzed++; // Increment counter after successful processing
+          }
         } catch (error) {
           results.push({ accountId, status: 'error', error: String(error) });
           accountsAnalyzed++; // Count errors too to avoid infinite loops

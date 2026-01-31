@@ -215,10 +215,7 @@ export default function Dashboard() {
     }
 
     setSyncing(true);
-    setSyncProgress('Step 1/2: Syncing account data from Salesforce...');
-
-    // Store initial snapshot count to detect changes
-    const initialSnapshotCount = accountsAnalyzedToday;
+    setSyncProgress('Syncing account data from Salesforce...');
 
     try {
       const response = await fetch('/api/salesforce/sync', {
@@ -254,167 +251,24 @@ export default function Dashboard() {
       }
 
       const result = await response.json();
-      setSyncProgress(`Step 2/2: Analyzing up to 3 accounts (100 cases from last 90 days)...`);
+      console.log('Sync result:', result);
 
-      // Get baseline snapshot count before analysis starts
-      const today = new Date().toISOString().split('T')[0];
-      const { data: initialSnapshots } = await supabase
-        .from('account_snapshots')
-        .select('id')
-        .eq('snapshot_date', today);
-      const initialSnapshotCount = initialSnapshots?.length || 0;
+      // Show the message from the backend
+      if (result.message) {
+        setSyncProgress(result.message);
+      }
 
-      // Poll for progress
-      let attempts = 0;
-      let previousCardCount = 0;
-      let stableCount = 0;
-      const maxAttempts = 150; // 5 minutes max (3 accounts take longer)
+      // If there was an analysis error, show it
+      if (result.analysisError) {
+        console.error('Analysis error:', result.analysisError);
+        alert(`⚠️ Analysis Failed\n\n${result.analysisError}\n\nCheck the console or Vercel logs for details.`);
+      }
 
-      const pollProgress = async () => {
-        // Only count recent inputs/cards (last 10 minutes) to show current sync progress
-        const recentTime = new Date(Date.now() - 600000).toISOString();
-
-        const { data: inputs } = await supabase
-          .from('raw_inputs')
-          .select('id')
-          .gte('created_at', recentTime);
-
-        const { data: cards } = await supabase
-          .from('friction_cards')
-          .select('id')
-          .gte('created_at', recentTime);
-
-        // Check snapshots from today (they use date-based deduplication)
-        const today = new Date().toISOString().split('T')[0];
-        const { data: snapshots } = await supabase
-          .from('account_snapshots')
-          .select('id')
-          .eq('snapshot_date', today);
-
-        const totalCases = inputs?.length || 0;
-        const cardsCount = cards?.length || 0;
-        const accountsAnalyzed = snapshots?.length || 0;
-
-        // If max attempts reached or we've been waiting too long, complete the sync
-        if (attempts >= maxAttempts) {
-          setSyncProgress('Refreshing dashboard...');
-          await loadDashboard();
-          const newlyAnalyzed = accountsAnalyzed - initialSnapshotCount;
-          const remaining = totalPortfolioAccounts - accountsAnalyzed;
-          const analyzedText = newlyAnalyzed > 0
-            ? `✓ ${newlyAnalyzed} account${newlyAnalyzed > 1 ? 's' : ''} analyzed!`
-            : `✓ Sync complete!`;
-          setSyncProgress(remaining > 0
-            ? `${analyzedText} ${remaining} accounts still need analysis.`
-            : `✓ All ${totalPortfolioAccounts} accounts are up to date!`);
-          setSyncing(false);
-          setTimeout(() => setSyncProgress(''), 10000);
-          return;
-        }
-
-        if (totalCases > 0) {
-          const percentComplete = totalCases > 0 ? Math.round((cardsCount / totalCases) * 100) : 0;
-
-          // Get the account name being analyzed
-          const { data: recentInputs } = await supabase
-            .from('raw_inputs')
-            .select('account_id, accounts(name)')
-            .gte('created_at', recentTime)
-            .limit(1);
-
-          const accountName = (recentInputs?.[0]?.accounts as any)?.name || 'account';
-
-          setSyncProgress(`Analyzing ${accountName}: ${cardsCount}/${totalCases} cases analyzed (${percentComplete}%) • ${accountsAnalyzed} accounts complete`);
-
-          // Check if card count is stable (not increasing)
-          if (cardsCount === previousCardCount) {
-            stableCount++;
-          } else {
-            stableCount = 0;
-          }
-          previousCardCount = cardsCount;
-
-          // Consider complete if: card count stable for 3 polls OR we have snapshots
-          if (stableCount >= 3 || (accountsAnalyzed > 0 && cardsCount > 20)) {
-            setSyncProgress('Refreshing dashboard...');
-            await loadDashboard();
-
-            // Calculate newly analyzed accounts in this sync
-            const newlyAnalyzed = accountsAnalyzed - initialSnapshotCount;
-            const remaining = totalPortfolioAccounts - accountsAnalyzed;
-
-            if (remaining > 0) {
-              const analyzedText = newlyAnalyzed > 0
-                ? `✓ ${newlyAnalyzed} account${newlyAnalyzed > 1 ? 's' : ''} analyzed!`
-                : `✓ Sync complete!`;
-              setSyncProgress(`${analyzedText} ${remaining} accounts still need analysis.`);
-            } else {
-              setSyncProgress(`✓ All ${totalPortfolioAccounts} accounts are up to date!`);
-            }
-
-            setSyncing(false);
-            setTimeout(() => setSyncProgress(''), 10000); // Clear after 10 seconds
-            return;
-          }
-        } else if (attempts > 5) {
-          // After 10 seconds of polling with no cases, check if snapshots were created
-          setSyncProgress('Refreshing dashboard...');
-
-          // Get fresh snapshot count directly from database
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) return;
-
-          const { data: portfolios } = await supabase
-            .from('portfolios')
-            .select('account_ids')
-            .eq('user_id', user.id)
-            .in('portfolio_type', ['top_25_edge', 'top_25_sitelink']);
-
-          if (portfolios && portfolios.length > 0) {
-            // Combine account IDs from all portfolios
-            const allAccountIds = portfolios.flatMap(p => p.account_ids || []);
-            const uniqueAccountIds = Array.from(new Set(allAccountIds));
-            const today = new Date().toISOString().split('T')[0];
-            const { data: todaySnapshots } = await supabase
-              .from('account_snapshots')
-              .select('account_id')
-              .in('account_id', uniqueAccountIds)
-              .eq('snapshot_date', today);
-
-            const newSnapshotCount = todaySnapshots?.length || 0;
-            const accountsAnalyzedThisRun = newSnapshotCount - initialSnapshotCount;
-
-            await loadDashboard();
-
-            if (accountsAnalyzedThisRun > 0) {
-              // Get the account name that was just analyzed
-              const { data: latestSnapshot } = await supabase
-                .from('account_snapshots')
-                .select('account_id, accounts(name)')
-                .eq('snapshot_date', today)
-                .in('account_id', uniqueAccountIds)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .single();
-
-              const accountName = (latestSnapshot?.accounts as any)?.name || 'Account';
-              const remaining = totalPortfolioAccounts - newSnapshotCount;
-              setSyncProgress(`✓ ${accountName} analyzed (0 cases found). ${remaining} accounts still need analysis.`);
-            } else {
-              setSyncProgress('✓ No new cases to sync. Already up to date!');
-            }
-          }
-
-          setSyncing(false);
-          setTimeout(() => setSyncProgress(''), 10000);
-          return;
-        }
-
-        attempts++;
-        setTimeout(pollProgress, 2000); // Check every 2 seconds
-      };
-
-      setTimeout(pollProgress, 2000); // Start polling after 2 seconds
+      // Refresh the dashboard to show updated data
+      await loadDashboard();
+      setSyncing(false);
+      setTimeout(() => setSyncProgress(''), 10000);
+      return;
 
     } catch (error) {
       console.error('Sync error (full):', error);
@@ -777,7 +631,7 @@ export default function Dashboard() {
                   )}
                 </div>
                 <div className="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-500">
-                  Click "Sync & Analyze All" to process all pending accounts. Runs automatically every night at 2am UTC.
+                  Click "Sync & Analyze All" to process all pending accounts. Runs automatically every hour.
                 </div>
               </div>
             )}

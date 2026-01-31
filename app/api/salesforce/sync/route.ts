@@ -285,7 +285,10 @@ export async function POST(request: NextRequest) {
 
     await supabase.from('integrations').update({ last_synced_at: new Date().toISOString() }).eq('id', integration.id);
 
-    // Trigger friction analysis in the background (fire-and-forget)
+    // Trigger friction analysis (wait for it to complete so we can report errors)
+    let analysisResult = null;
+    let analysisError = null;
+
     try {
       const protocol = request.headers.get('x-forwarded-proto') || 'https';
       const host = request.headers.get('host') || 'friction-intelligence.vercel.app';
@@ -293,18 +296,57 @@ export async function POST(request: NextRequest) {
 
       console.log('Triggering friction analysis at:', analyzeUrl);
 
-      // Fire and forget - don't wait for completion to avoid timeout
-      fetch(analyzeUrl, {
+      // Wait for the analysis to complete (or timeout after 30 seconds to check status)
+      const analysisResponse = await fetch(analyzeUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${process.env.CRON_SECRET}`
-        }
-      }).catch(e => console.error('Error triggering analysis:', e));
+        },
+        signal: AbortSignal.timeout(30000) // 30 second timeout for initial check
+      });
+
+      if (!analysisResponse.ok) {
+        const errorText = await analysisResponse.text();
+        console.error('Analysis endpoint returned error:', analysisResponse.status, errorText);
+        analysisError = `Analysis started but returned status ${analysisResponse.status}`;
+      } else {
+        analysisResult = await analysisResponse.json();
+        console.log('Analysis completed:', analysisResult);
+      }
     } catch (e) {
-      console.error('Error running analysis:', e);
+      console.error('Error triggering analysis:', e);
+      analysisError = e instanceof Error ? e.message : 'Unknown error';
+
+      // If it's a timeout, that's actually OK - analysis is long-running
+      if (e instanceof Error && e.name === 'TimeoutError') {
+        console.log('Analysis still running after 30s (expected for large portfolios)');
+        analysisError = null; // Don't treat timeout as error
+      }
     }
 
-    const message = `Synced ${upsertedAccounts?.length || 0} accounts successfully!\n\nFriction analysis is running in the background. Refresh the page in 2-3 minutes to see updated scores with correct dates.`;
+    // Build response message
+    let message = `Synced ${upsertedAccounts?.length || 0} accounts successfully!`;
+
+    if (analysisError) {
+      message += `\n\n⚠️ Warning: Analysis trigger failed - ${analysisError}\n\nYou may need to manually trigger analysis from the dashboard or check Vercel logs.`;
+    } else if (analysisResult) {
+      const summary = analysisResult.summary || {};
+      const analyzed = summary.analyzed || 0;
+      const skipped = summary.skipped || 0;
+      const pending = (storageAccounts?.length || 0) + (marineAccounts?.length || 0) - analyzed - skipped;
+
+      if (analyzed > 0) {
+        message += `\n\n✓ Analyzed ${analyzed} account${analyzed > 1 ? 's' : ''}!`;
+      }
+      if (skipped > 0) {
+        message += ` ${skipped} already up to date.`;
+      }
+      if (pending > 0) {
+        message += ` ${pending} still pending (will process in next run).`;
+      }
+    } else {
+      message += `\n\nAnalysis is running in the background (processing up to 50 accounts). Check back in a few minutes.`;
+    }
 
     return NextResponse.json({
       success: true,
@@ -313,6 +355,8 @@ export async function POST(request: NextRequest) {
         storage: storageAccounts?.length || 0,
         marine: marineAccounts?.length || 0,
       },
+      analysisResult,
+      analysisError,
       message
     });
 
