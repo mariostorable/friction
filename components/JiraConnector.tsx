@@ -198,6 +198,7 @@ export default function JiraConnector() {
           <SuccessToast
             message={success}
             onClose={() => setSuccess(null)}
+            autoClose={!success.includes('synced')} // Don't auto-close sync messages
           />
         )}
       </>
@@ -313,6 +314,7 @@ export default function JiraConnector() {
         <SuccessToast
           message={success}
           onClose={() => setSuccess(null)}
+          autoClose={true} // Connection messages can auto-close
         />
       )}
     </div>

@@ -155,6 +155,7 @@ export default function SalesforceConnector() {
           <SuccessToast
             message={success}
             onClose={() => setSuccess(null)}
+            autoClose={!success.includes('synced')} // Don't auto-close sync messages
           />
         )}
       </>
@@ -192,6 +193,7 @@ export default function SalesforceConnector() {
         <SuccessToast
           message={success}
           onClose={() => setSuccess(null)}
+          autoClose={!success.includes('synced')} // Don't auto-close sync messages
         />
       )}
     </>

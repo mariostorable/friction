@@ -6,15 +6,18 @@ import { X, CheckCircle, Copy, Check } from 'lucide-react';
 interface SuccessToastProps {
   message: string;
   onClose: () => void;
+  autoClose?: boolean; // Optional: defaults to true
 }
 
-export default function SuccessToast({ message, onClose }: SuccessToastProps) {
+export default function SuccessToast({ message, onClose, autoClose = true }: SuccessToastProps) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    if (!autoClose) return; // Don't auto-close if disabled
+
     const timer = setTimeout(onClose, 5000); // Auto-close after 5 seconds
     return () => clearTimeout(timer);
-  }, [onClose]);
+  }, [onClose, autoClose]);
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(message);
