@@ -87,6 +87,7 @@ export async function POST(request: NextRequest) {
     console.log(`Fetching Jira issues with JQL: ${jql}`);
 
     // Paginate through all results
+    let hasMorePages = true;
     do {
       const jiraResponse = await fetch(
         `${integration.instance_url}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&startAt=${startAt}&maxResults=${maxResults}&fields=summary,description,status,priority,assignee,labels,created,updated,resolutiondate,comment,sprint`,
@@ -122,19 +123,27 @@ export async function POST(request: NextRequest) {
         issuesLength: jiraData.issues?.length
       });
 
-      totalIssues = jiraData.total || jiraData.totalResults || jiraData.count || 0;
+      // Try different field names for total count
+      totalIssues = jiraData.total || jiraData.totalResults || jiraData.count || totalIssues;
 
-      if (jiraData.issues && jiraData.issues.length > 0) {
+      const fetchedCount = jiraData.issues?.length || 0;
+      if (fetchedCount > 0) {
         allIssues = allIssues.concat(jiraData.issues);
-        console.log(`Fetched ${allIssues.length} of ${totalIssues} total Jira issues`);
+        console.log(`Fetched ${allIssues.length} issues so far (got ${fetchedCount} in this batch)`);
       }
 
+      // Continue if we got a full page (meaning there might be more)
+      hasMorePages = fetchedCount === maxResults;
       startAt += maxResults;
 
-      // Continue if there are more results
-    } while (allIssues.length < totalIssues);
+    } while (hasMorePages);
 
     console.log(`Finished fetching ${allIssues.length} Jira issues`);
+
+    // If we never got a total count, use the actual number we fetched
+    if (totalIssues === 0 && allIssues.length > 0) {
+      totalIssues = allIssues.length;
+    }
 
     if (allIssues.length === 0) {
       return NextResponse.json({
