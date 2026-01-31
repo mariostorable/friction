@@ -60,6 +60,9 @@ export async function POST(request: NextRequest) {
           jira_account_id: jiraUser.accountId,
         },
         connected_at: new Date().toISOString(),
+      }, {
+        onConflict: 'user_id,integration_type',
+        ignoreDuplicates: false
       })
       .select()
       .single();
