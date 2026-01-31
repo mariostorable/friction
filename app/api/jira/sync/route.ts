@@ -194,8 +194,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       synced: insertedIssues?.length || 0,
+      total_available: totalIssues,
       links_created: linksCreated,
-      message: `Synced ${insertedIssues?.length} issues and created ${linksCreated} theme links`,
+      message: `Synced ${insertedIssues?.length} of ${totalIssues} total issues available`,
     });
 
   } catch (error) {

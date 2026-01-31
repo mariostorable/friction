@@ -116,7 +116,10 @@ export default function JiraConnector() {
       const result = await response.json();
 
       if (response.ok) {
-        setSuccess(`Successfully synced ${result.synced} Jira issues! Theme links created: ${result.links_created}`);
+        const totalMsg = result.total_available > result.synced
+          ? ` (${result.total_available} total available - rerun sync to get more)`
+          : ` (all ${result.total_available} available)`;
+        setSuccess(`Successfully synced ${result.synced} Jira issues${totalMsg}! Theme links created: ${result.links_created}`);
         await checkIntegration();
       } else {
         setError({
