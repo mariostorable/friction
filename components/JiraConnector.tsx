@@ -53,7 +53,7 @@ export default function JiraConnector() {
         setEmail('');
         setApiToken('');
       } else {
-        alert(`Failed to connect: ${result.error}`);
+        alert(`Failed to connect: ${result.error}${result.details ? '\n\nDetails: ' + result.details : ''}`);
       }
     } catch (error) {
       console.error('Connect error:', error);
