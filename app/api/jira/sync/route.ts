@@ -108,6 +108,10 @@ export async function POST(request: NextRequest) {
       }
 
       const jiraData = await jiraResponse.json();
+
+      // Log the response structure to debug total count
+      console.log(`Jira API response - total: ${jiraData.total}, maxResults: ${jiraData.maxResults}, startAt: ${jiraData.startAt}, issues count: ${jiraData.issues?.length}`);
+
       totalIssues = jiraData.total || 0;
 
       if (jiraData.issues && jiraData.issues.length > 0) {
