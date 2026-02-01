@@ -44,10 +44,30 @@ export async function POST(request: NextRequest) {
     console.log('Found raw inputs:', rawInputs?.length || 0);
 
     if (!rawInputs || rawInputs.length === 0) {
-      return NextResponse.json({
-        error: 'No unprocessed cases found. Make sure you synced cases first.',
-        analyzed: 0
-      }, { status: 404 });
+      // Check if there are ANY cases for this account (processed or not)
+      const { count: totalCases } = await supabase
+        .from('raw_inputs')
+        .select('*', { count: 'exact', head: true })
+        .eq('account_id', accountId)
+        .eq('user_id', user.id);
+
+      if (!totalCases || totalCases === 0) {
+        // No cases at all - they need to sync first
+        return NextResponse.json({
+          error: 'No cases found for this account. Please sync cases from your integration first.',
+          analyzed: 0
+        }, { status: 404 });
+      } else {
+        // Cases exist but all are already processed - this is success, not error
+        return NextResponse.json({
+          success: true,
+          analyzed: 0,
+          processed: 0,
+          filtered: 0,
+          remaining: 0,
+          message: `All ${totalCases} cases have already been analyzed. No new cases to process.`
+        });
+      }
     }
 
     const frictionCards = [];

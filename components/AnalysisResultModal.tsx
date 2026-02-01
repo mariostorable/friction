@@ -14,6 +14,7 @@ interface AnalysisResultModalProps {
   ofiScore: number;
   highSeverity: number;
   remaining?: number;
+  message?: string; // Custom message from API (e.g., "all cases already analyzed")
 }
 
 export default function AnalysisResultModal({
@@ -26,7 +27,8 @@ export default function AnalysisResultModal({
   processed,
   ofiScore,
   highSeverity,
-  remaining
+  remaining,
+  message
 }: AnalysisResultModalProps) {
   const [copied, setCopied] = useState(false);
 
@@ -79,6 +81,13 @@ High Severity: ${highSeverity}${remaining ? `\n\n⚠️ ${remaining} cases remai
               <div className="text-xs text-gray-500 font-mono">{accountId}</div>
             </div>
           </div>
+
+          {/* Custom message if provided */}
+          {message && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">{message}</p>
+            </div>
+          )}
 
           {/* Results */}
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 select-text">

@@ -55,6 +55,7 @@ export default function AccountDetailPage() {
     ofiScore: number;
     highSeverity: number;
     remaining?: number;
+    message?: string;
   } | null>(null);
 
   const supabase = createClientComponentClient();
@@ -504,7 +505,8 @@ export default function AccountDetailPage() {
         processed: analyzeResult.processed,
         ofiScore: ofiResult.ofi_score,
         highSeverity: ofiResult.high_severity,
-        remaining: analyzeResult.remaining
+        remaining: analyzeResult.remaining,
+        message: analyzeResult.message
       });
 
     } catch (error) {
@@ -857,6 +859,7 @@ export default function AccountDetailPage() {
         ofiScore={analysisResult?.ofiScore || 0}
         highSeverity={analysisResult?.highSeverity || 0}
         remaining={analysisResult?.remaining}
+        message={analysisResult?.message}
       />
     </div>
   );
