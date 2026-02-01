@@ -67,7 +67,8 @@ export async function GET(
           resolution_date,
           updated_date,
           issue_url,
-          labels
+          labels,
+          ai_summary
         )
       `)
       .eq('account_id', accountId)
@@ -90,7 +91,8 @@ export async function GET(
           resolution_date,
           updated_date,
           issue_url,
-          labels
+          labels,
+          ai_summary
         )
       `)
       .in('theme_key', accountThemeKeys)

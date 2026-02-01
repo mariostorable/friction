@@ -99,6 +99,42 @@ export async function POST(request: NextRequest) {
 
     console.log(`Fetching Jira issues with JQL: ${jql}`);
 
+    // Fetch field metadata on first run to discover custom fields
+    if (startAt === 0) {
+      try {
+        const fieldsResponse = await fetch(
+          `${integration.instance_url}/rest/api/3/field`,
+          {
+            headers: {
+              'Authorization': jiraAuthHeader,
+              'Accept': 'application/json',
+            },
+          }
+        );
+
+        if (fieldsResponse.ok) {
+          const fields = await fieldsResponse.json();
+          console.log('Available Jira fields that might contain account info:');
+          const relevantFields = fields.filter((f: any) => {
+            const nameLower = (f.name || '').toLowerCase();
+            return nameLower.includes('account') ||
+                   nameLower.includes('customer') ||
+                   nameLower.includes('salesforce') ||
+                   nameLower.includes('organization') ||
+                   nameLower.includes('company');
+          });
+          console.log('Potentially relevant fields:', relevantFields.map((f: any) => ({
+            id: f.id,
+            name: f.name,
+            custom: f.custom,
+            schema: f.schema
+          })));
+        }
+      } catch (error) {
+        console.error('Failed to fetch field metadata:', error);
+      }
+    }
+
     // Paginate through all results
     let hasMorePages = true;
     do {
@@ -136,6 +172,27 @@ export async function POST(request: NextRequest) {
         issuesLength: jiraData.issues?.length
       });
 
+      // Log first issue's field structure to discover custom fields
+      if (startAt === 0 && jiraData.issues && jiraData.issues.length > 0) {
+        const firstIssue = jiraData.issues[0];
+        console.log('\n=== First Issue Field Analysis ===');
+        console.log('Issue Key:', firstIssue.key);
+        console.log('All available field keys:', Object.keys(firstIssue.fields || {}));
+
+        // Look for custom fields that might contain account info
+        const customFields = Object.entries(firstIssue.fields || {})
+          .filter(([key]) => key.startsWith('customfield_'))
+          .map(([key, value]) => ({
+            key,
+            value: value,
+            type: typeof value,
+            hasValue: value !== null && value !== undefined && value !== ''
+          }));
+
+        console.log('Custom fields found:', customFields);
+        console.log('Custom fields with values:', customFields.filter(f => f.hasValue));
+      }
+
       // Try different field names for total count
       totalIssues = jiraData.total || jiraData.totalResults || jiraData.count || totalIssues;
 
@@ -167,6 +224,41 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Generate AI-friendly summaries for new/updated issues
+    const existingIssueKeys = new Set<string>();
+    const { data: existingIssues } = await supabaseAdmin
+      .from('jira_issues')
+      .select('jira_key, updated_date')
+      .eq('user_id', userId);
+
+    existingIssues?.forEach((issue: any) => {
+      existingIssueKeys.add(issue.jira_key);
+    });
+
+    const issuesNeedingSummary = allIssues.filter((issue: any) => !existingIssueKeys.has(issue.key));
+
+    console.log(`Generating AI summaries for ${issuesNeedingSummary.length} new issues...`);
+
+    // Generate summaries in batches to avoid rate limits
+    const aiSummaries: Record<string, string> = {};
+    for (let i = 0; i < issuesNeedingSummary.length; i += 5) {
+      const batch = issuesNeedingSummary.slice(i, i + 5);
+      await Promise.all(batch.map(async (issue: any) => {
+        try {
+          const summary = await generateAISummary(issue);
+          aiSummaries[issue.key] = summary;
+        } catch (error) {
+          console.error(`Failed to generate summary for ${issue.key}:`, error);
+          aiSummaries[issue.key] = issue.fields.summary; // Fallback to original
+        }
+      }));
+
+      // Rate limiting delay
+      if (i + 5 < issuesNeedingSummary.length) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+
     // Transform and store Jira issues
     const jiraIssues = allIssues.map((issue: any) => ({
       user_id: userId,
@@ -185,6 +277,7 @@ export async function POST(request: NextRequest) {
       updated_date: issue.fields.updated,
       resolution_date: issue.fields.resolutiondate || null,
       issue_url: `${integration.instance_url}/browse/${issue.key}`,
+      ai_summary: aiSummaries[issue.key] || null,
       metadata: {
         comment_count: issue.fields.comment?.total || 0,
         issue_type: issue.fields.issuetype?.name || 'Unknown',
@@ -364,5 +457,56 @@ async function createThemeLink(
       });
   } catch (error) {
     console.error(`Failed to create theme link for ${themeKey}:`, error);
+  }
+}
+
+// Helper: Generate AI-friendly summary using Claude
+async function generateAISummary(issue: any): Promise<string> {
+  try {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      console.error('ANTHROPIC_API_KEY not configured');
+      return issue.fields.summary;
+    }
+
+    const description = issue.fields.description || 'No description provided';
+    const prompt = `Rewrite this Jira ticket in plain English that a customer success manager would understand:
+
+Title: ${issue.fields.summary}
+Description: ${description}
+Status: ${issue.fields.status?.name || 'Unknown'}
+Priority: ${issue.fields.priority?.name || 'Not set'}
+
+Provide a 1-2 sentence summary focusing on:
+- What customer problem this fixes
+- The business impact
+
+Keep it concise, non-technical, and customer-focused.`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 200,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Claude API error:', errorText);
+      return issue.fields.summary;
+    }
+
+    const data = await response.json();
+    return data.content[0].text;
+  } catch (error) {
+    console.error('Failed to generate AI summary:', error);
+    return issue.fields.summary;
   }
 }

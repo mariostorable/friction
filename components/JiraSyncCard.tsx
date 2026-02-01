@@ -60,6 +60,8 @@ export default function JiraSyncCard() {
       });
 
       if (response.ok) {
+        // Wait a moment for database to propagate changes
+        await new Promise(resolve => setTimeout(resolve, 500));
         await fetchSyncStats(); // Refresh stats after sync
       }
     } catch (error) {

@@ -60,8 +60,15 @@ export default function JiraSyncButton() {
         method: 'POST',
       });
 
+      const result = await response.json();
+
       if (response.ok) {
+        console.log('✅ Jira sync complete:', result);
+        // Wait a moment for database to propagate changes
+        await new Promise(resolve => setTimeout(resolve, 500));
         await fetchSyncStats(); // Refresh stats after sync
+      } else {
+        console.error('❌ Jira sync failed:', result);
       }
     } catch (error) {
       console.error('Sync error:', error);

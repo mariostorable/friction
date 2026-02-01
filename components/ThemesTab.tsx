@@ -20,6 +20,13 @@ interface JiraTicket {
   priority: string | null;
 }
 
+interface TicketCounts {
+  resolved: number;
+  in_progress: number;
+  open: number;
+  total: number;
+}
+
 interface ThemesTabProps {
   accounts: AccountWithMetrics[];
   initialExpandedTheme?: string | null;
@@ -30,11 +37,18 @@ export default function ThemesTab({ accounts, initialExpandedTheme }: ThemesTabP
   const [expandedTheme, setExpandedTheme] = useState<string | null>(initialExpandedTheme || null);
   const [jiraTickets, setJiraTickets] = useState<Record<string, JiraTicket[]>>({});
   const [loadingTickets, setLoadingTickets] = useState<Record<string, boolean>>({});
+  const [ticketCounts, setTicketCounts] = useState<Record<string, TicketCounts>>({});
+  const [showTicketModal, setShowTicketModal] = useState<string | null>(null);
   const router = useRouter();
 
   const themes = aggregateThemesByProduct(accounts, productFilter);
   const totalIssues = getTotalIssueCount(themes);
   const affectedAccounts = getAffectedAccountCount(accounts, productFilter);
+
+  // Fetch ticket counts on mount
+  useEffect(() => {
+    fetchTicketCounts();
+  }, []);
 
   // Fetch Jira tickets when a theme is expanded
   useEffect(() => {
@@ -42,6 +56,18 @@ export default function ThemesTab({ accounts, initialExpandedTheme }: ThemesTabP
       fetchJiraTicketsForTheme(expandedTheme);
     }
   }, [expandedTheme]);
+
+  async function fetchTicketCounts() {
+    try {
+      const response = await fetch('/api/jira/theme-ticket-counts');
+      if (response.ok) {
+        const data = await response.json();
+        setTicketCounts(data.themeCounts || {});
+      }
+    } catch (error) {
+      console.error('Error fetching ticket counts:', error);
+    }
+  }
 
   async function fetchJiraTicketsForTheme(themeKey: string) {
     setLoadingTickets(prev => ({ ...prev, [themeKey]: true }));
@@ -140,6 +166,35 @@ export default function ThemesTab({ accounts, initialExpandedTheme }: ThemesTabP
                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${getSeverityColor(theme.avg_severity)}`}>
                       Avg Severity: {theme.avg_severity.toFixed(1)}
                     </span>
+                    {ticketCounts[theme.theme_key] && ticketCounts[theme.theme_key].total > 0 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowTicketModal(theme.theme_key);
+                          if (!jiraTickets[theme.theme_key]) {
+                            fetchJiraTicketsForTheme(theme.theme_key);
+                          }
+                        }}
+                        className="px-3 py-1.5 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-purple-900">
+                            {ticketCounts[theme.theme_key].total} Jira {ticketCounts[theme.theme_key].total === 1 ? 'ticket' : 'tickets'}
+                          </span>
+                          <div className="flex items-center gap-1 text-xs">
+                            {ticketCounts[theme.theme_key].resolved > 0 && (
+                              <span className="text-green-700">✓{ticketCounts[theme.theme_key].resolved}</span>
+                            )}
+                            {ticketCounts[theme.theme_key].in_progress > 0 && (
+                              <span className="text-blue-700">◐{ticketCounts[theme.theme_key].in_progress}</span>
+                            )}
+                            {ticketCounts[theme.theme_key].open > 0 && (
+                              <span className="text-gray-600">○{ticketCounts[theme.theme_key].open}</span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    )}
                     <span className="text-sm text-gray-600">
                       {theme.affected_accounts.length} {theme.affected_accounts.length === 1 ? 'account' : 'accounts'}
                     </span>
@@ -252,6 +307,99 @@ export default function ThemesTab({ accounts, initialExpandedTheme }: ThemesTabP
           </div>
         )}
       </div>
+
+      {/* Jira Ticket Modal */}
+      {showTicketModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowTicketModal(null)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Jira Roadmap Tickets
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {themes.find(t => t.theme_key === showTicketModal)?.theme_label}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowTicketModal(null)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Status Summary */}
+              {ticketCounts[showTicketModal] && (
+                <div className="flex items-center gap-4 mt-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-gray-700">Total:</span>
+                    <span className="text-sm font-semibold text-gray-900">{ticketCounts[showTicketModal].total}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-green-700">Resolved:</span>
+                    <span className="text-sm font-semibold text-green-900">{ticketCounts[showTicketModal].resolved}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-blue-700">In Progress:</span>
+                    <span className="text-sm font-semibold text-blue-900">{ticketCounts[showTicketModal].in_progress}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-gray-700">Open:</span>
+                    <span className="text-sm font-semibold text-gray-900">{ticketCounts[showTicketModal].open}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              {loadingTickets[showTicketModal] && (
+                <div className="text-center py-8 text-gray-500">Loading tickets...</div>
+              )}
+
+              {!loadingTickets[showTicketModal] && jiraTickets[showTicketModal] && jiraTickets[showTicketModal].length > 0 && (
+                <div className="space-y-3">
+                  {jiraTickets[showTicketModal].map(ticket => (
+                    <div key={ticket.jira_key} className="bg-gray-50 rounded-lg border border-gray-200 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <a
+                              href={ticket.issue_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm font-mono font-semibold text-blue-700 hover:text-blue-900 hover:underline flex items-center gap-1"
+                            >
+                              {ticket.jira_key}
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                            <span className="text-xs bg-white border border-gray-300 px-2 py-0.5 rounded text-gray-700">
+                              {ticket.status}
+                            </span>
+                            {ticket.priority && (
+                              <span className="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded font-medium">
+                                {ticket.priority}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-700">{ticket.summary}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!loadingTickets[showTicketModal] && jiraTickets[showTicketModal] && jiraTickets[showTicketModal].length === 0 && (
+                <div className="text-center py-8 text-gray-500">No tickets found for this theme.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

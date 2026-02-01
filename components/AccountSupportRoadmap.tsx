@@ -8,6 +8,7 @@ interface JiraIssue {
   id: string;
   jira_key: string;
   summary: string;
+  ai_summary?: string | null;
   status: string;
   priority: string;
   assignee_name: string | null;
@@ -262,7 +263,7 @@ export default function AccountSupportRoadmap({ accountId }: { accountId: string
                           {issue.resolved_days_ago}d ago
                         </span>
                       </div>
-                      <p className="text-sm text-gray-700 mb-1">{issue.summary}</p>
+                      <p className="text-sm text-gray-700 mb-1">{issue.ai_summary || issue.summary}</p>
                       <div className="flex items-center gap-2 text-xs text-gray-600">
                         <button
                           onClick={() => setSelectedTheme(issue.theme_key)}
@@ -307,7 +308,7 @@ export default function AccountSupportRoadmap({ accountId }: { accountId: string
                           {issue.status}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-700 mb-1">{issue.summary}</p>
+                      <p className="text-sm text-gray-700 mb-1">{issue.ai_summary || issue.summary}</p>
                       <div className="flex items-center gap-2 text-xs text-gray-600">
                         <button
                           onClick={() => setSelectedTheme(issue.theme_key)}
@@ -353,7 +354,7 @@ export default function AccountSupportRoadmap({ accountId }: { accountId: string
                           {issue.status}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-700 mb-1">{issue.summary}</p>
+                      <p className="text-sm text-gray-700 mb-1">{issue.ai_summary || issue.summary}</p>
                       <div className="flex items-center gap-2 text-xs text-gray-600">
                         <button
                           onClick={() => setSelectedTheme(issue.theme_key)}
