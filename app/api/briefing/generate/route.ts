@@ -99,10 +99,10 @@ async function generateBriefingWithClaude(data: any) {
 
   // Use different models and token limits based on briefing type
   const model = briefingType === 'quick'
-    ? 'claude-3-haiku-20240307'      // Fast, cost-effective for quick briefings
+    ? 'claude-sonnet-4-20250514'      // Smart, balanced for quick briefings
     : 'claude-opus-4-20250514';       // Most powerful for deep analysis
 
-  const maxTokens = briefingType === 'quick' ? 2000 : 8000;  // More tokens for deep analysis
+  const maxTokens = briefingType === 'quick' ? 3000 : 8000;  // More tokens for deep analysis
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',

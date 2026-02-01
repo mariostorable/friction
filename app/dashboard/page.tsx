@@ -9,7 +9,7 @@ import PortfolioSummary from '@/components/PortfolioSummary';
 import FavoritesTab from '@/components/FavoritesTab';
 import ReportsHub from '@/components/ReportsHub';
 import ThemesTab from '@/components/ThemesTab';
-import JiraSyncCard from '@/components/JiraSyncCard';
+import JiraSyncButton from '@/components/JiraSyncButton';
 
 export default function Dashboard() {
   const [top25, setTop25] = useState<AccountWithMetrics[]>([]);
@@ -543,8 +543,11 @@ export default function Dashboard() {
             </button>
           </div>
 
-          <div className="relative">
-            <button
+          <div className="flex items-center gap-2">
+            <JiraSyncButton />
+
+            <div className="relative">
+              <button
               onClick={!isSalesforceConnected ? () => router.push('/settings') : syncSalesforce}
               disabled={syncing || checkingConnection}
               onMouseEnter={() => setShowSyncTooltip(true)}
@@ -637,6 +640,7 @@ export default function Dashboard() {
               </div>
             )}
           </div>
+          </div>
         </div>
 
         {syncProgress && (
@@ -712,12 +716,7 @@ export default function Dashboard() {
               />
             )}
 
-            {/* Jira Sync Status */}
-            <div className="mt-6">
-              <JiraSyncCard />
-            </div>
-
-            <section className="mt-12">
+            <section className="mt-8">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-900">
                   {businessUnit === 'storage' && 'Storage Accounts (EDGE & SiteLink)'}
