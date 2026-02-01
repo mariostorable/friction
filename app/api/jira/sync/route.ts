@@ -213,10 +213,22 @@ export async function POST(request: NextRequest) {
 
     // Create theme links using keyword matching
     let linksCreated = 0;
+    let accountLinksCreated = 0;
+
+    // Get all Top 25 accounts for name matching
+    const { data: accounts } = await supabaseAdmin
+      .from('accounts')
+      .select('id, name')
+      .eq('user_id', userId)
+      .eq('status', 'active');
 
     for (const issue of insertedIssues || []) {
       const linkedThemes = await linkIssueToThemes(supabaseAdmin, userId, issue);
       linksCreated += linkedThemes.length;
+
+      // Also link to accounts if account name appears in summary/description
+      const linkedAccounts = await linkIssueToAccounts(supabaseAdmin, userId, issue, accounts || []);
+      accountLinksCreated += linkedAccounts.length;
     }
 
     // Update integration last_synced_at
@@ -225,14 +237,15 @@ export async function POST(request: NextRequest) {
       .update({ last_synced_at: new Date().toISOString() })
       .eq('id', integration.id);
 
-    console.log(`Sync complete: ${insertedIssues?.length} issues, ${linksCreated} theme links created`);
+    console.log(`Sync complete: ${insertedIssues?.length} issues, ${linksCreated} theme links, ${accountLinksCreated} account links created`);
 
     return NextResponse.json({
       success: true,
       synced: insertedIssues?.length || 0,
       total_available: totalIssues,
       links_created: linksCreated,
-      message: `Synced ${insertedIssues?.length} of ${totalIssues} total issues available`,
+      account_links_created: accountLinksCreated,
+      message: `Synced ${insertedIssues?.length} of ${totalIssues} total issues (${accountLinksCreated} linked to accounts)`,
     });
 
   } catch (error) {
@@ -282,6 +295,49 @@ async function linkIssueToThemes(supabase: any, userId: string, issue: any): Pro
   }
 
   return linkedThemes;
+}
+
+// Helper: Link Jira issue to accounts by name matching
+async function linkIssueToAccounts(
+  supabase: any,
+  userId: string,
+  issue: any,
+  accounts: Array<{ id: string; name: string }>
+): Promise<string[]> {
+  const linkedAccounts: string[] = [];
+  const searchText = `${issue.summary} ${issue.description || ''}`.toLowerCase();
+
+  for (const account of accounts) {
+    // Check if account name appears in the ticket
+    // Try both full name and variations (e.g., "William Warren" matches "Warren")
+    const nameParts = account.name.toLowerCase().split(/[\s-,]+/);
+    const matchesName = nameParts.some(part =>
+      part.length > 3 && searchText.includes(part)
+    );
+
+    if (matchesName) {
+      try {
+        await supabase
+          .from('account_jira_links')
+          .upsert({
+            user_id: userId,
+            account_id: account.id,
+            jira_issue_id: issue.id,
+            match_type: 'account_name',
+            match_confidence: 0.9,
+          }, {
+            onConflict: 'account_id,jira_issue_id',
+            ignoreDuplicates: true
+          });
+        linkedAccounts.push(account.id);
+        console.log(`Linked ${issue.jira_key} to account ${account.name}`);
+      } catch (error) {
+        console.error(`Failed to link to account ${account.name}:`, error);
+      }
+    }
+  }
+
+  return linkedAccounts;
 }
 
 // Helper: Create theme-jira link

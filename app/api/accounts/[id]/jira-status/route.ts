@@ -51,8 +51,30 @@ export async function GET(
 
     const accountThemeKeys = Object.keys(themeWeights);
 
-    // 2. Get all Jira issues linked to these themes
-    const { data: jiraIssues } = await supabase
+    // 2a. Get Jira issues linked directly to this account by name
+    const { data: accountJiraIssues } = await supabase
+      .from('account_jira_links')
+      .select(`
+        match_confidence,
+        jira_issues!inner(
+          id,
+          jira_key,
+          summary,
+          description,
+          status,
+          priority,
+          assignee_name,
+          resolution_date,
+          updated_date,
+          issue_url,
+          labels
+        )
+      `)
+      .eq('account_id', accountId)
+      .eq('jira_issues.user_id', user.id);
+
+    // 2b. Get all Jira issues linked to these themes
+    const { data: themeJiraIssues } = await supabase
       .from('theme_jira_links')
       .select(`
         theme_key,
@@ -73,6 +95,26 @@ export async function GET(
       `)
       .in('theme_key', accountThemeKeys)
       .eq('jira_issues.user_id', user.id);
+
+    // Combine both sources (prioritize direct account links)
+    const accountIssuesMap = new Map();
+    (accountJiraIssues || []).forEach((link: any) => {
+      const issue = link.jira_issues;
+      accountIssuesMap.set(issue.id, {
+        ...link,
+        theme_key: 'account_specific', // Special marker for account-specific tickets
+        is_account_specific: true
+      });
+    });
+
+    (themeJiraIssues || []).forEach((link: any) => {
+      const issue = link.jira_issues;
+      if (!accountIssuesMap.has(issue.id)) {
+        accountIssuesMap.set(issue.id, { ...link, is_account_specific: false });
+      }
+    });
+
+    const jiraIssues = Array.from(accountIssuesMap.values());
 
     if (!jiraIssues || jiraIssues.length === 0) {
       // No tickets yet - all themes should be prioritized

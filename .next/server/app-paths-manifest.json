@@ -1,4 +1,23 @@
 {
+  "/_not-found": "app/_not-found.js",
+  "/api/accounts/[id]/issue-progress/route": "app/api/accounts/[id]/issue-progress/route.js",
+  "/api/accounts/[id]/jira-status/route": "app/api/accounts/[id]/jira-status/route.js",
+  "/api/calculate-ofi/route": "app/api/calculate-ofi/route.js",
+  "/account/[id]/page": "app/account/[id]/page.js",
+  "/api/auth/salesforce/callback/route": "app/api/auth/salesforce/callback/route.js",
+  "/api/briefing/generate/route": "app/api/briefing/generate/route.js",
+  "/api/jira/disconnect/route": "app/api/jira/disconnect/route.js",
+  "/api/jira/connect/route": "app/api/jira/connect/route.js",
+  "/api/jira/portfolio-stats/route": "app/api/jira/portfolio-stats/route.js",
+  "/api/jira/theme-tickets/route": "app/api/jira/theme-tickets/route.js",
+  "/api/salesforce/sync/route": "app/api/salesforce/sync/route.js",
+  "/settings/page": "app/settings/page.js",
   "/page": "app/page.js",
-  "/settings/page": "app/settings/page.js"
+  "/dashboard/page": "app/dashboard/page.js",
+  "/api/analyze-all/route": "app/api/analyze-all/route.js",
+  "/api/cron/sync-jira/route": "app/api/cron/sync-jira/route.js",
+  "/api/analyze-friction/route": "app/api/analyze-friction/route.js",
+  "/api/jira/sync/route": "app/api/jira/sync/route.js",
+  "/api/salesforce/sync-cases/route": "app/api/salesforce/sync-cases/route.js",
+  "/api/cron/analyze-portfolio/route": "app/api/cron/analyze-portfolio/route.js"
 }
