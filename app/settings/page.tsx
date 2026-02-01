@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { LogOut, User, HelpCircle, Target, TrendingDown, BarChart3, AlertTriangle, CheckCircle, Link as LinkIcon, Shield, Lock } from 'lucide-react';
 import SalesforceConnector from '@/components/SalesforceConnector';
 import JiraConnector from '@/components/JiraConnector';
+import JiraLinksDiagnostic from '@/components/JiraLinksDiagnostic';
 
 export default function SettingsPage() {
   const [user, setUser] = useState<any>(null);
@@ -270,6 +271,9 @@ export default function SettingsPage() {
           </div>
           <JiraConnector />
         </div>
+
+        {/* Jira Diagnostics Section */}
+        <JiraLinksDiagnostic />
 
         {/* Account Section */}
         <div className="bg-white rounded-lg shadow p-6">

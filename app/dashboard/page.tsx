@@ -10,6 +10,7 @@ import FavoritesTab from '@/components/FavoritesTab';
 import ReportsHub from '@/components/ReportsHub';
 import ThemesTab from '@/components/ThemesTab';
 import JiraSyncButton from '@/components/JiraSyncButton';
+import JiraFieldDiscovery from '@/components/JiraFieldDiscovery';
 import JiraPortfolioOverview from '@/components/JiraPortfolioOverview';
 
 export default function Dashboard() {
@@ -785,6 +786,11 @@ export default function Dashboard() {
               <JiraPortfolioOverview />
             </div>
 
+            {/* Jira Field Discovery */}
+            <div className="mt-6">
+              <JiraFieldDiscovery />
+            </div>
+
             <section className="mt-8">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-900">
@@ -815,21 +821,21 @@ export default function Dashboard() {
                   </span>
                 </div>
               </div>
-              <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
+              <div className="bg-white rounded-lg border border-gray-200">
+                <table className="w-full divide-y divide-gray-200 table-fixed">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th onClick={() => handleSort('name')} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
+                      <th onClick={() => handleSort('name')} className="w-[20%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-tight cursor-pointer hover:bg-gray-100">
                         Account {getSortIcon('name')}
                       </th>
-                      <th onClick={() => handleSort('arr')} className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
+                      <th onClick={() => handleSort('arr')} className="w-[9%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-tight cursor-pointer hover:bg-gray-100">
                         ARR {getSortIcon('arr')}
                       </th>
-                      <th onClick={() => handleSort('software')} className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
-                        Software {getSortIcon('software')}
+                      <th onClick={() => handleSort('software')} className="w-[8%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-tight cursor-pointer hover:bg-gray-100">
+                        SW {getSortIcon('software')}
                       </th>
-                      <th onClick={() => handleSort('ofi')} className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
-                        OFI Score {getSortIcon('ofi')}
+                      <th onClick={() => handleSort('ofi')} className="w-[8%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-tight cursor-pointer hover:bg-gray-100">
+                        OFI {getSortIcon('ofi')}
                       </th>
                       <th
                         onClick={() => handleSort('case_volume')}
