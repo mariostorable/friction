@@ -9,6 +9,7 @@ import PortfolioSummary from '@/components/PortfolioSummary';
 import FavoritesTab from '@/components/FavoritesTab';
 import ReportsHub from '@/components/ReportsHub';
 import ThemesTab from '@/components/ThemesTab';
+import JiraSyncCard from '@/components/JiraSyncCard';
 
 export default function Dashboard() {
   const [top25, setTop25] = useState<AccountWithMetrics[]>([]);
@@ -710,6 +711,11 @@ export default function Dashboard() {
                 singleOperator={[]}
               />
             )}
+
+            {/* Jira Sync Status */}
+            <div className="mt-6">
+              <JiraSyncCard />
+            </div>
 
             <section className="mt-12">
               <div className="flex justify-between items-center mb-6">

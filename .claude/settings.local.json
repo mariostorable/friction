@@ -15,7 +15,9 @@
       "Bash(node:*)",
       "Bash(npx tsx:*)",
       "Bash(npm run build:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(vercel ls:*)",
+      "Bash(git push:*)"
     ]
   }
 }
