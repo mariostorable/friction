@@ -10,6 +10,7 @@ interface AnalysisResultModalProps {
   accountId: string;
   synced: number;
   analyzed: number;
+  processed?: number; // Total cases processed (including filtered)
   ofiScore: number;
   highSeverity: number;
   remaining?: number;
@@ -22,6 +23,7 @@ export default function AnalysisResultModal({
   accountId,
   synced,
   analyzed,
+  processed,
   ofiScore,
   highSeverity,
   remaining
@@ -30,9 +32,9 @@ export default function AnalysisResultModal({
 
   if (!isOpen) return null;
 
-  // Calculate total and processed
-  const totalCases = analyzed + (remaining || 0);
-  const processedCount = analyzed;
+  // Calculate total and processed - use processed count if available, otherwise fall back to analyzed
+  const processedCount = processed || analyzed;
+  const totalCases = processedCount + (remaining || 0);
   const progressPercentage = totalCases > 0 ? Math.round((processedCount / totalCases) * 100) : 0;
 
   const resultText = `✅ Analysis Complete!
@@ -40,7 +42,7 @@ export default function AnalysisResultModal({
 Account: ${accountName}
 Account ID: ${accountId}
 
-${synced > 0 ? `New cases synced: ${synced}\n` : ''}Analyzed this batch: ${analyzed} friction points
+${synced > 0 ? `New cases synced: ${synced}\n` : ''}Processed: ${processedCount} cases → ${analyzed} friction points
 Progress: ${processedCount} of ${totalCases} cases (${progressPercentage}%)
 OFI Score: ${ofiScore}
 High Severity: ${highSeverity}${remaining ? `\n\n⚠️ ${remaining} cases remaining - click Analyze again to continue` : ''}`;
@@ -88,8 +90,12 @@ High Severity: ${highSeverity}${remaining ? `\n\n⚠️ ${remaining} cases remai
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-gray-600">Analyzed this batch:</span>
-                <span className="font-semibold text-gray-900">{analyzed} friction points</span>
+                <span className="text-gray-600">Processed this batch:</span>
+                <span className="font-semibold text-gray-900">{processedCount} cases</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Friction points found:</span>
+                <span className="font-semibold text-gray-900">{analyzed}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Progress:</span>

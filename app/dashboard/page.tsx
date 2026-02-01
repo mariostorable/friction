@@ -10,6 +10,7 @@ import FavoritesTab from '@/components/FavoritesTab';
 import ReportsHub from '@/components/ReportsHub';
 import ThemesTab from '@/components/ThemesTab';
 import JiraSyncButton from '@/components/JiraSyncButton';
+import JiraPortfolioOverview from '@/components/JiraPortfolioOverview';
 
 export default function Dashboard() {
   const [top25, setTop25] = useState<AccountWithMetrics[]>([]);
@@ -33,6 +34,7 @@ export default function Dashboard() {
   const [checkingConnection, setCheckingConnection] = useState(true);
   const [hoveredColumn, setHoveredColumn] = useState<string | null>(null);
   const [hoveredCaseIcon, setHoveredCaseIcon] = useState<string | null>(null);
+  const [jiraTicketCounts, setJiraTicketCounts] = useState<Record<string, { resolved_7d: number; in_progress: number; open: number }>>({});
   const supabase = createClientComponentClient();
   const router = useRouter();
 
@@ -166,6 +168,17 @@ export default function Dashboard() {
             acc[alert.account_id] = (acc[alert.account_id] || 0) + 1;
             return acc;
           }, {});
+
+          // Fetch Jira ticket counts for each account
+          try {
+            const jiraResponse = await fetch('/api/jira/portfolio-stats');
+            if (jiraResponse.ok) {
+              const jiraData = await jiraResponse.json();
+              setJiraTicketCounts(jiraData.accountTicketCounts || {});
+            }
+          } catch (error) {
+            console.error('Error fetching Jira ticket counts:', error);
+          }
 
           // Add alert counts to accounts (always, even if all are 0)
           const accountsWithAlerts = accountsWithSnapshot.map(acc => ({
@@ -716,6 +729,11 @@ export default function Dashboard() {
               />
             )}
 
+            {/* Jira Portfolio Overview */}
+            <div className="mt-6">
+              <JiraPortfolioOverview />
+            </div>
+
             <section className="mt-8">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-900">
@@ -799,6 +817,21 @@ export default function Dashboard() {
                       </th>
                       <th onClick={() => handleSort('last_analyzed')} className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
                         Last Analyzed {getSortIcon('last_analyzed')}
+                      </th>
+                      <th
+                        onMouseEnter={() => setHoveredColumn('jira_tickets')}
+                        onMouseLeave={() => setHoveredColumn(null)}
+                        className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider relative"
+                      >
+                        <div className="flex items-center gap-1">
+                          Jira Tickets
+                        </div>
+                        {hoveredColumn === 'jira_tickets' && (
+                          <div className="absolute left-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 z-50 whitespace-normal normal-case font-normal">
+                            Product roadmap tickets linked to this account's friction themes. Shows resolved (7d) / in progress / open.
+                            <div className="absolute -top-1 left-6 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                          </div>
+                        )}
                       </th>
                     </tr>
                   </thead>
@@ -927,6 +960,25 @@ export default function Dashboard() {
                           {account.current_snapshot?.created_at
                             ? new Date(account.current_snapshot.created_at).toLocaleDateString()
                             : 'Never'}
+                        </td>
+                        <td className="px-3 py-3 whitespace-nowrap text-sm">
+                          {jiraTicketCounts[account.id] ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-green-700 font-medium" title="Resolved (7 days)">
+                                {jiraTicketCounts[account.id].resolved_7d}
+                              </span>
+                              <span className="text-gray-300">/</span>
+                              <span className="text-blue-700 font-medium" title="In Progress">
+                                {jiraTicketCounts[account.id].in_progress}
+                              </span>
+                              <span className="text-gray-300">/</span>
+                              <span className="text-gray-600 font-medium" title="Open">
+                                {jiraTicketCounts[account.id].open}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
                         </td>
                       </tr>
                     ))}

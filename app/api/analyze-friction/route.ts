@@ -280,12 +280,13 @@ If is_friction is TRUE, continue with:
       .eq('processed', false);
 
     const message = remainingCount && remainingCount > 0
-      ? `Created ${insertedCards?.length} friction cards (${nonFrictionCount} non-friction cases filtered). ${remainingCount} more cases remaining - click Analyze again to continue.`
-      : `Created ${insertedCards?.length} friction cards (${nonFrictionCount} non-friction cases filtered). All cases processed!`;
+      ? `Processed ${rawInputs.length} cases: ${insertedCards?.length} friction cards created, ${nonFrictionCount} routine support filtered. ${remainingCount} more cases remaining - click Analyze again to continue.`
+      : `Processed ${rawInputs.length} cases: ${insertedCards?.length} friction cards created, ${nonFrictionCount} routine support filtered. All cases processed!`;
 
     return NextResponse.json({
       success: true,
       analyzed: insertedCards?.length || 0,
+      processed: rawInputs.length, // Total cases processed in this batch
       filtered: nonFrictionCount,
       remaining: remainingCount || 0,
       message

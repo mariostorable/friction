@@ -50,6 +50,7 @@ export default function AccountDetailPage() {
   const [analysisResult, setAnalysisResult] = useState<{
     synced: number;
     analyzed: number;
+    processed?: number;
     ofiScore: number;
     highSeverity: number;
     remaining?: number;
@@ -493,6 +494,7 @@ export default function AccountDetailPage() {
       setAnalysisResult({
         synced: casesResult.synced,
         analyzed: analyzeResult.analyzed,
+        processed: analyzeResult.processed,
         ofiScore: ofiResult.ofi_score,
         highSeverity: ofiResult.high_severity,
         remaining: analyzeResult.remaining
@@ -839,6 +841,7 @@ export default function AccountDetailPage() {
         accountId={accountId}
         synced={analysisResult?.synced || 0}
         analyzed={analysisResult?.analyzed || 0}
+        processed={analysisResult?.processed}
         ofiScore={analysisResult?.ofiScore || 0}
         highSeverity={analysisResult?.highSeverity || 0}
         remaining={analysisResult?.remaining}

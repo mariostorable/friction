@@ -75,8 +75,35 @@ export default function VisitBriefing({ account, frictionCards, snapshot }: Visi
         }
       });
 
-      casesData.sort((a, b) => new Date(b.case_date).getTime() - new Date(a.case_date).getTime());
-      setCases(casesData);
+      // Sort by severity (highest first), then by date (most recent first)
+      casesData.sort((a, b) => {
+        if (b.severity !== a.severity) return b.severity - a.severity;
+        return new Date(b.case_date).getTime() - new Date(a.case_date).getTime();
+      });
+
+      // Select top 6 cases, prioritizing theme diversity
+      const topCases: CaseData[] = [];
+      const seenThemes = new Set<string>();
+      const MAX_CASES = 6;
+
+      // First pass: Get high severity cases with diverse themes
+      for (const caseData of casesData) {
+        if (topCases.length >= MAX_CASES) break;
+        if (caseData.severity >= 4 && !seenThemes.has(caseData.theme)) {
+          topCases.push(caseData);
+          seenThemes.add(caseData.theme);
+        }
+      }
+
+      // Second pass: Fill remaining slots with highest severity cases
+      for (const caseData of casesData) {
+        if (topCases.length >= MAX_CASES) break;
+        if (!topCases.includes(caseData)) {
+          topCases.push(caseData);
+        }
+      }
+
+      setCases(topCases);
 
       const response = await fetch('/api/briefing/generate', {
         method: 'POST',
@@ -236,8 +263,14 @@ export default function VisitBriefing({ account, frictionCards, snapshot }: Visi
       }
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.text('Support Cases (Chronological)', margin, y);
-      y += 8;
+      doc.text('Top Support Cases (Highest Severity)', margin, y);
+      y += 5;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Showing ${cases.length} of ${frictionCards.length} cases`, margin, y);
+      doc.setTextColor(0, 0, 0);
+      y += 6;
 
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
@@ -461,7 +494,12 @@ export default function VisitBriefing({ account, frictionCards, snapshot }: Visi
 
               {cases.length > 0 && (
                 <div>
-                  <h3 className="text-lg font-semibold mb-3">🔍 Support Cases (Chronological)</h3>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-semibold">🔍 Top Support Cases</h3>
+                    <span className="text-xs text-gray-500">
+                      Showing {cases.length} of {frictionCards.length} cases (highest severity)
+                    </span>
+                  </div>
                   <div className="space-y-2">
                     {cases.map((caseData) => (
                       <div key={caseData.id} className="p-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors">
