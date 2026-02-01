@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
     }
 
     const email = integration.metadata?.email;
-    const authHeader = `Basic ${Buffer.from(`${email}:${tokens.access_token}`).toString('base64')}`;
+    const jiraAuthHeader = `Basic ${Buffer.from(`${email}:${tokens.access_token}`).toString('base64')}`;
 
     // Fetch ALL issues from Jira (last 90 days, updated recently) with pagination
     const jql = `updated >= -90d ORDER BY updated DESC`;
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
         `${integration.instance_url}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&startAt=${startAt}&maxResults=${maxResults}&fields=summary,description,status,priority,assignee,labels,created,updated,resolutiondate,comment,sprint`,
         {
           headers: {
-            'Authorization': authHeader,
+            'Authorization': jiraAuthHeader,
             'Accept': 'application/json',
           },
         }
