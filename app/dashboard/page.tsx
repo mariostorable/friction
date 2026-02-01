@@ -36,8 +36,26 @@ export default function Dashboard() {
   const [hoveredColumn, setHoveredColumn] = useState<string | null>(null);
   const [hoveredCaseIcon, setHoveredCaseIcon] = useState<string | null>(null);
   const [jiraTicketCounts, setJiraTicketCounts] = useState<Record<string, { resolved_7d: number; in_progress: number; open: number }>>({});
+  const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
   const supabase = createClientComponentClient();
   const router = useRouter();
+
+  // Handle URL parameters for tab and theme navigation
+  useEffect(() => {
+    // Read URL params manually to avoid SSR issues
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      const theme = params.get('theme');
+
+      if (tab === 'themes') {
+        setActiveTab('themes');
+        if (theme) {
+          setSelectedTheme(theme);
+        }
+      }
+    }
+  }, []);
 
   useEffect(() => {
     loadDashboard();
@@ -1038,6 +1056,7 @@ export default function Dashboard() {
         {activeTab === 'themes' && (
           <ThemesTab
             accounts={filterAccountsByBusinessUnit(top25)}
+            initialExpandedTheme={selectedTheme}
           />
         )}
       </main>

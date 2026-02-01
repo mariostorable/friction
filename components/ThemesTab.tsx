@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AccountWithMetrics } from '@/types';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   aggregateThemesByProduct,
@@ -12,18 +12,53 @@ import {
   ThemeWithAccounts
 } from '@/lib/themeAggregation';
 
-interface ThemesTabProps {
-  accounts: AccountWithMetrics[];
+interface JiraTicket {
+  jira_key: string;
+  summary: string;
+  status: string;
+  issue_url: string;
+  priority: string | null;
 }
 
-export default function ThemesTab({ accounts }: ThemesTabProps) {
+interface ThemesTabProps {
+  accounts: AccountWithMetrics[];
+  initialExpandedTheme?: string | null;
+}
+
+export default function ThemesTab({ accounts, initialExpandedTheme }: ThemesTabProps) {
   const [productFilter, setProductFilter] = useState<ProductFilter>('All');
-  const [expandedTheme, setExpandedTheme] = useState<string | null>(null);
+  const [expandedTheme, setExpandedTheme] = useState<string | null>(initialExpandedTheme || null);
+  const [jiraTickets, setJiraTickets] = useState<Record<string, JiraTicket[]>>({});
+  const [loadingTickets, setLoadingTickets] = useState<Record<string, boolean>>({});
   const router = useRouter();
 
   const themes = aggregateThemesByProduct(accounts, productFilter);
   const totalIssues = getTotalIssueCount(themes);
   const affectedAccounts = getAffectedAccountCount(accounts, productFilter);
+
+  // Fetch Jira tickets when a theme is expanded
+  useEffect(() => {
+    if (expandedTheme && !jiraTickets[expandedTheme] && !loadingTickets[expandedTheme]) {
+      fetchJiraTicketsForTheme(expandedTheme);
+    }
+  }, [expandedTheme]);
+
+  async function fetchJiraTicketsForTheme(themeKey: string) {
+    setLoadingTickets(prev => ({ ...prev, [themeKey]: true }));
+
+    try {
+      const response = await fetch(`/api/jira/theme-tickets?theme=${themeKey}`);
+      if (response.ok) {
+        const data = await response.json();
+        setJiraTickets(prev => ({ ...prev, [themeKey]: data.tickets || [] }));
+      }
+    } catch (error) {
+      console.error('Error fetching Jira tickets:', error);
+      setJiraTickets(prev => ({ ...prev, [themeKey]: [] }));
+    } finally {
+      setLoadingTickets(prev => ({ ...prev, [themeKey]: false }));
+    }
+  }
 
   function getSeverityColor(severity: number): string {
     if (severity >= 4) return 'bg-red-100 text-red-800';
@@ -113,9 +148,60 @@ export default function ThemesTab({ accounts }: ThemesTabProps) {
 
                 {/* Expanded Details */}
                 {expandedTheme === theme.theme_key && (
-                  <div className="px-4 py-4 bg-gray-50 border-t border-gray-200">
+                  <div className="px-4 py-4 bg-gray-50 border-t border-gray-200 space-y-4">
+                    {/* Jira Tickets */}
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                        Product Roadmap
+                        {jiraTickets[theme.theme_key] && jiraTickets[theme.theme_key].length > 0 && (
+                          <span className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded font-medium">
+                            {jiraTickets[theme.theme_key].length} {jiraTickets[theme.theme_key].length === 1 ? 'ticket' : 'tickets'}
+                          </span>
+                        )}
+                      </h4>
+                      {loadingTickets[theme.theme_key] && (
+                        <div className="text-sm text-gray-500">Loading roadmap tickets...</div>
+                      )}
+                      {!loadingTickets[theme.theme_key] && jiraTickets[theme.theme_key] && jiraTickets[theme.theme_key].length > 0 && (
+                        <div className="space-y-2">
+                          {jiraTickets[theme.theme_key].map(ticket => (
+                            <div key={ticket.jira_key} className="bg-white rounded border border-gray-200 p-3">
+                              <div className="flex items-start gap-2">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <a
+                                      href={ticket.issue_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="text-sm font-mono font-semibold text-blue-700 hover:text-blue-900 hover:underline flex items-center gap-1"
+                                    >
+                                      {ticket.jira_key}
+                                      <ExternalLink className="w-3 h-3" />
+                                    </a>
+                                    <span className="text-xs bg-gray-100 px-2 py-0.5 rounded border border-gray-300 text-gray-700">
+                                      {ticket.status}
+                                    </span>
+                                    {ticket.priority && (
+                                      <span className="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded font-medium">
+                                        {ticket.priority}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-sm text-gray-700">{ticket.summary}</div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {!loadingTickets[theme.theme_key] && jiraTickets[theme.theme_key] && jiraTickets[theme.theme_key].length === 0 && (
+                        <div className="text-sm text-gray-500 italic">No roadmap tickets linked to this theme yet.</div>
+                      )}
+                    </div>
+
                     {/* Severity Distribution */}
-                    <div className="mb-4">
+                    <div>
                       <h4 className="text-sm font-medium text-gray-700 mb-2">Severity Distribution</h4>
                       <div className="flex items-center gap-6">
                         <div className="flex items-center gap-2">
