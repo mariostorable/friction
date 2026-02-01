@@ -54,12 +54,28 @@ export async function POST(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(20);
 
+    // Get Jira status data
+    let jiraStatus = null;
+    try {
+      const jiraResponse = await fetch(`${request.url.replace('/api/briefing/generate', '')}/api/accounts/${account_id}/jira-status`, {
+        headers: {
+          cookie: request.headers.get('cookie') || '',
+        },
+      });
+      if (jiraResponse.ok) {
+        jiraStatus = await jiraResponse.json();
+      }
+    } catch (error) {
+      console.log('Could not fetch Jira status for briefing:', error);
+    }
+
     // Generate briefing with Claude
     const briefing = await generateBriefingWithClaude({
       account,
       snapshot,
       frictionCards: frictionCards || [],
       rawInputs: rawInputs || [],
+      jiraStatus,
       briefingType: briefing_type,
     });
 
@@ -75,11 +91,11 @@ export async function POST(request: NextRequest) {
 }
 
 async function generateBriefingWithClaude(data: any) {
-  const { account, snapshot, frictionCards, rawInputs, briefingType } = data;
+  const { account, snapshot, frictionCards, rawInputs, jiraStatus, briefingType } = data;
 
   const prompt = briefingType === 'quick'
-    ? generateQuickBriefingPrompt(account, snapshot, frictionCards)
-    : generateDeepBriefingPrompt(account, snapshot, frictionCards, rawInputs);
+    ? generateQuickBriefingPrompt(account, snapshot, frictionCards, jiraStatus)
+    : generateDeepBriefingPrompt(account, snapshot, frictionCards, rawInputs, jiraStatus);
 
   // Use different models and token limits based on briefing type
   const model = briefingType === 'quick'
@@ -119,7 +135,7 @@ async function generateBriefingWithClaude(data: any) {
   return JSON.parse(jsonMatch[0]);
 }
 
-function generateQuickBriefingPrompt(account: any, snapshot: any, frictionCards: any[]) {
+function generateQuickBriefingPrompt(account: any, snapshot: any, frictionCards: any[], jiraStatus: any) {
   const ofiScore = snapshot?.ofi_score || 0;
   const trend = snapshot?.trend_vs_prior_period || 0;
   const trendText = trend > 15 ? '↑ WORSENING' : trend < -15 ? '↓ IMPROVING' : 'STABLE';
@@ -130,6 +146,35 @@ function generateQuickBriefingPrompt(account: any, snapshot: any, frictionCards:
       return `- ${card.summary} (Severity: ${card.severity}, Theme: ${card.theme_key}, Raw Input ID: ${card.raw_input_id})`;
     })
     .join('\n');
+
+  // Format Jira data
+  let jiraSection = '';
+  if (jiraStatus && jiraStatus.summary) {
+    const { summary, recentlyResolved, comingSoon, shouldPrioritize } = jiraStatus;
+    jiraSection = `
+
+JIRA ROADMAP PROGRESS:
+- Recently Resolved (7d): ${summary.resolved_7d} tickets
+- Recently Resolved (30d): ${summary.resolved_30d} tickets
+- In Progress: ${summary.in_progress} tickets
+- On Radar: ${summary.open_count - summary.in_progress} tickets
+- High-Priority Themes Without Tickets: ${summary.needs_ticket}
+
+QUICK WINS TO REFERENCE (Recently Resolved):
+${recentlyResolved?.slice(0, 3).map((issue: any) =>
+  `- ${issue.jira_key}: ${issue.summary} (${issue.resolved_days_ago}d ago)`
+).join('\n') || 'None recently'}
+
+COMING SOON (In Development):
+${comingSoon?.slice(0, 3).map((issue: any) =>
+  `- ${issue.jira_key}: ${issue.summary} (Status: ${issue.status})`
+).join('\n') || 'None'}
+
+SHOULD PRIORITIZE (High friction, no ticket):
+${shouldPrioritize?.slice(0, 3).map((theme: any) =>
+  `- ${theme.theme_key}: ${theme.case_count} cases, impact score ${Math.round(theme.weight)}`
+).join('\n') || 'All covered'}`;
+  }
 
   return `You are preparing a quick customer visit briefing for a business executive.
 
@@ -155,7 +200,7 @@ IMPORTANT - OFI SCORE INTERPRETATION:
 RECENT FRICTION SIGNALS (Last 30 days):
 ${cardsSummary || 'No recent friction signals'}
 
-HIGH SEVERITY COUNT: ${snapshot?.high_severity_count || 0}
+HIGH SEVERITY COUNT: ${snapshot?.high_severity_count || 0}${jiraSection}
 TOTAL SIGNALS: ${frictionCards.length}
 
 Generate a JSON object for a QUICK customer visit briefing (2-3 minute read):
@@ -200,8 +245,8 @@ Generate a JSON object for a QUICK customer visit briefing (2-3 minute read):
 Be specific with dates, numbers, and concrete details. Focus on what's most actionable for the visit.`;
 }
 
-function generateDeepBriefingPrompt(account: any, snapshot: any, frictionCards: any[], rawInputs: any[]) {
-  const quickPrompt = generateQuickBriefingPrompt(account, snapshot, frictionCards);
+function generateDeepBriefingPrompt(account: any, snapshot: any, frictionCards: any[], rawInputs: any[], jiraStatus: any) {
+  const quickPrompt = generateQuickBriefingPrompt(account, snapshot, frictionCards, jiraStatus);
 
   const recentInputsSummary = rawInputs
     .slice(0, 15)

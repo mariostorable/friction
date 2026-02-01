@@ -23,6 +23,7 @@ import CaseOriginsAlert from '@/components/CaseOriginsAlert';
 import PeerCaseComparison from '@/components/PeerCaseComparison';
 import FrictionClusters from '@/components/FrictionClusters';
 import AnalysisResultModal from '@/components/AnalysisResultModal';
+import AccountSupportRoadmap from '@/components/AccountSupportRoadmap';
 
 export default function AccountDetailPage() {
   const params = useParams();
@@ -756,6 +757,11 @@ export default function AccountDetailPage() {
             peers={peerAccounts}
           />
         )}
+
+        {/* Support & Roadmap */}
+        <div className="mb-6">
+          <AccountSupportRoadmap accountId={accountId} />
+        </div>
 
         {/* Trend Chart */}
         <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
