@@ -25,6 +25,7 @@ interface SharedIssue {
   jira_key: string;
   summary: string;
   status: string;
+  issue_url: string;
   affected_accounts: Array<{ id: string; name: string; arr: number }>;
   impact_score: number;
 }
@@ -203,14 +204,25 @@ export default function JiraPortfolioOverview() {
             <div key={issue.jira_key} className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
               <div className="flex items-start justify-between mb-2">
                 <div className="flex-1">
-                  <div className="font-medium text-gray-900">{issue.summary}</div>
-                  <div className="text-xs text-gray-600 mt-1">
-                    {issue.jira_key} • {issue.status}
+                  <div className="flex items-center gap-2 mb-1">
+                    <a
+                      href={issue.issue_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-sm font-mono font-semibold text-blue-700 hover:text-blue-900 hover:underline"
+                    >
+                      {issue.jira_key}
+                    </a>
+                    <span className="text-xs bg-white px-2 py-0.5 rounded border border-gray-300 text-gray-600">
+                      {issue.status}
+                    </span>
+                    <span className="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded font-medium">
+                      {issue.affected_accounts.length} accounts
+                    </span>
                   </div>
+                  <div className="text-sm text-gray-700">{issue.summary}</div>
                 </div>
-                <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded font-medium">
-                  {issue.affected_accounts.length} accounts
-                </span>
               </div>
               <div className="mt-2 flex flex-wrap gap-2">
                 {issue.affected_accounts.slice(0, 3).map((account) => (

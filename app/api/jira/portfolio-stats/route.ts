@@ -151,6 +151,7 @@ export async function GET(request: NextRequest) {
           jira_key: jiraKey,
           summary: ticket?.summary || '',
           status: ticket?.status || 'Unknown',
+          issue_url: ticket?.issue_url || '#',
           affected_accounts: affectedAccounts,
           impact_score: affectedAccounts.reduce((sum, a) => sum + (a.arr || 0), 0)
         };
