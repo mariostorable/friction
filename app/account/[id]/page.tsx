@@ -282,6 +282,12 @@ export default function AccountDetailPage() {
                 })
                 .filter(p => p.caseVolume > 0); // Only include accounts with case data
 
+              console.log('Peer accounts loaded:', peers.length, 'total peers');
+              console.log('Product breakdown:', {
+                edge: peers.filter(p => p.product === 'EDGE').length,
+                sitelink: peers.filter(p => p.product === 'SiteLink').length,
+                other: peers.filter(p => p.product === 'Other').length
+              });
               setPeerAccounts(peers);
             }
           }
@@ -753,8 +759,8 @@ export default function AccountDetailPage() {
             currentAccount={{
               name: account.name,
               caseVolume: caseVolumeMetrics.current,
-              product: account.products?.includes('EDGE') ? 'EDGE' :
-                       account.products?.includes('SiteLink') ? 'SiteLink' : 'Other'
+              product: account.vertical?.includes('EDGE') ? 'EDGE' :
+                       account.vertical?.includes('SiteLink') ? 'SiteLink' : 'Other'
             }}
             peers={peerAccounts}
           />

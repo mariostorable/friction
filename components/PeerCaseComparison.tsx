@@ -21,6 +21,13 @@ export default function PeerCaseComparison({ currentAccount, peers }: PeerCaseCo
   // Filter to only peers with the same software provider
   const productPeers = peers.filter(p => p.product === currentAccount.product);
 
+  console.log('PeerCaseComparison debug:', {
+    currentAccountProduct: currentAccount.product,
+    totalPeers: peers.length,
+    matchingPeers: productPeers.length,
+    peerProducts: peers.map(p => ({ name: p.name, product: p.product })).slice(0, 5)
+  });
+
   // Calculate statistics using product-specific peers
   const sortedPeers = [...productPeers].sort((a, b) => b.caseVolume - a.caseVolume);
   const currentRank = sortedPeers.findIndex(p => p.name === currentAccount.name) + 1;
