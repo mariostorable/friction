@@ -71,8 +71,8 @@ export async function POST(request: NextRequest) {
               'anthropic-version': '2023-06-01',
             },
             body: JSON.stringify({
-              model: 'claude-3-haiku-20240307',
-              max_tokens: 500,
+              model: 'claude-sonnet-4-20250514',
+              max_tokens: 1000,
               messages: [{ role: 'user', content: prompt }],
             }),
           });
@@ -196,7 +196,7 @@ If is_friction is TRUE, continue with:
           root_cause_hypothesis: analysis.root_cause || 'Unknown',
           evidence_snippets: analysis.evidence || [],
           confidence_score: 0.8,
-          reasoning: 'Analyzed by Claude Sonnet',
+          reasoning: 'Analyzed by Claude Sonnet 4.5',
           lifecycle_stage: null,
           is_new_theme: false,
         });
