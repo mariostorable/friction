@@ -42,14 +42,58 @@ export async function POST(request: NextRequest) {
     // Count high-severity issues (severity 4 or 5)
     const highSeverityCount = recentCards.filter(c => c.severity >= 4).length;
 
+    // Get Jira ticket status for friction themes to adjust scoring
+    const themeKeys = Array.from(new Set(recentCards.map(c => c.theme_key)));
+
+    const { data: jiraLinks } = await supabase
+      .from('theme_jira_links')
+      .select(`
+        theme_key,
+        jira_issues!inner(
+          status,
+          resolution_date
+        )
+      `)
+      .in('theme_key', themeKeys)
+      .eq('jira_issues.user_id', user.id);
+
+    // Build map of theme -> best ticket status (resolved > in_progress > open)
+    const themeStatus: Record<string, 'resolved' | 'in_progress' | 'open'> = {};
+
+    jiraLinks?.forEach((link: any) => {
+      const theme = link.theme_key;
+      const ticket = link.jira_issues;
+
+      if (ticket.resolution_date) {
+        themeStatus[theme] = 'resolved'; // Best status
+      } else if (!themeStatus[theme] || themeStatus[theme] === 'open') {
+        const statusLower = ticket.status?.toLowerCase() || '';
+        if (statusLower.includes('progress') || statusLower.includes('development') || statusLower.includes('review')) {
+          themeStatus[theme] = 'in_progress';
+        } else if (!themeStatus[theme]) {
+          themeStatus[theme] = 'open';
+        }
+      }
+    });
+
     // Calculate OFI Score with improved algorithm
     // Severity weights: reduced from exponential to prevent easy maxing out
     // Old: 1, 2, 4, 8, 16 -> New: 1, 2, 3, 5, 8 (still emphasizes high severity but more gradual)
     const severityWeights = { 1: 1, 2: 2, 3: 3, 4: 5, 5: 8 };
 
-    // Calculate weighted friction score
+    // Jira adjustment multipliers (reduce score if issue is being addressed)
+    const jiraMultipliers = {
+      'resolved': 0.2,    // Issue fixed - only 20% of friction weight
+      'in_progress': 0.5, // Being worked on - 50% of friction weight
+      'open': 1.0         // Not addressed yet - full weight
+    };
+
+    // Calculate weighted friction score with Jira adjustments
     const weightedScore = recentCards.reduce((sum, card) => {
-      return sum + (severityWeights[card.severity as keyof typeof severityWeights] || 1);
+      const baseWeight = severityWeights[card.severity as keyof typeof severityWeights] || 1;
+      const jiraStatus = themeStatus[card.theme_key] || 'open';
+      const jiraMultiplier = jiraMultipliers[jiraStatus];
+      return sum + (baseWeight * jiraMultiplier);
     }, 0);
 
     // Normalize by case volume to get friction density
