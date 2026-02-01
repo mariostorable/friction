@@ -26,6 +26,7 @@ export default function Dashboard() {
   const [analyzedAccountNames, setAnalyzedAccountNames] = useState<string[]>([]);
   const [pendingAccountNames, setPendingAccountNames] = useState<string[]>([]);
   const [showSyncTooltip, setShowSyncTooltip] = useState(false);
+  const [lastAnalysisTime, setLastAnalysisTime] = useState<string | null>(null);
   const [sortField, setSortField] = useState<string>('arr');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [softwareFilter, setSoftwareFilter] = useState<'all' | 'edge' | 'sitelink'>('all');
@@ -132,6 +133,22 @@ export default function Dashboard() {
           setAccountsAnalyzedToday(todaySnapshots?.length || 0);
           setAnalyzedAccountNames(analyzed);
           setPendingAccountNames(pending);
+
+          // Get the most recent snapshot time for "last analyzed" display
+          if (todaySnapshots && todaySnapshots.length > 0) {
+            const { data: recentSnapshot } = await supabase
+              .from('account_snapshots')
+              .select('created_at')
+              .in('account_id', accountIds)
+              .eq('snapshot_date', today)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .single();
+
+            if (recentSnapshot) {
+              setLastAnalysisTime(recentSnapshot.created_at);
+            }
+          }
 
           // Calculate portfolio-wide case volume average
           const { data: allSnapshots } = await supabase
@@ -565,7 +582,7 @@ export default function Dashboard() {
               disabled={syncing || checkingConnection}
               onMouseEnter={() => setShowSyncTooltip(true)}
               onMouseLeave={() => setShowSyncTooltip(false)}
-              className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${
+              className={`px-4 py-2 rounded-lg font-medium flex flex-col items-start transition-colors ${
                 syncing || checkingConnection
                   ? 'bg-gray-400 text-white cursor-not-allowed'
                   : !isSalesforceConnected
@@ -577,23 +594,39 @@ export default function Dashboard() {
                   : 'bg-green-600 text-white hover:bg-green-700'
               }`}
             >
-              {syncing && (
-                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
+              <div className="flex items-center gap-2">
+                {syncing && (
+                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                )}
+                <span>
+                  {checkingConnection
+                    ? 'Checking...'
+                    : syncing
+                    ? 'Syncing Portfolio...'
+                    : !isSalesforceConnected
+                    ? 'Connect Salesforce'
+                    : totalPortfolioAccounts === 0
+                    ? 'Sync from Salesforce'
+                    : accountsAnalyzedToday < totalPortfolioAccounts
+                    ? 'Sync & Analyze All'
+                    : 'All Up to Date ✓'}
+                </span>
+              </div>
+              {!syncing && !checkingConnection && isSalesforceConnected && accountsAnalyzedToday === totalPortfolioAccounts && lastAnalysisTime && (
+                <span className="text-xs opacity-90 mt-0.5">
+                  Last analyzed {(() => {
+                    const diffMs = Date.now() - new Date(lastAnalysisTime).getTime();
+                    const diffMins = Math.floor(diffMs / 60000);
+                    const diffHours = Math.floor(diffMins / 60);
+                    if (diffHours > 0) return `${diffHours}h ago`;
+                    if (diffMins > 0) return `${diffMins}m ago`;
+                    return 'just now';
+                  })()} • Click to re-sync
+                </span>
               )}
-              {checkingConnection
-                ? 'Checking...'
-                : syncing
-                ? 'Syncing Portfolio...'
-                : !isSalesforceConnected
-                ? 'Connect Salesforce'
-                : totalPortfolioAccounts === 0
-                ? 'Sync from Salesforce'
-                : accountsAnalyzedToday < totalPortfolioAccounts
-                ? 'Sync & Analyze All'
-                : 'All Up to Date ✓'}
             </button>
             {!syncing && accountsAnalyzedToday < totalPortfolioAccounts && (
               <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">

@@ -78,6 +78,21 @@ export default function JiraSyncButton() {
     ? new Date(syncStats.lastSynced).toLocaleString()
     : 'Never';
 
+  // Calculate time ago for compact display
+  const timeAgo = syncStats.lastSynced
+    ? (() => {
+        const diffMs = Date.now() - new Date(syncStats.lastSynced).getTime();
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMins / 60);
+        const diffDays = Math.floor(diffHours / 24);
+
+        if (diffDays > 0) return `${diffDays}d ago`;
+        if (diffHours > 0) return `${diffHours}h ago`;
+        if (diffMins > 0) return `${diffMins}m ago`;
+        return 'just now';
+      })()
+    : 'never';
+
   return (
     <div className="relative">
       <button
@@ -85,10 +100,17 @@ export default function JiraSyncButton() {
         disabled={syncing}
         onMouseEnter={() => setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
-        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-purple-700 bg-purple-50 border border-purple-300 rounded-lg hover:bg-purple-100 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex flex-col items-start px-4 py-2 text-sm font-medium text-purple-700 bg-purple-50 border border-purple-300 rounded-lg hover:bg-purple-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       >
-        <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-        {syncing ? 'Syncing Jira...' : 'Sync Jira'}
+        <div className="flex items-center gap-2">
+          <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+          <span>{syncing ? 'Syncing Jira...' : 'Sync Jira'}</span>
+        </div>
+        {!syncing && (
+          <span className="text-xs text-purple-600 mt-0.5 ml-6">
+            Last synced {timeAgo}
+          </span>
+        )}
       </button>
 
       {/* Hover Tooltip */}
