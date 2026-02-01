@@ -175,7 +175,10 @@ export default function JiraPortfolioOverview() {
           {data.topThemes.slice(0, 5).map((theme) => (
             <button
               key={theme.theme_key}
-              onClick={() => router.push(`/dashboard?tab=themes&theme=${theme.theme_key}`)}
+              onClick={() => {
+                console.log('Navigating to theme:', theme.theme_key);
+                window.location.href = `/dashboard?tab=themes&theme=${theme.theme_key}`;
+              }}
               className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-left"
             >
               <div className="flex-1">
