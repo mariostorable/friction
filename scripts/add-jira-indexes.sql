@@ -26,9 +26,12 @@ ON theme_jira_links(theme_key);
 CREATE INDEX IF NOT EXISTS idx_theme_jira_links_composite
 ON theme_jira_links(theme_key, match_confidence DESC);
 
--- Index for case_themes queries (to find themes by account)
-CREATE INDEX IF NOT EXISTS idx_case_themes_case_id
-ON case_themes(case_id);
+-- Index for friction_cards queries (to find themes by account)
+CREATE INDEX IF NOT EXISTS idx_friction_cards_account_theme
+ON friction_cards(account_id, theme_key);
+
+CREATE INDEX IF NOT EXISTS idx_friction_cards_theme_key
+ON friction_cards(theme_key);
 
 -- Verify indexes were created
 SELECT

@@ -18,15 +18,9 @@ export async function GET(
 
     // 1. Get friction themes for this account (weighted by case volume and severity)
     const { data: accountThemes } = await supabase
-      .from('case_themes')
-      .select(`
-        theme_key,
-        friction_cases!inner(
-          account_id,
-          severity
-        )
-      `)
-      .eq('friction_cases.account_id', accountId);
+      .from('friction_cards')
+      .select('theme_key, severity')
+      .eq('account_id', accountId);
 
     if (!accountThemes || accountThemes.length === 0) {
       return NextResponse.json({
@@ -46,7 +40,7 @@ export async function GET(
         themeWeights[theme] = { count: 0, avgSeverity: 0, weight: 0 };
       }
       themeWeights[theme].count++;
-      themeWeights[theme].avgSeverity += item.friction_cases.severity || 3;
+      themeWeights[theme].avgSeverity += item.severity || 3;
     });
 
     Object.keys(themeWeights).forEach(theme => {

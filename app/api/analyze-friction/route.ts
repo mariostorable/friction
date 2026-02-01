@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
     const frictionCards = [];
     let parseErrorCount = 0;
     let apiErrorCount = 0;
+    let nonFrictionCount = 0;
     const errors: string[] = [];
 
     // Helper function: sleep for rate limiting
@@ -116,8 +117,17 @@ export async function POST(request: NextRequest) {
 ${truncatedText}${truncationNote}
 
 Return a single JSON object with these fields:
+
+FIRST, determine if this is actual friction or routine support:
+- is_friction: true/false
+  * TRUE = User is blocked, confused, frustrated, experiencing errors, or encountering product limitations
+  * FALSE = Routine questions, transactional requests (change email/password), positive feedback, simple how-to questions that are easily answered, or feature requests without clear pain
+
+If is_friction is FALSE, stop here and return: {"is_friction": false, "reason": "brief explanation"}
+
+If is_friction is TRUE, continue with:
 - summary: Brief description of the issue (1 sentence)
-- theme_key: Choose the MOST SPECIFIC theme that fits (avoid "other" unless truly necessary):
+- theme_key: Choose the MOST SPECIFIC theme. "other" should be under 10% of cases:
   * billing_confusion: Invoice, payment, pricing, subscription issues
   * integration_failures: API issues, third-party app connections, data sync problems
   * ui_confusion: Interface unclear, hard to find features, confusing workflow
@@ -133,7 +143,7 @@ Return a single JSON object with these fields:
   * workflow_inefficiency: Process is too complex or time-consuming
   * mobile_issues: Mobile app or mobile web problems
   * documentation_gaps: Help docs missing, outdated, or unclear
-  * other: Only use if none of the above fit
+  * other: ONLY if absolutely none of the above apply (should be rare)
 - severity: 1-5 (1=minor inconvenience, 5=critical blocker)
 - sentiment: frustrated, confused, angry, neutral, satisfied
 - root_cause: Your hypothesis about the underlying cause
@@ -161,9 +171,19 @@ Return a single JSON object with these fields:
 
       const anthropicData = await anthropicResponse.json();
       let responseText = anthropicData.content[0].text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      
+
       try {
         const analysis = JSON.parse(responseText);
+
+        // Skip if not actual friction
+        if (analysis.is_friction === false) {
+          nonFrictionCount++;
+          console.log(`Skipping non-friction case ${input.id}: ${analysis.reason || 'Not friction'}`);
+          // Still count as processed but don't create a friction card
+          await sleep(300);
+          continue;
+        }
+
         frictionCards.push({
           user_id: user.id,
           account_id: accountId,
@@ -189,7 +209,7 @@ Return a single JSON object with these fields:
       }
     }
 
-    console.log(`Analyzed ${frictionCards.length} cases successfully, ${parseErrorCount} parse errors, ${apiErrorCount} API errors`);
+    console.log(`Analyzed ${frictionCards.length} friction cases, ${nonFrictionCount} non-friction filtered, ${parseErrorCount} parse errors, ${apiErrorCount} API errors`);
 
     // IMPORTANT: Mark ALL cases as processed, even if they failed
     // This prevents cases from getting stuck in an infinite loop
@@ -215,9 +235,21 @@ Return a single JSON object with these fields:
 
     // If no cards were created, return error but cases are already marked processed
     if (frictionCards.length === 0) {
+      // If all cases were non-friction, that's actually success
+      if (nonFrictionCount === rawInputs.length) {
+        return NextResponse.json({
+          success: true,
+          analyzed: 0,
+          filtered: nonFrictionCount,
+          remaining: 0,
+          message: `All ${nonFrictionCount} cases were routine support (not friction). Cases marked as processed.`
+        });
+      }
+
       return NextResponse.json({
-        error: `No cases could be analyzed. Tried ${rawInputs.length} cases. API errors: ${apiErrorCount}, Parse errors: ${parseErrorCount}. ${errors[0] || 'Unknown error'}`,
+        error: `No friction cases found. Tried ${rawInputs.length} cases. Non-friction filtered: ${nonFrictionCount}, API errors: ${apiErrorCount}, Parse errors: ${parseErrorCount}. ${errors[0] || 'Unknown error'}`,
         analyzed: 0,
+        filtered: nonFrictionCount,
         parse_errors: parseErrorCount,
         api_errors: apiErrorCount,
         sample_error: errors[0],
@@ -248,12 +280,13 @@ Return a single JSON object with these fields:
       .eq('processed', false);
 
     const message = remainingCount && remainingCount > 0
-      ? `Created ${insertedCards?.length} friction cards. ${remainingCount} more cases remaining - click Analyze again to continue.`
-      : `Created ${insertedCards?.length} friction cards. All cases processed!`;
+      ? `Created ${insertedCards?.length} friction cards (${nonFrictionCount} non-friction cases filtered). ${remainingCount} more cases remaining - click Analyze again to continue.`
+      : `Created ${insertedCards?.length} friction cards (${nonFrictionCount} non-friction cases filtered). All cases processed!`;
 
     return NextResponse.json({
       success: true,
       analyzed: insertedCards?.length || 0,
+      filtered: nonFrictionCount,
       remaining: remainingCount || 0,
       message
     });
