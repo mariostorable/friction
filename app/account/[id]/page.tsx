@@ -24,6 +24,7 @@ import PeerCaseComparison from '@/components/PeerCaseComparison';
 import FrictionClusters from '@/components/FrictionClusters';
 import AnalysisResultModal from '@/components/AnalysisResultModal';
 import AccountSupportRoadmap from '@/components/AccountSupportRoadmap';
+import AccountIssueProgress from '@/components/AccountIssueProgress';
 
 export default function AccountDetailPage() {
   const params = useParams();
@@ -765,6 +766,11 @@ export default function AccountDetailPage() {
             peers={peerAccounts}
           />
         )}
+
+        {/* Issue Resolution Progress */}
+        <div className="mb-6">
+          <AccountIssueProgress accountId={accountId} />
+        </div>
 
         {/* Support & Roadmap */}
         <div className="mb-6">
