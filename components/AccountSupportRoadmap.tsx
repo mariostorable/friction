@@ -64,6 +64,7 @@ export default function AccountSupportRoadmap({ accountId }: { accountId: string
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<JiraStatusData | null>(null);
   const [activeTab, setActiveTab] = useState<'resolved' | 'radar' | 'priority' | 'coming'>('resolved');
+  const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
 
   const supabase = createClientComponentClient();
 
@@ -118,39 +119,55 @@ export default function AccountSupportRoadmap({ accountId }: { accountId: string
         </p>
       </div>
 
-      {/* Summary Stats */}
+      {/* Summary Stats - Clickable */}
       <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-green-50 rounded-lg p-4">
+        <button
+          onClick={() => setActiveTab('resolved')}
+          className="bg-green-50 rounded-lg p-4 text-left hover:bg-green-100 transition-colors cursor-pointer"
+        >
           <div className="flex items-center gap-2 mb-1">
             <CheckCircle2 className="w-4 h-4 text-green-600" />
             <span className="text-xs font-medium text-green-700">Resolved (7d)</span>
           </div>
           <div className="text-2xl font-bold text-green-900">{data.summary.resolved_7d}</div>
-        </div>
+          <div className="text-xs text-green-600 mt-1">Click to view →</div>
+        </button>
 
-        <div className="bg-blue-50 rounded-lg p-4">
+        <button
+          onClick={() => setActiveTab('coming')}
+          className="bg-blue-50 rounded-lg p-4 text-left hover:bg-blue-100 transition-colors cursor-pointer"
+        >
           <div className="flex items-center gap-2 mb-1">
             <Rocket className="w-4 h-4 text-blue-600" />
             <span className="text-xs font-medium text-blue-700">In Progress</span>
           </div>
           <div className="text-2xl font-bold text-blue-900">{data.summary.in_progress}</div>
-        </div>
+          <div className="text-xs text-blue-600 mt-1">Click to view →</div>
+        </button>
 
-        <div className="bg-gray-50 rounded-lg p-4">
+        <button
+          onClick={() => setActiveTab('radar')}
+          className="bg-gray-50 rounded-lg p-4 text-left hover:bg-gray-100 transition-colors cursor-pointer"
+        >
           <div className="flex items-center gap-2 mb-1">
             <Clock className="w-4 h-4 text-gray-600" />
             <span className="text-xs font-medium text-gray-700">On Radar</span>
           </div>
           <div className="text-2xl font-bold text-gray-900">{data.summary.open_count}</div>
-        </div>
+          <div className="text-xs text-gray-600 mt-1">Click to view →</div>
+        </button>
 
-        <div className="bg-amber-50 rounded-lg p-4">
+        <button
+          onClick={() => setActiveTab('priority')}
+          className="bg-amber-50 rounded-lg p-4 text-left hover:bg-amber-100 transition-colors cursor-pointer"
+        >
           <div className="flex items-center gap-2 mb-1">
             <AlertTriangle className="w-4 h-4 text-amber-600" />
             <span className="text-xs font-medium text-amber-700">Needs Ticket</span>
           </div>
           <div className="text-2xl font-bold text-amber-900">{data.summary.needs_ticket}</div>
-        </div>
+          <div className="text-xs text-amber-600 mt-1">Click to view →</div>
+        </button>
       </div>
 
       {/* Tabs */}
@@ -199,14 +216,34 @@ export default function AccountSupportRoadmap({ accountId }: { accountId: string
         </div>
       </div>
 
+      {/* Theme Filter Breadcrumb */}
+      {selectedTheme && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-blue-700">Filtered by:</span>
+            <span className="bg-blue-100 text-blue-900 px-2 py-1 rounded text-sm font-medium">
+              {formatThemeLabel(selectedTheme)}
+            </span>
+          </div>
+          <button
+            onClick={() => setSelectedTheme(null)}
+            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+          >
+            Clear filter
+          </button>
+        </div>
+      )}
+
       {/* Content */}
       <div className="space-y-3 max-h-96 overflow-y-auto">
         {activeTab === 'resolved' && (
           <>
-            {data.recentlyResolved.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-8">No tickets resolved recently</p>
+            {(selectedTheme ? data.recentlyResolved.filter(i => i.theme_key === selectedTheme) : data.recentlyResolved).length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-8">
+                {selectedTheme ? `No tickets resolved for ${formatThemeLabel(selectedTheme)}` : 'No tickets resolved recently'}
+              </p>
             ) : (
-              data.recentlyResolved.map((issue) => (
+              (selectedTheme ? data.recentlyResolved.filter(i => i.theme_key === selectedTheme) : data.recentlyResolved).map((issue) => (
                 <div key={issue.id} className="border border-green-200 rounded-lg p-3 bg-green-50">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
@@ -227,9 +264,13 @@ export default function AccountSupportRoadmap({ accountId }: { accountId: string
                       </div>
                       <p className="text-sm text-gray-700 mb-1">{issue.summary}</p>
                       <div className="flex items-center gap-2 text-xs text-gray-600">
-                        <span className="bg-white px-2 py-0.5 rounded border border-green-200">
+                        <button
+                          onClick={() => setSelectedTheme(issue.theme_key)}
+                          className="bg-white px-2 py-0.5 rounded border border-green-200 hover:bg-green-50 transition-colors cursor-pointer"
+                          title="Filter by this theme"
+                        >
                           {formatThemeLabel(issue.theme_key)}
-                        </span>
+                        </button>
                         <span>{issue.case_count} cases</span>
                       </div>
                     </div>
@@ -242,10 +283,12 @@ export default function AccountSupportRoadmap({ accountId }: { accountId: string
 
         {activeTab === 'coming' && (
           <>
-            {data.comingSoon.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-8">No tickets in progress</p>
+            {(selectedTheme ? data.comingSoon.filter(i => i.theme_key === selectedTheme) : data.comingSoon).length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-8">
+                {selectedTheme ? `No tickets in progress for ${formatThemeLabel(selectedTheme)}` : 'No tickets in progress'}
+              </p>
             ) : (
-              data.comingSoon.map((issue) => (
+              (selectedTheme ? data.comingSoon.filter(i => i.theme_key === selectedTheme) : data.comingSoon).map((issue) => (
                 <div key={issue.id} className="border border-blue-200 rounded-lg p-3 bg-blue-50">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
@@ -266,9 +309,13 @@ export default function AccountSupportRoadmap({ accountId }: { accountId: string
                       </div>
                       <p className="text-sm text-gray-700 mb-1">{issue.summary}</p>
                       <div className="flex items-center gap-2 text-xs text-gray-600">
-                        <span className="bg-white px-2 py-0.5 rounded border border-blue-200">
+                        <button
+                          onClick={() => setSelectedTheme(issue.theme_key)}
+                          className="bg-white px-2 py-0.5 rounded border border-blue-200 hover:bg-blue-50 transition-colors cursor-pointer"
+                          title="Filter by this theme"
+                        >
                           {formatThemeLabel(issue.theme_key)}
-                        </span>
+                        </button>
                         <span>{issue.case_count} cases</span>
                         {issue.assignee_name && <span>• {issue.assignee_name}</span>}
                       </div>
@@ -282,10 +329,12 @@ export default function AccountSupportRoadmap({ accountId }: { accountId: string
 
         {activeTab === 'radar' && (
           <>
-            {data.onRadar.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-8">No open tickets</p>
+            {(selectedTheme ? data.onRadar.filter(i => i.theme_key === selectedTheme) : data.onRadar).length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-8">
+                {selectedTheme ? `No open tickets for ${formatThemeLabel(selectedTheme)}` : 'No open tickets'}
+              </p>
             ) : (
-              data.onRadar.map((issue) => (
+              (selectedTheme ? data.onRadar.filter(i => i.theme_key === selectedTheme) : data.onRadar).map((issue) => (
                 <div key={issue.id} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
@@ -306,9 +355,13 @@ export default function AccountSupportRoadmap({ accountId }: { accountId: string
                       </div>
                       <p className="text-sm text-gray-700 mb-1">{issue.summary}</p>
                       <div className="flex items-center gap-2 text-xs text-gray-600">
-                        <span className="bg-white px-2 py-0.5 rounded border border-gray-200">
+                        <button
+                          onClick={() => setSelectedTheme(issue.theme_key)}
+                          className="bg-white px-2 py-0.5 rounded border border-gray-200 hover:bg-gray-100 transition-colors cursor-pointer"
+                          title="Filter by this theme"
+                        >
                           {formatThemeLabel(issue.theme_key)}
-                        </span>
+                        </button>
                         <span>{issue.case_count} cases</span>
                         {issue.priority && <span>• {issue.priority}</span>}
                       </div>
@@ -322,18 +375,28 @@ export default function AccountSupportRoadmap({ accountId }: { accountId: string
 
         {activeTab === 'priority' && (
           <>
-            {data.shouldPrioritize.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-8">All friction themes have tickets</p>
+            {(selectedTheme ? data.shouldPrioritize.filter(t => t.theme_key === selectedTheme) : data.shouldPrioritize).length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-8">
+                {selectedTheme ? `${formatThemeLabel(selectedTheme)} has a ticket` : 'All friction themes have tickets'}
+              </p>
             ) : (
-              data.shouldPrioritize.map((theme) => (
+              (selectedTheme ? data.shouldPrioritize.filter(t => t.theme_key === selectedTheme) : data.shouldPrioritize).map((theme) => (
                 <div key={theme.theme_key} className="border border-amber-200 rounded-lg p-3 bg-amber-50">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                        <span className="text-sm font-medium text-amber-900">
+                        <button
+                          onClick={() => {
+                            setSelectedTheme(theme.theme_key);
+                            // Switch to resolved tab to see if any historical tickets exist
+                            setActiveTab('resolved');
+                          }}
+                          className="text-sm font-medium text-amber-900 hover:text-amber-700 cursor-pointer underline decoration-dotted"
+                          title="Search for related tickets"
+                        >
                           {formatThemeLabel(theme.theme_key)}
-                        </span>
+                        </button>
                         <span className="text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
                           No ticket
                         </span>
