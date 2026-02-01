@@ -1,3 +1,15 @@
+/**
+ * DEPRECATED: This Vercel Cron endpoint is no longer used.
+ *
+ * The Jira sync cron job has been migrated to Supabase pg_cron for better
+ * cost efficiency and centralized database management.
+ *
+ * See: scripts/setup-jira-sync-cron.sql for the new implementation
+ * See: scripts/SUPABASE_CRON_SETUP.md for setup instructions
+ *
+ * This file is kept for reference/backup purposes only.
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 

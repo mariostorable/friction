@@ -26,27 +26,27 @@ const THEME_KEYWORDS: Record<string, string[]> = {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    // Check if this is a cron job request
+    const authHeader = request.headers.get('authorization');
+    const userIdHeader = request.headers.get('x-user-id');
+    const isCronRequest = authHeader === `Bearer ${process.env.CRON_SECRET}` && userIdHeader;
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    let userId: string;
+
+    if (isCronRequest) {
+      // Cron job request - use the user ID from header
+      userId = userIdHeader!;
+    } else {
+      // Regular user request - authenticate via session
+      const supabase = createRouteHandlerClient({ cookies });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+      }
+      userId = user.id;
     }
 
-    // Get Jira integration
-    const { data: integration } = await supabase
-      .from('integrations')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('integration_type', 'jira')
-      .eq('status', 'active')
-      .single();
-
-    if (!integration) {
-      return NextResponse.json({ error: 'Jira not connected' }, { status: 400 });
-    }
-
-    // Get API token
+    // Use admin client for all database operations
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -57,6 +57,19 @@ export async function POST(request: NextRequest) {
         }
       }
     );
+
+    // Get Jira integration
+    const { data: integration } = await supabaseAdmin
+      .from('integrations')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('integration_type', 'jira')
+      .eq('status', 'active')
+      .single();
+
+    if (!integration) {
+      return NextResponse.json({ error: 'Jira not connected' }, { status: 400 });
+    }
 
     // Retrieve and decrypt API token
     let tokens;
@@ -156,7 +169,7 @@ export async function POST(request: NextRequest) {
 
     // Transform and store Jira issues
     const jiraIssues = allIssues.map((issue: any) => ({
-      user_id: user.id,
+      user_id: userId,
       integration_id: integration.id,
       jira_id: issue.id,
       jira_key: issue.key,
@@ -180,7 +193,7 @@ export async function POST(request: NextRequest) {
     }));
 
     // Upsert issues
-    const { data: insertedIssues, error: insertError } = await supabase
+    const { data: insertedIssues, error: insertError } = await supabaseAdmin
       .from('jira_issues')
       .upsert(jiraIssues, {
         onConflict: 'user_id,jira_key',
@@ -202,12 +215,12 @@ export async function POST(request: NextRequest) {
     let linksCreated = 0;
 
     for (const issue of insertedIssues || []) {
-      const linkedThemes = await linkIssueToThemes(supabase, user.id, issue);
+      const linkedThemes = await linkIssueToThemes(supabaseAdmin, userId, issue);
       linksCreated += linkedThemes.length;
     }
 
     // Update integration last_synced_at
-    await supabase
+    await supabaseAdmin
       .from('integrations')
       .update({ last_synced_at: new Date().toISOString() })
       .eq('id', integration.id);

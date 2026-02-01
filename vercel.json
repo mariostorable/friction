@@ -3,10 +3,6 @@
     {
       "path": "/api/cron/analyze-portfolio",
       "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/sync-jira",
-      "schedule": "0 3 * * *"
     }
   ]
 }

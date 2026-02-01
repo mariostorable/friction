@@ -110,7 +110,7 @@ export default function JiraSyncCard() {
             Jira Sync
           </h3>
           <p className="text-sm text-gray-600">
-            Automated daily sync at 3:00 AM UTC
+            Automated daily sync at 3:00 AM UTC via Supabase
           </p>
         </div>
         <button
