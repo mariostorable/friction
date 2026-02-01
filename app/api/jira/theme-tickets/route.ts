@@ -29,7 +29,10 @@ export async function GET(request: NextRequest) {
           summary,
           status,
           priority,
-          issue_url
+          issue_url,
+          resolution_date,
+          metadata,
+          updated_date
         )
       `)
       .eq('theme_key', themeKey)
@@ -42,6 +45,12 @@ export async function GET(request: NextRequest) {
       status: link.jira_issues.status,
       priority: link.jira_issues.priority,
       issue_url: link.jira_issues.issue_url,
+      resolution_date: link.jira_issues.resolution_date,
+      release_date: link.jira_issues.metadata?.fixVersions?.[0]?.releaseDate ||
+                    link.jira_issues.metadata?.['Release Date'] ||
+                    link.jira_issues.metadata?.releaseDate ||
+                    null,
+      updated_date: link.jira_issues.updated_date,
       match_confidence: link.match_confidence
     })) || [];
 

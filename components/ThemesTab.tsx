@@ -18,6 +18,9 @@ interface JiraTicket {
   status: string;
   issue_url: string;
   priority: string | null;
+  resolution_date: string | null;
+  release_date: string | null;
+  updated_date: string;
 }
 
 interface TicketCounts {
@@ -39,6 +42,7 @@ export default function ThemesTab({ accounts, initialExpandedTheme }: ThemesTabP
   const [loadingTickets, setLoadingTickets] = useState<Record<string, boolean>>({});
   const [ticketCounts, setTicketCounts] = useState<Record<string, TicketCounts>>({});
   const [showTicketModal, setShowTicketModal] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'resolved' | 'in_progress' | 'open'>('all');
   const router = useRouter();
 
   const themes = aggregateThemesByProduct(accounts, productFilter);
@@ -92,8 +96,53 @@ export default function ThemesTab({ accounts, initialExpandedTheme }: ThemesTabP
     return 'bg-green-100 text-green-800';
   }
 
+  function getTicketStatusCategory(status: string): 'resolved' | 'in_progress' | 'open' {
+    const statusLower = status.toLowerCase();
+
+    // Resolved statuses
+    if (statusLower.includes('done') ||
+        statusLower.includes('closed') ||
+        statusLower.includes('resolved') ||
+        statusLower.includes('complete')) {
+      return 'resolved';
+    }
+
+    // In progress statuses
+    if (statusLower.includes('progress') ||
+        statusLower.includes('development') ||
+        statusLower.includes('testing') ||
+        statusLower.includes('review') ||
+        statusLower.includes('staging')) {
+      return 'in_progress';
+    }
+
+    // Everything else is open
+    return 'open';
+  }
+
+  function getFilteredTickets(themeKey: string): JiraTicket[] {
+    const tickets = jiraTickets[themeKey] || [];
+    if (statusFilter === 'all') return tickets;
+
+    return tickets.filter(ticket => getTicketStatusCategory(ticket.status) === statusFilter);
+  }
+
+  function formatDate(dateString: string | null): string {
+    if (!dateString) return 'Not set';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
   function toggleTheme(themeKey: string) {
     setExpandedTheme(expandedTheme === themeKey ? null : themeKey);
+  }
+
+  function openTicketModal(themeKey: string) {
+    setStatusFilter('all'); // Reset filter when opening modal
+    setShowTicketModal(themeKey);
+    if (!jiraTickets[themeKey]) {
+      fetchJiraTicketsForTheme(themeKey);
+    }
   }
 
   return (
@@ -170,10 +219,7 @@ export default function ThemesTab({ accounts, initialExpandedTheme }: ThemesTabP
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setShowTicketModal(theme.theme_key);
-                          if (!jiraTickets[theme.theme_key]) {
-                            fetchJiraTicketsForTheme(theme.theme_key);
-                          }
+                          openTicketModal(theme.theme_key);
                         }}
                         className="px-3 py-1.5 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors"
                       >
@@ -332,25 +378,53 @@ export default function ThemesTab({ accounts, initialExpandedTheme }: ThemesTabP
                 </button>
               </div>
 
-              {/* Status Summary */}
+              {/* Status Summary - Clickable Filters */}
               {ticketCounts[showTicketModal] && (
-                <div className="flex items-center gap-4 mt-4">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 mt-4">
+                  <button
+                    onClick={() => setStatusFilter('all')}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors ${
+                      statusFilter === 'all'
+                        ? 'bg-gray-100 border-gray-400 shadow-sm'
+                        : 'border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
                     <span className="text-xs font-medium text-gray-700">Total:</span>
                     <span className="text-sm font-semibold text-gray-900">{ticketCounts[showTicketModal].total}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter('resolved')}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors ${
+                      statusFilter === 'resolved'
+                        ? 'bg-green-50 border-green-300 shadow-sm'
+                        : 'border-gray-200 hover:bg-green-50'
+                    }`}
+                  >
                     <span className="text-xs font-medium text-green-700">Resolved:</span>
                     <span className="text-sm font-semibold text-green-900">{ticketCounts[showTicketModal].resolved}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter('in_progress')}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors ${
+                      statusFilter === 'in_progress'
+                        ? 'bg-blue-50 border-blue-300 shadow-sm'
+                        : 'border-gray-200 hover:bg-blue-50'
+                    }`}
+                  >
                     <span className="text-xs font-medium text-blue-700">In Progress:</span>
                     <span className="text-sm font-semibold text-blue-900">{ticketCounts[showTicketModal].in_progress}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter('open')}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors ${
+                      statusFilter === 'open'
+                        ? 'bg-orange-50 border-orange-300 shadow-sm'
+                        : 'border-gray-200 hover:bg-orange-50'
+                    }`}
+                  >
                     <span className="text-xs font-medium text-gray-700">Open:</span>
                     <span className="text-sm font-semibold text-gray-900">{ticketCounts[showTicketModal].open}</span>
-                  </div>
+                  </button>
                 </div>
               )}
             </div>
@@ -362,34 +436,71 @@ export default function ThemesTab({ accounts, initialExpandedTheme }: ThemesTabP
 
               {!loadingTickets[showTicketModal] && jiraTickets[showTicketModal] && jiraTickets[showTicketModal].length > 0 && (
                 <div className="space-y-3">
-                  {jiraTickets[showTicketModal].map(ticket => (
-                    <div key={ticket.jira_key} className="bg-gray-50 rounded-lg border border-gray-200 p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <a
-                              href={ticket.issue_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm font-mono font-semibold text-blue-700 hover:text-blue-900 hover:underline flex items-center gap-1"
-                            >
-                              {ticket.jira_key}
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
-                            <span className="text-xs bg-white border border-gray-300 px-2 py-0.5 rounded text-gray-700">
-                              {ticket.status}
-                            </span>
-                            {ticket.priority && (
-                              <span className="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded font-medium">
-                                {ticket.priority}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-gray-700">{ticket.summary}</p>
-                        </div>
-                      </div>
+                  {getFilteredTickets(showTicketModal).length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      No {statusFilter === 'all' ? '' : statusFilter.replace('_', ' ')} tickets found.
                     </div>
-                  ))}
+                  ) : (
+                    getFilteredTickets(showTicketModal).map(ticket => {
+                      const statusCategory = getTicketStatusCategory(ticket.status);
+                      return (
+                        <div key={ticket.jira_key} className="bg-gray-50 rounded-lg border border-gray-200 p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <a
+                                  href={ticket.issue_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm font-mono font-semibold text-blue-700 hover:text-blue-900 hover:underline flex items-center gap-1"
+                                >
+                                  {ticket.jira_key}
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                                <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                                  statusCategory === 'resolved' ? 'bg-green-100 text-green-800 border border-green-300' :
+                                  statusCategory === 'in_progress' ? 'bg-blue-100 text-blue-800 border border-blue-300' :
+                                  'bg-gray-100 text-gray-700 border border-gray-300'
+                                }`}>
+                                  {ticket.status}
+                                </span>
+                                {ticket.priority && (
+                                  <span className="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded font-medium">
+                                    {ticket.priority}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-700 mb-2">{ticket.summary}</p>
+
+                              {/* Date information */}
+                              <div className="flex items-center gap-4 text-xs text-gray-600">
+                                {statusCategory === 'resolved' && ticket.resolution_date && (
+                                  <div className="flex items-center gap-1">
+                                    <span className="font-medium">Resolved:</span>
+                                    <span>{formatDate(ticket.resolution_date)}</span>
+                                  </div>
+                                )}
+                                {ticket.release_date && (
+                                  <div className="flex items-center gap-1">
+                                    <span className="font-medium">
+                                      {statusCategory === 'resolved' ? 'Released:' : 'Planned Release:'}
+                                    </span>
+                                    <span className="text-purple-700 font-medium">{formatDate(ticket.release_date)}</span>
+                                  </div>
+                                )}
+                                {!ticket.resolution_date && statusCategory === 'in_progress' && (
+                                  <div className="flex items-center gap-1">
+                                    <span className="font-medium">Last Updated:</span>
+                                    <span>{formatDate(ticket.updated_date)}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               )}
 
