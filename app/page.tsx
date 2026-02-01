@@ -1,5 +1,4 @@
 'use client';
-// Testing GitHub→Vercel connection
 
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
