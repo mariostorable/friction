@@ -86,7 +86,7 @@ export default function RoadmapPage() {
             account_jira_links:account_jira_links!inner(
               jira_key,
               jira_issue:jira_issues!inner(
-                key,
+                jira_key,
                 summary,
                 status,
                 issue_type,
@@ -95,7 +95,7 @@ export default function RoadmapPage() {
                 fix_versions,
                 parent_key,
                 priority,
-                jira_url
+                issue_url
               )
             )
           `)
@@ -301,19 +301,19 @@ export default function RoadmapPage() {
 
                               return (
                                 <div
-                                  key={issue.key}
+                                  key={issue.jira_key}
                                   className="p-3 bg-gray-50 border border-gray-200 rounded-lg"
                                 >
                                   <div className="flex items-start justify-between gap-3 mb-2">
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                                         <a
-                                          href={issue.jira_url}
+                                          href={issue.issue_url}
                                           target="_blank"
                                           rel="noopener noreferrer"
                                           className="text-sm font-medium text-purple-700 hover:text-purple-900 flex items-center gap-1"
                                         >
-                                          {issue.key}
+                                          {issue.jira_key}
                                           <ExternalLink className="w-3 h-3" />
                                         </a>
                                         {issue.issue_type && (
