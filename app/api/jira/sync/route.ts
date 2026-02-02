@@ -275,13 +275,14 @@ export async function POST(request: NextRequest) {
           // Store custom field with simplified value
           if (typeof value === 'object') {
             // For objects, try to extract meaningful value
-            if (value.displayName) customFields[key] = value.displayName;
-            else if (value.name) customFields[key] = value.name;
-            else if (value.value) customFields[key] = value.value;
-            else if (Array.isArray(value)) {
-              customFields[key] = value.map((v: any) => v.name || v.value || v).join(', ');
+            const objValue = value as any;
+            if (objValue.displayName) customFields[key] = objValue.displayName;
+            else if (objValue.name) customFields[key] = objValue.name;
+            else if (objValue.value) customFields[key] = objValue.value;
+            else if (Array.isArray(objValue)) {
+              customFields[key] = objValue.map((v: any) => v.name || v.value || v).join(', ');
             } else {
-              customFields[key] = JSON.stringify(value).substring(0, 500);
+              customFields[key] = JSON.stringify(objValue).substring(0, 500);
             }
           } else {
             customFields[key] = value;
