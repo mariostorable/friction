@@ -920,8 +920,8 @@ export default function Dashboard() {
                         className="hover:bg-gray-50 cursor-pointer"
                       >
                         <td className="px-3 py-3">
-                          <div className="text-xs font-medium text-gray-900">{account.name}</div>
-                          <div className="text-xs text-gray-500">{account.segment}</div>
+                          <div className="text-sm font-medium text-gray-900 break-words">{account.name}</div>
+                          <div className="text-xs text-gray-500 mt-0.5">{account.segment}</div>
                         </td>
                         <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900">
                           ${(account.arr || 0) >= 1000000 ? `${((account.arr || 0) / 1000000).toFixed(1)}M` : `${Math.round((account.arr || 0) / 1000)}K`}
