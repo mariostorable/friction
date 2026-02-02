@@ -497,13 +497,27 @@ export default function Dashboard() {
               <h1 className="text-3xl font-bold text-gray-900">Friction Intelligence</h1>
               <p className="mt-1 text-sm text-gray-500">Early warning system for customer friction</p>
             </div>
-            <button 
-              onClick={() => router.push('/settings')}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              <Settings className="w-4 h-4" />
-              Settings
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push('/roadmap')}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                Jira Roadmap
+              </button>
+              <button
+                onClick={() => router.push('/integrations')}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                Integrations
+              </button>
+              <button
+                onClick={() => router.push('/settings')}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                <Settings className="w-4 h-4" />
+                Settings
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -825,23 +839,23 @@ export default function Dashboard() {
                 <table className="w-full divide-y divide-gray-200 table-fixed">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th onClick={() => handleSort('name')} className="w-[20%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-tight cursor-pointer hover:bg-gray-100">
+                      <th onClick={() => handleSort('name')} className="w-[25%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-tight cursor-pointer hover:bg-gray-100">
                         Account {getSortIcon('name')}
                       </th>
-                      <th onClick={() => handleSort('arr')} className="w-[9%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-tight cursor-pointer hover:bg-gray-100">
+                      <th onClick={() => handleSort('arr')} className="w-[8%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-tight cursor-pointer hover:bg-gray-100">
                         ARR {getSortIcon('arr')}
                       </th>
                       <th onClick={() => handleSort('software')} className="w-[8%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-tight cursor-pointer hover:bg-gray-100">
                         SW {getSortIcon('software')}
                       </th>
-                      <th onClick={() => handleSort('ofi')} className="w-[8%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-tight cursor-pointer hover:bg-gray-100">
+                      <th onClick={() => handleSort('ofi')} className="w-[7%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-tight cursor-pointer hover:bg-gray-100">
                         OFI {getSortIcon('ofi')}
                       </th>
                       <th
                         onClick={() => handleSort('case_volume')}
                         onMouseEnter={() => setHoveredColumn('case_volume')}
                         onMouseLeave={() => setHoveredColumn(null)}
-                        className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 relative"
+                        className="w-[10%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-tight cursor-pointer hover:bg-gray-100 relative"
                       >
                         <div className="flex items-center gap-1">
                           Cases (90d) {getSortIcon('case_volume')}
@@ -857,10 +871,10 @@ export default function Dashboard() {
                         onClick={() => handleSort('cases_per_facility')}
                         onMouseEnter={() => setHoveredColumn('cases_per_facility')}
                         onMouseLeave={() => setHoveredColumn(null)}
-                        className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 relative"
+                        className="w-[10%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-tight cursor-pointer hover:bg-gray-100 relative"
                       >
                         <div className="flex items-center gap-1">
-                          Per Location (90d) {getSortIcon('cases_per_facility')}
+                          Per Loc (90d) {getSortIcon('cases_per_facility')}
                         </div>
                         {hoveredColumn === 'cases_per_facility' && (
                           <div className="absolute left-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 z-50 whitespace-normal normal-case font-normal">
@@ -869,16 +883,16 @@ export default function Dashboard() {
                           </div>
                         )}
                       </th>
-                      <th onClick={() => handleSort('trend')} className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
+                      <th onClick={() => handleSort('trend')} className="w-[7%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-tight cursor-pointer hover:bg-gray-100">
                         Trend {getSortIcon('trend')}
                       </th>
-                      <th onClick={() => handleSort('last_analyzed')} className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
+                      <th onClick={() => handleSort('last_analyzed')} className="w-[11%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-tight cursor-pointer hover:bg-gray-100">
                         Last Analyzed {getSortIcon('last_analyzed')}
                       </th>
                       <th
                         onMouseEnter={() => setHoveredColumn('jira_tickets')}
                         onMouseLeave={() => setHoveredColumn(null)}
-                        className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider relative"
+                        className="w-[14%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-tight relative"
                       >
                         <div className="flex items-center gap-1">
                           Jira Tickets
@@ -899,17 +913,17 @@ export default function Dashboard() {
                         onClick={() => router.push(`/account/${account.id}`)}
                         className="hover:bg-gray-50 cursor-pointer"
                       >
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{account.name}</div>
+                        <td className="px-2 py-2">
+                          <div className="text-xs font-medium text-gray-900 truncate" title={account.name}>{account.name}</div>
                           <div className="text-xs text-gray-500">{account.segment}</div>
                         </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
-                          ${Math.round(account.arr || 0).toLocaleString()}
+                        <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900">
+                          ${(account.arr || 0) >= 1000000 ? `${((account.arr || 0) / 1000000).toFixed(1)}M` : `${Math.round((account.arr || 0) / 1000)}K`}
                         </td>
-                        <td className="px-3 py-3 text-sm text-gray-900">
+                        <td className="px-2 py-2 text-xs text-gray-900">
                           {getPrimarySoftware(account)}
                         </td>
-                        <td className="px-3 py-3 whitespace-nowrap">
+                        <td className="px-2 py-2 whitespace-nowrap">
                           {account.current_snapshot?.ofi_score ? (
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                               account.current_snapshot.ofi_score >= 70
@@ -924,7 +938,7 @@ export default function Dashboard() {
                             <span className="text-xs text-gray-400">-</span>
                           )}
                         </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-sm">
+                        <td className="px-2 py-2 whitespace-nowrap text-xs">
                           {account.current_snapshot?.case_volume !== undefined ? (
                             <div className="flex items-center gap-1">
                               <span className="text-gray-900 font-medium">{account.current_snapshot.case_volume}</span>
@@ -963,7 +977,7 @@ export default function Dashboard() {
                             <span className="text-gray-400">-</span>
                           )}
                         </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-sm">
+                        <td className="px-2 py-2 whitespace-nowrap text-xs">
                           {account.current_snapshot?.case_volume !== undefined && account.facility_count && account.facility_count > 0 ? (
                             <div className="flex items-center gap-1">
                               <span className="text-gray-900 font-medium">
@@ -974,7 +988,7 @@ export default function Dashboard() {
                                 onMouseEnter={() => setHoveredCaseIcon(`facility-${account.id}`)}
                                 onMouseLeave={() => setHoveredCaseIcon(null)}
                               >
-                                <span className="text-xs text-gray-500 cursor-help">({account.facility_count} loc)</span>
+                                <span className="text-[10px] text-gray-500 cursor-help">({account.facility_count})</span>
                                 {hoveredCaseIcon === `facility-${account.id}` && (
                                   <div className="absolute left-0 top-full mt-1 w-56 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 z-50 whitespace-normal">
                                     <div className="font-semibold mb-1">{account.name}</div>
@@ -1010,17 +1024,17 @@ export default function Dashboard() {
                             <span className="text-gray-400">-</span>
                           )}
                         </td>
-                        <td className="px-3 py-3 whitespace-nowrap">
+                        <td className="px-2 py-2 whitespace-nowrap text-center">
                           {getTrendIcon(account.current_snapshot?.trend_direction)}
                         </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-500">
                           {account.current_snapshot?.created_at
-                            ? new Date(account.current_snapshot.created_at).toLocaleDateString()
+                            ? new Date(account.current_snapshot.created_at).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
                             : 'Never'}
                         </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-sm">
+                        <td className="px-2 py-2 whitespace-nowrap text-xs">
                           {jiraTicketCounts[account.id] ? (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1">
                               <span className="text-green-700 font-medium" title="Resolved (7 days)">
                                 {jiraTicketCounts[account.id].resolved_7d}
                               </span>
