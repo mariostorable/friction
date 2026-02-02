@@ -61,6 +61,18 @@ export default function JiraSyncButton() {
         method: 'POST',
       });
 
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const textResponse = await response.text();
+        console.error('Non-JSON response:', textResponse.substring(0, 500));
+        alert(`Sync failed: Server returned ${response.status} error. Check console for details.`);
+        return;
+      }
+
       const result = await response.json();
 
       if (response.ok) {
@@ -74,7 +86,7 @@ export default function JiraSyncButton() {
         console.log('Stats refresh complete. Before:', beforeLastSynced, 'After: will update on next render');
       } else {
         console.error('❌ Jira sync failed:', result);
-        alert(`Sync failed: ${result.error || 'Unknown error'}`);
+        alert(`Sync failed: ${result.error || 'Unknown error'}\n${result.details || ''}`);
       }
     } catch (error) {
       console.error('Sync error:', error);
