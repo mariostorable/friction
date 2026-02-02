@@ -56,6 +56,7 @@ export default function JiraSyncButton() {
   async function syncNow() {
     setSyncing(true);
     try {
+      console.log('Starting Jira sync...');
       const response = await fetch('/api/jira/sync', {
         method: 'POST',
       });
@@ -64,14 +65,20 @@ export default function JiraSyncButton() {
 
       if (response.ok) {
         console.log('✅ Jira sync complete:', result);
-        // Wait a moment for database to propagate changes
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Wait longer for database to propagate changes
+        console.log('Waiting 2 seconds for database propagation...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        console.log('Fetching updated sync stats...');
+        const beforeLastSynced = syncStats.lastSynced;
         await fetchSyncStats(); // Refresh stats after sync
+        console.log('Stats refresh complete. Before:', beforeLastSynced, 'After: will update on next render');
       } else {
         console.error('❌ Jira sync failed:', result);
+        alert(`Sync failed: ${result.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Sync error:', error);
+      alert(`Sync error: ${error instanceof Error ? error.message : 'Unknown'}`);
     } finally {
       setSyncing(false);
     }
