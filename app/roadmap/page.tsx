@@ -77,7 +77,7 @@ export default function RoadmapPage() {
         setAccountsWithUnlinkedThemes(unlinked);
 
         // Get accounts with linked tickets
-        const { data: withTickets } = await supabase
+        const { data: withTickets, error: ticketsError } = await supabase
           .from('accounts')
           .select(`
             id,
@@ -101,6 +101,10 @@ export default function RoadmapPage() {
           `)
           .order('arr', { ascending: false });
 
+        if (ticketsError) {
+          console.error('Error fetching tickets:', ticketsError);
+        }
+        console.log('Accounts with tickets:', withTickets);
         setAccountsWithTickets(withTickets || []);
       }
     } catch (error) {
@@ -138,6 +142,14 @@ export default function RoadmapPage() {
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Link
+              href="/dashboard"
+              className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
+            >
+              ← Back to Dashboard
+            </Link>
+          </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Jira Roadmap</h1>
           <p className="text-gray-600">
             Track friction themes, manage Jira tickets, and prioritize improvements across your portfolio
