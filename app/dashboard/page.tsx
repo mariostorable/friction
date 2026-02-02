@@ -604,6 +604,12 @@ export default function Dashboard() {
             >
               Key Friction Themes
             </button>
+            <button
+              onClick={() => router.push('/roadmap')}
+              className="px-4 py-2 rounded-lg font-medium bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+            >
+              Jira Roadmap
+            </button>
           </div>
 
           <div className="flex items-center gap-2">
