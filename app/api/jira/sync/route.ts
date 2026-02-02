@@ -342,9 +342,9 @@ export async function POST(request: NextRequest) {
 
     console.log(`Stored ${insertedIssues?.length || 0} Jira issues`);
 
-    // Create theme links using keyword matching
-    let linksCreated = 0;
-    let accountLinksCreated = 0;
+    // Batch link creation for better performance
+    const themeLinksToCreate: any[] = [];
+    const accountLinksToCreate: any[] = [];
 
     // Get all Top 25 accounts for name matching
     const { data: accounts } = await supabaseAdmin
@@ -353,13 +353,33 @@ export async function POST(request: NextRequest) {
       .eq('user_id', userId)
       .eq('status', 'active');
 
+    // Collect all links to create (batch processing)
     for (const issue of insertedIssues || []) {
-      const linkedThemes = await linkIssueToThemes(supabaseAdmin, userId, issue);
-      linksCreated += linkedThemes.length;
+      // Get theme links for this issue
+      const themeLinks = getThemeLinks(userId, issue);
+      themeLinksToCreate.push(...themeLinks);
 
-      // Also link to accounts if account name appears in summary/description
-      const linkedAccounts = await linkIssueToAccounts(supabaseAdmin, userId, issue, accounts || []);
-      accountLinksCreated += linkedAccounts.length;
+      // Get account links for this issue
+      const accountLinks = getAccountLinks(userId, issue, accounts || []);
+      accountLinksToCreate.push(...accountLinks);
+    }
+
+    // Batch insert theme links
+    let linksCreated = 0;
+    if (themeLinksToCreate.length > 0) {
+      const { data: createdThemeLinks } = await supabaseAdmin
+        .from('theme_jira_links')
+        .upsert(themeLinksToCreate, { onConflict: 'user_id,jira_issue_id,theme_key', ignoreDuplicates: true });
+      linksCreated = createdThemeLinks?.length || themeLinksToCreate.length;
+    }
+
+    // Batch insert account links
+    let accountLinksCreated = 0;
+    if (accountLinksToCreate.length > 0) {
+      const { data: createdAccountLinks } = await supabaseAdmin
+        .from('account_jira_links')
+        .upsert(accountLinksToCreate, { onConflict: 'user_id,account_id,jira_key', ignoreDuplicates: true });
+      accountLinksCreated = createdAccountLinks?.length || accountLinksToCreate.length;
     }
 
     console.log(`Sync complete: ${insertedIssues?.length} issues, ${linksCreated} theme links, ${accountLinksCreated} account links created`);
@@ -438,6 +458,102 @@ async function linkIssueToThemes(supabase: any, userId: string, issue: any): Pro
   }
 
   return linkedThemes;
+}
+
+// Helper: Get theme links for batch processing (doesn't do DB operations)
+function getThemeLinks(userId: string, issue: any): any[] {
+  const links: any[] = [];
+  const linkedThemes: string[] = [];
+  const searchText = `${issue.summary} ${issue.description || ''}`.toLowerCase();
+  const componentsText = (issue.components || []).join(' ').toLowerCase();
+
+  // Strategy 1: Label-based matching
+  for (const label of issue.labels || []) {
+    const labelLower = label.toLowerCase().replace(/[_-\s]/g, '_');
+    if (THEME_KEYWORDS[labelLower]) {
+      links.push({
+        user_id: userId,
+        jira_issue_id: issue.id,
+        theme_key: labelLower,
+        jira_key: issue.jira_key,
+        match_type: 'label',
+        confidence: 1.0
+      });
+      linkedThemes.push(labelLower);
+    }
+  }
+
+  // Strategy 2: Component-based matching
+  if (componentsText) {
+    for (const [themeKey, keywords] of Object.entries(THEME_KEYWORDS)) {
+      if (linkedThemes.includes(themeKey)) continue;
+      const componentMatches = keywords.filter(keyword =>
+        componentsText.includes(keyword.toLowerCase())
+      ).length;
+      if (componentMatches >= 1) {
+        links.push({
+          user_id: userId,
+          jira_issue_id: issue.id,
+          theme_key: themeKey,
+          jira_key: issue.jira_key,
+          match_type: 'component',
+          confidence: 0.9
+        });
+        linkedThemes.push(themeKey);
+      }
+    }
+  }
+
+  // Strategy 3: Keyword-based matching
+  for (const [themeKey, keywords] of Object.entries(THEME_KEYWORDS)) {
+    if (linkedThemes.includes(themeKey)) continue;
+    const matchCount = keywords.filter(keyword =>
+      searchText.includes(keyword.toLowerCase())
+    ).length;
+    if (matchCount >= 2) {
+      links.push({
+        user_id: userId,
+        jira_issue_id: issue.id,
+        theme_key: themeKey,
+        jira_key: issue.jira_key,
+        match_type: 'keyword',
+        confidence: 0.8
+      });
+      linkedThemes.push(themeKey);
+    } else if (matchCount === 1) {
+      links.push({
+        user_id: userId,
+        jira_issue_id: issue.id,
+        theme_key: themeKey,
+        jira_key: issue.jira_key,
+        match_type: 'keyword',
+        confidence: 0.5
+      });
+      linkedThemes.push(themeKey);
+    }
+  }
+
+  return links;
+}
+
+// Helper: Get account links for batch processing (doesn't do DB operations)
+function getAccountLinks(userId: string, issue: any, accounts: any[]): any[] {
+  const links: any[] = [];
+  const searchText = `${issue.summary} ${issue.description || ''}`.toLowerCase();
+
+  for (const account of accounts) {
+    const accountName = account.name.toLowerCase();
+    if (searchText.includes(accountName)) {
+      links.push({
+        user_id: userId,
+        account_id: account.id,
+        jira_key: issue.jira_key,
+        match_confidence: 0.9
+      });
+    }
+  }
+
+  return links;
 }
 
 // Helper: Link Jira issue to accounts by name matching
