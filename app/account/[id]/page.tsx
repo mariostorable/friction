@@ -564,15 +564,37 @@ export default function AccountDetailPage() {
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           {/* Navigation Breadcrumb */}
-          <div className="flex items-center gap-2 text-sm mb-4">
-            <button
-              onClick={() => router.push("/dashboard")}
-              className="text-blue-600 hover:text-blue-800 font-medium"
-            >
-              Dashboard
-            </button>
-            <span className="text-gray-400">/</span>
-            <span className="text-gray-600">{account.name}</span>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2 text-sm">
+              <button
+                onClick={() => router.push("/dashboard")}
+                className="text-blue-600 hover:text-blue-800 font-medium"
+              >
+                Dashboard
+              </button>
+              <span className="text-gray-400">/</span>
+              <span className="text-gray-600">{account.name}</span>
+            </div>
+            <div className="flex items-center gap-3 text-sm">
+              <button
+                onClick={() => router.push("/roadmap")}
+                className="px-3 py-1.5 text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                Jira Roadmap
+              </button>
+              <button
+                onClick={() => router.push("/integrations")}
+                className="px-3 py-1.5 text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                Integrations
+              </button>
+              <button
+                onClick={() => router.push("/settings")}
+                className="px-3 py-1.5 text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                Settings
+              </button>
+            </div>
           </div>
           <div className="flex justify-between items-start">
             <div>

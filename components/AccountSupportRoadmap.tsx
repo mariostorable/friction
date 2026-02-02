@@ -59,6 +59,7 @@ const THEME_LABELS: Record<string, string> = {
   'notification_issues': 'Notifications',
   'workflow_inefficiency': 'Workflow Efficiency',
   'mobile_issues': 'Mobile Experience',
+  'other': 'Other Friction Points',
 };
 
 export default function AccountSupportRoadmap({ accountId }: { accountId: string }) {
@@ -66,6 +67,9 @@ export default function AccountSupportRoadmap({ accountId }: { accountId: string
   const [data, setData] = useState<JiraStatusData | null>(null);
   const [activeTab, setActiveTab] = useState<'resolved' | 'radar' | 'priority' | 'coming'>('resolved');
   const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
+  const [expandedTheme, setExpandedTheme] = useState<string | null>(null);
+  const [themeCases, setThemeCases] = useState<any[]>([]);
+  const [loadingCases, setLoadingCases] = useState(false);
 
   const supabase = createClientComponentClient();
 
@@ -86,6 +90,35 @@ export default function AccountSupportRoadmap({ accountId }: { accountId: string
       setLoading(false);
     }
   }
+
+  async function fetchThemeCases(themeKey: string) {
+    setLoadingCases(true);
+    try {
+      const { data: frictionCards } = await supabase
+        .from('friction_cards')
+        .select('id, summary, severity')
+        .eq('account_id', accountId)
+        .eq('theme_key', themeKey)
+        .order('severity', { ascending: false })
+        .limit(5);
+
+      setThemeCases(frictionCards || []);
+    } catch (error) {
+      console.error('Failed to fetch theme cases:', error);
+    } finally {
+      setLoadingCases(false);
+    }
+  }
+
+  const toggleThemeExpansion = (themeKey: string) => {
+    if (expandedTheme === themeKey) {
+      setExpandedTheme(null);
+      setThemeCases([]);
+    } else {
+      setExpandedTheme(themeKey);
+      fetchThemeCases(themeKey);
+    }
+  };
 
   if (loading) {
     return (
@@ -382,38 +415,71 @@ export default function AccountSupportRoadmap({ accountId }: { accountId: string
               </p>
             ) : (
               (selectedTheme ? data.shouldPrioritize.filter(t => t.theme_key === selectedTheme) : data.shouldPrioritize).map((theme) => (
-                <div key={theme.theme_key} className="border border-amber-200 rounded-lg p-3 bg-amber-50">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                        <button
-                          onClick={() => {
-                            setSelectedTheme(theme.theme_key);
-                            // Switch to resolved tab to see if any historical tickets exist
-                            setActiveTab('resolved');
-                          }}
-                          className="text-sm font-medium text-amber-900 hover:text-amber-700 cursor-pointer underline decoration-dotted"
-                          title="Search for related tickets"
-                        >
-                          {formatThemeLabel(theme.theme_key)}
-                        </button>
-                        <span className="text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
-                          No ticket
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-700 mb-1">
-                        High friction area with no roadmap item
-                      </p>
-                      <div className="flex items-center gap-2 text-xs text-gray-600">
-                        <span className="bg-white px-2 py-0.5 rounded border border-amber-200">
-                          {theme.case_count} cases
-                        </span>
-                        <span>Avg severity: {theme.avg_severity.toFixed(1)}</span>
-                        <span>Impact score: {Math.round(theme.weight)}</span>
+                <div key={theme.theme_key} className="border border-amber-200 rounded-lg bg-amber-50">
+                  <div
+                    className="p-3 cursor-pointer hover:bg-amber-100 transition-colors"
+                    onClick={() => toggleThemeExpansion(theme.theme_key)}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                          <span className="text-sm font-medium text-amber-900">
+                            {formatThemeLabel(theme.theme_key)}
+                          </span>
+                          <span className="text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
+                            No ticket
+                          </span>
+                          <span className="text-xs text-amber-600 ml-auto">
+                            {expandedTheme === theme.theme_key ? '▼' : '▶'} Click to view cases
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-700 mb-1">
+                          High friction area with no roadmap item
+                        </p>
+                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                          <span className="bg-white px-2 py-0.5 rounded border border-amber-200">
+                            {theme.case_count} cases
+                          </span>
+                          <span>Avg severity: {theme.avg_severity.toFixed(1)}</span>
+                          <span>Impact score: {Math.round(theme.weight)}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
+
+                  {expandedTheme === theme.theme_key && (
+                    <div className="border-t border-amber-200 p-3 bg-white">
+                      {loadingCases ? (
+                        <p className="text-sm text-gray-500 italic">Loading cases...</p>
+                      ) : themeCases.length === 0 ? (
+                        <p className="text-sm text-gray-500 italic">No cases found for this theme</p>
+                      ) : (
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-gray-700 mb-2">Sample friction cases (top 5 by severity):</p>
+                          {themeCases.map((frictionCase) => (
+                            <div key={frictionCase.id} className="pl-3 border-l-2 border-amber-300">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                                  frictionCase.severity >= 4 ? 'bg-red-100 text-red-700' :
+                                  frictionCase.severity >= 3 ? 'bg-orange-100 text-orange-700' :
+                                  'bg-yellow-100 text-yellow-700'
+                                }`}>
+                                  Severity {frictionCase.severity}
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-700">{frictionCase.summary}</p>
+                            </div>
+                          ))}
+                          {theme.case_count > 5 && (
+                            <p className="text-xs text-gray-500 italic mt-2">
+                              +{theme.case_count - 5} more cases with this friction theme
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))
             )}

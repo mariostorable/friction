@@ -43,12 +43,26 @@ export default function SettingsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="text-sm text-gray-600 hover:text-gray-900"
-            >
-              ← Back to Dashboard
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                Dashboard
+              </button>
+              <button
+                onClick={() => router.push('/roadmap')}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                Jira Roadmap
+              </button>
+              <button
+                onClick={() => router.push('/integrations')}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                Integrations
+              </button>
+            </div>
           </div>
         </div>
       </header>
