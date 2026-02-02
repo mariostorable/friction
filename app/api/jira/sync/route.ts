@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { getDecryptedToken } from '@/lib/encryption';
 
-export const maxDuration = 60;
+export const maxDuration = 120; // Increased for large Jira instances
 
 // Theme keyword mapping for intelligent matching
 const THEME_KEYWORDS: Record<string, string[]> = {
@@ -70,6 +70,12 @@ export async function POST(request: NextRequest) {
     if (!integration) {
       return NextResponse.json({ error: 'Jira not connected' }, { status: 400 });
     }
+
+    // Update last_synced_at at the START so UI updates even if we timeout
+    await supabaseAdmin
+      .from('integrations')
+      .update({ last_synced_at: new Date().toISOString() })
+      .eq('id', integration.id);
 
     // Retrieve and decrypt API token
     let tokens;
@@ -139,7 +145,7 @@ export async function POST(request: NextRequest) {
     let hasMorePages = true;
     do {
       const jiraResponse = await fetch(
-        `${integration.instance_url}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&startAt=${startAt}&maxResults=${maxResults}&fields=summary,description,status,priority,assignee,labels,created,updated,resolutiondate,comment,sprint`,
+        `${integration.instance_url}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&startAt=${startAt}&maxResults=${maxResults}&fields=summary,description,status,priority,assignee,labels,created,updated,resolutiondate,resolution,comment,sprint,components,fixVersions,parent,issuetype,reporter,customfield_*`,
         {
           headers: {
             'Authorization': jiraAuthHeader,
@@ -237,53 +243,84 @@ export async function POST(request: NextRequest) {
 
     const issuesNeedingSummary = allIssues.filter((issue: any) => !existingIssueKeys.has(issue.key));
 
-    console.log(`Generating AI summaries for ${issuesNeedingSummary.length} new issues...`);
+    console.log(`Found ${issuesNeedingSummary.length} new issues (skipping AI summaries to avoid timeout)`);
 
-    // Generate summaries in batches to avoid rate limits
+    // Skip AI summary generation to avoid timeouts
+    // AI summaries are nice-to-have but not critical for linking tickets to themes/accounts
+    // TODO: Consider generating summaries in a separate background job
     const aiSummaries: Record<string, string> = {};
-    for (let i = 0; i < issuesNeedingSummary.length; i += 5) {
-      const batch = issuesNeedingSummary.slice(i, i + 5);
-      await Promise.all(batch.map(async (issue: any) => {
-        try {
-          const summary = await generateAISummary(issue);
-          aiSummaries[issue.key] = summary;
-        } catch (error) {
-          console.error(`Failed to generate summary for ${issue.key}:`, error);
-          aiSummaries[issue.key] = issue.fields.summary; // Fallback to original
-        }
-      }));
-
-      // Rate limiting delay
-      if (i + 5 < issuesNeedingSummary.length) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-    }
 
     // Transform and store Jira issues
-    const jiraIssues = allIssues.map((issue: any) => ({
-      user_id: userId,
-      integration_id: integration.id,
-      jira_id: issue.id,
-      jira_key: issue.key,
-      summary: issue.fields.summary,
-      description: issue.fields.description || '',
-      status: issue.fields.status?.name || 'Unknown',
-      priority: issue.fields.priority?.name || null,
-      assignee_name: issue.fields.assignee?.displayName || null,
-      assignee_email: issue.fields.assignee?.emailAddress || null,
-      sprint_name: issue.fields.sprint?.name || null,
-      labels: issue.fields.labels || [],
-      created_date: issue.fields.created,
-      updated_date: issue.fields.updated,
-      resolution_date: issue.fields.resolutiondate || null,
-      issue_url: `${integration.instance_url}/browse/${issue.key}`,
-      ai_summary: aiSummaries[issue.key] || null,
-      metadata: {
-        comment_count: issue.fields.comment?.total || 0,
+    const jiraIssues = allIssues.map((issue: any) => {
+      // Extract components
+      const components = (issue.fields.components || []).map((c: any) => c.name);
+
+      // Extract fix versions
+      const fixVersions = (issue.fields.fixVersions || []).map((v: any) => v.name);
+
+      // Extract parent issue key (for subtasks)
+      const parentKey = issue.fields.parent?.key || null;
+
+      // Extract resolution reason
+      const resolution = issue.fields.resolution?.name || null;
+
+      // Extract reporter
+      const reporterName = issue.fields.reporter?.displayName || null;
+      const reporterEmail = issue.fields.reporter?.emailAddress || null;
+
+      // Extract all custom fields for discovery
+      const customFields: Record<string, any> = {};
+      Object.entries(issue.fields || {}).forEach(([key, value]) => {
+        if (key.startsWith('customfield_') && value !== null && value !== undefined && value !== '') {
+          // Store custom field with simplified value
+          if (typeof value === 'object') {
+            // For objects, try to extract meaningful value
+            if (value.displayName) customFields[key] = value.displayName;
+            else if (value.name) customFields[key] = value.name;
+            else if (value.value) customFields[key] = value.value;
+            else if (Array.isArray(value)) {
+              customFields[key] = value.map((v: any) => v.name || v.value || v).join(', ');
+            } else {
+              customFields[key] = JSON.stringify(value).substring(0, 500);
+            }
+          } else {
+            customFields[key] = value;
+          }
+        }
+      });
+
+      return {
+        user_id: userId,
+        integration_id: integration.id,
+        jira_id: issue.id,
+        jira_key: issue.key,
+        summary: issue.fields.summary,
+        description: issue.fields.description || '',
+        status: issue.fields.status?.name || 'Unknown',
         issue_type: issue.fields.issuetype?.name || 'Unknown',
-      },
-      last_synced_at: new Date().toISOString(),
-    }));
+        priority: issue.fields.priority?.name || null,
+        resolution: resolution,
+        components: components,
+        fix_versions: fixVersions,
+        parent_key: parentKey,
+        assignee_name: issue.fields.assignee?.displayName || null,
+        assignee_email: issue.fields.assignee?.emailAddress || null,
+        reporter_name: reporterName,
+        reporter_email: reporterEmail,
+        sprint_name: issue.fields.sprint?.name || null,
+        labels: issue.fields.labels || [],
+        created_date: issue.fields.created,
+        updated_date: issue.fields.updated,
+        resolution_date: issue.fields.resolutiondate || null,
+        issue_url: `${integration.instance_url}/browse/${issue.key}`,
+        ai_summary: aiSummaries[issue.key] || null,
+        metadata: {
+          comment_count: issue.fields.comment?.total || 0,
+          custom_fields: customFields,
+        },
+        last_synced_at: new Date().toISOString(),
+      };
+    });
 
     // Upsert issues
     const { data: insertedIssues, error: insertError } = await supabaseAdmin
@@ -324,12 +361,6 @@ export async function POST(request: NextRequest) {
       accountLinksCreated += linkedAccounts.length;
     }
 
-    // Update integration last_synced_at
-    await supabaseAdmin
-      .from('integrations')
-      .update({ last_synced_at: new Date().toISOString() })
-      .eq('id', integration.id);
-
     console.log(`Sync complete: ${insertedIssues?.length} issues, ${linksCreated} theme links, ${accountLinksCreated} account links created`);
 
     return NextResponse.json({
@@ -354,6 +385,7 @@ export async function POST(request: NextRequest) {
 async function linkIssueToThemes(supabase: any, userId: string, issue: any): Promise<string[]> {
   const linkedThemes: string[] = [];
   const searchText = `${issue.summary} ${issue.description || ''}`.toLowerCase();
+  const componentsText = (issue.components || []).join(' ').toLowerCase();
 
   // Strategy 1: Label-based matching (highest confidence)
   for (const label of issue.labels || []) {
@@ -366,9 +398,26 @@ async function linkIssueToThemes(supabase: any, userId: string, issue: any): Pro
     }
   }
 
-  // Strategy 2: Keyword-based matching (medium confidence)
+  // Strategy 2: Component-based matching (high confidence)
+  // Components often directly map to product areas
+  if (componentsText) {
+    for (const [themeKey, keywords] of Object.entries(THEME_KEYWORDS)) {
+      if (linkedThemes.includes(themeKey)) continue;
+
+      const componentMatches = keywords.filter(keyword =>
+        componentsText.includes(keyword.toLowerCase())
+      ).length;
+
+      if (componentMatches >= 1) {
+        await createThemeLink(supabase, userId, issue.id, themeKey, 'component', 0.9);
+        linkedThemes.push(themeKey);
+      }
+    }
+  }
+
+  // Strategy 3: Keyword-based matching (medium confidence)
   for (const [themeKey, keywords] of Object.entries(THEME_KEYWORDS)) {
-    // Skip if already linked via label
+    // Skip if already linked via label or component
     if (linkedThemes.includes(themeKey)) continue;
 
     // Count keyword matches
@@ -439,7 +488,7 @@ async function createThemeLink(
   userId: string,
   jiraIssueId: string,
   themeKey: string,
-  matchType: 'label' | 'keyword',
+  matchType: 'label' | 'keyword' | 'component',
   confidence: number
 ) {
   try {
