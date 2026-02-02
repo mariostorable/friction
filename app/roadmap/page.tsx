@@ -15,6 +15,7 @@ export default function RoadmapPage() {
   const [jiraIntegration, setJiraIntegration] = useState<any>(null);
   const [accountsWithUnlinkedThemes, setAccountsWithUnlinkedThemes] = useState<any[]>([]);
   const [accountsWithTickets, setAccountsWithTickets] = useState<any[]>([]);
+  const [themeTickets, setThemeTickets] = useState<any[]>([]);
 
   useEffect(() => {
     loadRoadmapData();
@@ -106,6 +107,50 @@ export default function RoadmapPage() {
         }
         console.log('Accounts with tickets:', withTickets);
         setAccountsWithTickets(withTickets || []);
+
+        // Get Jira issues grouped by theme
+        const { data: themeLinksWithIssues, error: themeLinkError } = await supabase
+          .from('theme_jira_links')
+          .select(`
+            theme_key,
+            jira_key,
+            confidence,
+            match_type,
+            jira_issue:jira_issues!inner(
+              jira_key,
+              summary,
+              status,
+              issue_type,
+              resolution,
+              components,
+              fix_versions,
+              parent_key,
+              priority,
+              issue_url,
+              assignee_name
+            )
+          `)
+          .order('confidence', { ascending: false });
+
+        if (themeLinkError) {
+          console.error('Error fetching theme links:', themeLinkError);
+        }
+
+        // Group by theme
+        const groupedByTheme: Record<string, any[]> = {};
+        themeLinksWithIssues?.forEach((link: any) => {
+          if (!groupedByTheme[link.theme_key]) {
+            groupedByTheme[link.theme_key] = [];
+          }
+          groupedByTheme[link.theme_key].push(link);
+        });
+
+        const themeTicketsArray = Object.entries(groupedByTheme).map(([theme_key, links]) => ({
+          theme_key,
+          tickets: links,
+        }));
+
+        setThemeTickets(themeTicketsArray);
       }
     } catch (error) {
       console.error('Error loading roadmap data:', error);
@@ -115,15 +160,20 @@ export default function RoadmapPage() {
   }
 
   const THEME_LABELS: Record<string, string> = {
-    'authentication': 'Authentication & Login',
-    'performance': 'Performance & Speed',
-    'ui_ux': 'UI/UX Issues',
-    'integration': 'Integration Issues',
-    'data_accuracy': 'Data Accuracy',
-    'mobile': 'Mobile Experience',
-    'reporting': 'Reporting & Analytics',
-    'onboarding': 'Onboarding',
-    'other': 'Other Friction Points'
+    'billing_confusion': 'Billing & Payments',
+    'integration_failures': 'Integration Issues',
+    'ui_confusion': 'UI/UX Confusion',
+    'performance_issues': 'Performance Issues',
+    'missing_features': 'Missing Features',
+    'training_gaps': 'Training & Documentation',
+    'support_response_time': 'Support Response Time',
+    'data_quality': 'Data Quality',
+    'reporting_issues': 'Reporting & Analytics',
+    'access_permissions': 'Access & Permissions',
+    'configuration_problems': 'Configuration Issues',
+    'notification_issues': 'Notifications',
+    'workflow_inefficiency': 'Workflow Inefficiency',
+    'mobile_issues': 'Mobile Issues',
   };
 
   if (loading) {
@@ -260,44 +310,42 @@ export default function RoadmapPage() {
               </div>
             </div>
 
-            {/* Accounts with Linked Tickets */}
+            {/* Tickets Grouped by Theme */}
             <div>
               <div className="bg-white rounded-lg border border-gray-200">
                 <div className="p-6 border-b border-gray-200">
-                  <h2 className="text-lg font-semibold text-gray-900">Active Jira Tickets</h2>
+                  <h2 className="text-lg font-semibold text-gray-900">Active Jira Tickets by Theme</h2>
                   <p className="text-sm text-gray-600 mt-1">
-                    Tickets linked to account friction themes
+                    {themeTickets.length} friction themes with linked Jira tickets
                   </p>
                 </div>
 
                 <div className="divide-y divide-gray-200">
-                  {!accountsWithTickets || accountsWithTickets.length === 0 ? (
+                  {!themeTickets || themeTickets.length === 0 ? (
                     <div className="p-6 text-center text-gray-500">
-                      <p className="text-sm">No Jira tickets linked to accounts yet</p>
+                      <p className="text-sm">No Jira tickets linked to friction themes yet</p>
+                      <p className="text-xs text-gray-400 mt-1">Run a sync to link tickets based on labels, components, and keywords</p>
                     </div>
                   ) : (
-                    accountsWithTickets.map(account => {
-                      const links = account.account_jira_links || [];
-                      if (links.length === 0) return null;
+                    themeTickets.map(themeGroup => {
+                      const tickets = themeGroup.tickets || [];
+                      if (tickets.length === 0) return null;
 
                       return (
-                        <div key={account.id} className="p-6 hover:bg-gray-50">
+                        <div key={themeGroup.theme_key} className="p-6 hover:bg-gray-50">
                           <div className="flex items-start justify-between mb-4">
                             <div className="flex-1">
-                              <Link
-                                href={`/accounts/${account.id}`}
-                                className="text-base font-semibold text-gray-900 hover:text-purple-700"
-                              >
-                                {account.name}
-                              </Link>
+                              <h3 className="text-base font-semibold text-gray-900">
+                                {THEME_LABELS[themeGroup.theme_key] || themeGroup.theme_key}
+                              </h3>
                               <p className="text-sm text-gray-600 mt-1">
-                                ARR: ${(account.arr || 0).toLocaleString()} • {links.length} ticket{links.length !== 1 ? 's' : ''}
+                                {tickets.length} ticket{tickets.length !== 1 ? 's' : ''}
                               </p>
                             </div>
                           </div>
 
                           <div className="space-y-2">
-                            {links.map((link: any) => {
+                            {tickets.map((link: any) => {
                               const issue = link.jira_issue;
                               if (!issue) return null;
 
@@ -339,6 +387,14 @@ export default function RoadmapPage() {
                                         {issue.priority && (
                                           <span className={`text-xs font-medium ${priorityColor}`}>
                                             {issue.priority}
+                                          </span>
+                                        )}
+                                        {link.match_type && (
+                                          <span
+                                            className="text-xs px-2 py-0.5 rounded bg-purple-100 text-purple-700"
+                                            title={`Matched by ${link.match_type} (${Math.round(link.confidence * 100)}% confidence)`}
+                                          >
+                                            {link.match_type}
                                           </span>
                                         )}
                                       </div>

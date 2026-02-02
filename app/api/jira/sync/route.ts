@@ -96,14 +96,16 @@ export async function POST(request: NextRequest) {
     const email = integration.metadata?.email;
     const jiraAuthHeader = `Basic ${Buffer.from(`${email}:${tokens.access_token}`).toString('base64')}`;
 
-    // Fetch ALL issues from Jira (last 90 days, updated recently) with pagination
+    // Fetch recent issues from Jira with pagination
+    // Limit to avoid Vercel timeout (10s on Hobby plan)
+    const MAX_ISSUES_PER_SYNC = 200; // Process most recent 200 issues per sync
     const jql = `updated >= -90d ORDER BY updated DESC`;
     const maxResults = 100; // Jira's max per request
     let startAt = 0;
     let allIssues: any[] = [];
     let totalIssues = 0;
 
-    console.log(`Fetching Jira issues with JQL: ${jql}`);
+    console.log(`Fetching Jira issues with JQL: ${jql} (max ${MAX_ISSUES_PER_SYNC})`);
 
     // Fetch field metadata on first run to discover custom fields
     if (startAt === 0) {
@@ -208,8 +210,8 @@ export async function POST(request: NextRequest) {
         console.log(`Fetched ${allIssues.length} issues so far (got ${fetchedCount} in this batch)`);
       }
 
-      // Continue if we got a full page (meaning there might be more)
-      hasMorePages = fetchedCount === maxResults;
+      // Continue if we got a full page AND haven't hit our limit
+      hasMorePages = fetchedCount === maxResults && allIssues.length < MAX_ISSUES_PER_SYNC;
       startAt += maxResults;
 
     } while (hasMorePages);
@@ -323,10 +325,19 @@ export async function POST(request: NextRequest) {
       };
     });
 
+    // Deduplicate issues by jira_key (keep most recent)
+    const uniqueIssuesMap = new Map<string, any>();
+    jiraIssues.forEach((issue: any) => {
+      uniqueIssuesMap.set(issue.jira_key, issue);
+    });
+    const uniqueJiraIssues = Array.from(uniqueIssuesMap.values());
+
+    console.log(`Deduped ${jiraIssues.length} to ${uniqueJiraIssues.length} unique issues`);
+
     // Upsert issues
     const { data: insertedIssues, error: insertError } = await supabaseAdmin
       .from('jira_issues')
-      .upsert(jiraIssues, {
+      .upsert(uniqueJiraIssues, {
         onConflict: 'user_id,jira_key',
         ignoreDuplicates: false
       })
@@ -369,7 +380,8 @@ export async function POST(request: NextRequest) {
     if (themeLinksToCreate.length > 0) {
       const { data: createdThemeLinks } = await supabaseAdmin
         .from('theme_jira_links')
-        .upsert(themeLinksToCreate, { onConflict: 'user_id,jira_issue_id,theme_key', ignoreDuplicates: true });
+        .upsert(themeLinksToCreate, { onConflict: 'user_id,jira_issue_id,theme_key', ignoreDuplicates: true })
+        .select();
       linksCreated = createdThemeLinks?.length || themeLinksToCreate.length;
     }
 
@@ -378,11 +390,17 @@ export async function POST(request: NextRequest) {
     if (accountLinksToCreate.length > 0) {
       const { data: createdAccountLinks } = await supabaseAdmin
         .from('account_jira_links')
-        .upsert(accountLinksToCreate, { onConflict: 'user_id,account_id,jira_key', ignoreDuplicates: true });
+        .upsert(accountLinksToCreate, { onConflict: 'user_id,account_id,jira_key', ignoreDuplicates: true })
+        .select();
       accountLinksCreated = createdAccountLinks?.length || accountLinksToCreate.length;
     }
 
     console.log(`Sync complete: ${insertedIssues?.length} issues, ${linksCreated} theme links, ${accountLinksCreated} account links created`);
+
+    const hasMoreIssues = totalIssues > (insertedIssues?.length || 0);
+    const message = hasMoreIssues
+      ? `Synced ${insertedIssues?.length} most recent issues (${totalIssues} total available). Run sync again to fetch more.`
+      : `Synced all ${insertedIssues?.length} issues (${accountLinksCreated} linked to accounts)`;
 
     return NextResponse.json({
       success: true,
@@ -390,7 +408,8 @@ export async function POST(request: NextRequest) {
       total_available: totalIssues,
       links_created: linksCreated,
       account_links_created: accountLinksCreated,
-      message: `Synced ${insertedIssues?.length} of ${totalIssues} total issues (${accountLinksCreated} linked to accounts)`,
+      message,
+      has_more: hasMoreIssues,
     });
 
   } catch (error) {
