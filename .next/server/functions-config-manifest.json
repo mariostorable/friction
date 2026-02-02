@@ -1,1 +1,0 @@
-{"version":1,"functions":{"/api/analyze-all":{"maxDuration":300},"/api/cron/sync-jira":{"maxDuration":60},"/api/salesforce/sync-cases":{"maxDuration":60},"/api/analyze-friction":{"maxDuration":300},"/api/jira/sync":{"maxDuration":60},"/api/cron/analyze-portfolio":{"maxDuration":300}}}
