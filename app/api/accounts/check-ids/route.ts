@@ -17,17 +17,17 @@ export async function GET() {
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id);
 
-    // Get accounts WITH salesforce_account_id
+    // Get accounts WITH salesforce_id
     const { count: accountsWithSfId } = await supabase
       .from('accounts')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)
-      .not('salesforce_account_id', 'is', null);
+      .not('salesforce_id', 'is', null);
 
     // Get sample accounts with their IDs
     const { data: sampleAccounts } = await supabase
       .from('accounts')
-      .select('name, salesforce_account_id')
+      .select('name, salesforce_id')
       .eq('user_id', user.id)
       .limit(20);
 

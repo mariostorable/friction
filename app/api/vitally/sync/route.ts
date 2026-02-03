@@ -120,15 +120,15 @@ export async function POST() {
     // Get all existing accounts for this user to match against
     const { data: existingAccounts } = await supabaseAdmin
       .from('accounts')
-      .select('id, salesforce_account_id, name')
+      .select('id, salesforce_id, name')
       .eq('user_id', user.id);
 
     // Create a map for quick lookup by Salesforce ID
     const accountsBySalesforceId = new Map();
     const accountsByName = new Map();
     existingAccounts?.forEach(acc => {
-      if (acc.salesforce_account_id) {
-        accountsBySalesforceId.set(acc.salesforce_account_id, acc);
+      if (acc.salesforce_id) {
+        accountsBySalesforceId.set(acc.salesforce_id, acc);
       }
       accountsByName.set(acc.name.toLowerCase().trim(), acc);
     });
