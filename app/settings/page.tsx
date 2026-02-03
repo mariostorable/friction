@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { LogOut, User, HelpCircle, Target, TrendingDown, BarChart3, AlertTriangle, CheckCircle, Link as LinkIcon, Shield, Lock } from 'lucide-react';
 import SalesforceConnector from '@/components/SalesforceConnector';
 import JiraConnector from '@/components/JiraConnector';
+import VitallyConnector from '@/components/VitallyConnector';
 import JiraLinksDiagnostic from '@/components/JiraLinksDiagnostic';
 
 export default function SettingsPage() {
@@ -284,6 +285,15 @@ export default function SettingsPage() {
             <h2 className="text-xl font-semibold text-gray-900">Jira Integration</h2>
           </div>
           <JiraConnector />
+        </div>
+
+        {/* Vitally Integration Section */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <LinkIcon className="w-6 h-6 text-orange-600" />
+            <h2 className="text-xl font-semibold text-gray-900">Vitally Integration</h2>
+          </div>
+          <VitallyConnector />
         </div>
 
         {/* Jira Diagnostics Section */}
