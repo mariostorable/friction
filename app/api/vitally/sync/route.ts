@@ -56,31 +56,54 @@ export async function POST() {
     const apiKey = tokenData.access_token;
     const authHeader = `Basic ${Buffer.from(`${apiKey}:`).toString('base64')}`;
 
-    // Fetch accounts from Vitally
-    const response = await fetch(`${integration.instance_url}/resources/accounts`, {
-      method: 'GET',
-      headers: {
-        'Authorization': authHeader,
-        'Content-Type': 'application/json',
-      },
-    });
+    // Fetch ALL accounts from Vitally with pagination
+    const vitallyAccounts: any[] = [];
+    let nextUrl: string | null = `${integration.instance_url}/resources/accounts`;
+    let pageCount = 0;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Vitally API error:', errorText);
-      return NextResponse.json({
-        error: 'Vitally API request failed',
-        details: errorText,
-      }, { status: response.status });
+    console.log('Starting Vitally account fetch with pagination...');
+
+    while (nextUrl && pageCount < 100) { // Safety limit of 100 pages
+      pageCount++;
+      console.log(`Fetching page ${pageCount} from: ${nextUrl}`);
+
+      const pageResponse: Response = await fetch(nextUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!pageResponse.ok) {
+        const errorText = await pageResponse.text();
+        console.error('Vitally API error:', errorText);
+        return NextResponse.json({
+          error: 'Vitally API request failed',
+          details: errorText,
+        }, { status: pageResponse.status });
+      }
+
+      const pageData: any = await pageResponse.json();
+      const pageResults = pageData.results || [];
+      vitallyAccounts.push(...pageResults);
+
+      console.log(`Page ${pageCount}: fetched ${pageResults.length} accounts. Total so far: ${vitallyAccounts.length}`);
+
+      // Check if there are more pages
+      if (pageData.atEnd || !pageData.next) {
+        console.log('Reached end of results');
+        nextUrl = null;
+      } else {
+        // Vitally returns the full URL in the 'next' field
+        nextUrl = pageData.next;
+      }
     }
 
-    const data = await response.json();
-    console.log('Vitally API response structure:', JSON.stringify(Object.keys(data)));
-    const vitallyAccounts = data.results || [];
-    console.log(`Fetched ${vitallyAccounts.length} accounts from Vitally`);
+    console.log(`Finished fetching. Total accounts: ${vitallyAccounts.length} across ${pageCount} pages`);
 
     if (vitallyAccounts.length === 0) {
-      console.log('No accounts in results array. Full response:', JSON.stringify(data).substring(0, 500));
+      console.log('No accounts found in Vitally');
       return NextResponse.json({
         success: true,
         synced: 0,
