@@ -4,5 +4,16 @@
       "path": "/api/cron/analyze-portfolio",
       "schedule": "0 2 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "app/api/vitally/sync/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/salesforce/sync/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/jira/sync/route.ts": {
+      "maxDuration": 300
+    }
+  }
 }
