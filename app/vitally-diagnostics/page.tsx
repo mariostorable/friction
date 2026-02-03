@@ -44,11 +44,19 @@ export default function VitallyDiagnostics() {
         apiTest = { error: errorText };
       }
 
+      // Get match status
+      const matchResponse = await fetch('/api/vitally/match-status');
+      let matchStatus = null;
+      if (matchResponse.ok) {
+        matchStatus = await matchResponse.json();
+      }
+
       setDiagnostics({
         integration: integration || 'Not found',
         vitallyAccountsCount: vitallyCount,
         sampleAccounts: sampleAccounts || [],
         apiTest: apiTest,
+        matchStatus: matchStatus,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
@@ -110,6 +118,40 @@ export default function VitallyDiagnostics() {
                   <pre className="bg-gray-50 p-4 rounded border border-gray-200 overflow-auto">
                     {JSON.stringify(diagnostics.sampleAccounts, null, 2)}
                   </pre>
+                )}
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Account Matching Status</h3>
+                {diagnostics.matchStatus ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-blue-50 p-4 rounded border border-blue-200">
+                        <p className="text-sm text-blue-900 font-medium">Total Vitally Accounts</p>
+                        <p className="text-2xl font-bold text-blue-900">{diagnostics.matchStatus.summary.total_vitally_accounts}</p>
+                      </div>
+                      <div className="bg-green-50 p-4 rounded border border-green-200">
+                        <p className="text-sm text-green-900 font-medium">Matched to Salesforce</p>
+                        <p className="text-2xl font-bold text-green-900">{diagnostics.matchStatus.summary.matched_vitally_accounts}</p>
+                      </div>
+                      <div className="bg-yellow-50 p-4 rounded border border-yellow-200">
+                        <p className="text-sm text-yellow-900 font-medium">Unmatched Accounts</p>
+                        <p className="text-2xl font-bold text-yellow-900">{diagnostics.matchStatus.summary.unmatched_vitally_accounts}</p>
+                      </div>
+                      <div className="bg-purple-50 p-4 rounded border border-purple-200">
+                        <p className="text-sm text-purple-900 font-medium">SF Accounts with Vitally Data</p>
+                        <p className="text-2xl font-bold text-purple-900">{diagnostics.matchStatus.summary.salesforce_accounts_with_vitally_data}</p>
+                      </div>
+                    </div>
+                    <details className="bg-gray-50 p-4 rounded border border-gray-200">
+                      <summary className="cursor-pointer font-medium text-sm">View Full Match Status</summary>
+                      <pre className="mt-3 text-xs overflow-auto max-h-64">
+                        {JSON.stringify(diagnostics.matchStatus, null, 2)}
+                      </pre>
+                    </details>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-600">Loading match status...</p>
                 )}
               </div>
 
