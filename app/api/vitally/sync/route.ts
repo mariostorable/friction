@@ -75,10 +75,12 @@ export async function POST() {
     }
 
     const data = await response.json();
+    console.log('Vitally API response structure:', JSON.stringify(Object.keys(data)));
     const vitallyAccounts = data.results || [];
     console.log(`Fetched ${vitallyAccounts.length} accounts from Vitally`);
 
     if (vitallyAccounts.length === 0) {
+      console.log('No accounts in results array. Full response:', JSON.stringify(data).substring(0, 500));
       return NextResponse.json({
         success: true,
         synced: 0,
@@ -106,10 +108,12 @@ export async function POST() {
     let stored = 0;
 
     // Process each Vitally account
+    console.log(`Processing ${vitallyAccounts.length} Vitally accounts...`);
     for (const vAccount of vitallyAccounts) {
       try {
         const vitallyId = vAccount.id;
         const accountName = vAccount.name || 'Unknown';
+        console.log(`Processing account: ${accountName} (${vitallyId})`);
 
         // Try multiple possible field names for Salesforce ID
         const salesforceId = vAccount.accountId ||
@@ -148,6 +152,7 @@ export async function POST() {
         }
 
         // Store in vitally_accounts table with ALL Vitally data
+        console.log(`Attempting to store account ${accountName} with health_score: ${healthScore}`);
         const { error: vitallyError } = await supabaseAdmin
           .from('vitally_accounts')
           .upsert({
@@ -169,10 +174,11 @@ export async function POST() {
           });
 
         if (vitallyError) {
-          console.error(`Error storing Vitally account ${vitallyId}:`, vitallyError);
+          console.error(`Error storing Vitally account ${vitallyId}:`, JSON.stringify(vitallyError));
           continue;
         }
 
+        console.log(`Successfully stored account ${accountName}`);
         stored++;
 
         // Update the main accounts table with Vitally data if matched
