@@ -58,16 +58,22 @@ export async function POST() {
 
     // Fetch ALL accounts from Vitally with pagination
     const vitallyAccounts: any[] = [];
-    let nextUrl: string | null = `${integration.instance_url}/resources/accounts`;
+    let nextCursor: string | null = null;
     let pageCount = 0;
 
     console.log('Starting Vitally account fetch with pagination...');
 
-    while (nextUrl && pageCount < 100) { // Safety limit of 100 pages
+    while (pageCount < 100) { // Safety limit of 100 pages
       pageCount++;
-      console.log(`Fetching page ${pageCount} from: ${nextUrl}`);
 
-      const pageResponse: Response = await fetch(nextUrl, {
+      // Build URL with cursor if we have one
+      const url = nextCursor
+        ? `${integration.instance_url}/resources/accounts?from=${encodeURIComponent(nextCursor)}`
+        : `${integration.instance_url}/resources/accounts`;
+
+      console.log(`Fetching page ${pageCount} from: ${url}`);
+
+      const pageResponse: Response = await fetch(url, {
         method: 'GET',
         headers: {
           'Authorization': authHeader,
@@ -93,10 +99,10 @@ export async function POST() {
       // Check if there are more pages
       if (pageData.atEnd || !pageData.next) {
         console.log('Reached end of results');
-        nextUrl = null;
+        break;
       } else {
-        // Vitally returns the full URL in the 'next' field
-        nextUrl = pageData.next;
+        // Vitally returns a cursor token in the 'next' field
+        nextCursor = pageData.next;
       }
     }
 
