@@ -413,6 +413,10 @@ export default function Dashboard() {
           aVal = a.current_snapshot?.created_at ? new Date(a.current_snapshot.created_at).getTime() : 0;
           bVal = b.current_snapshot?.created_at ? new Date(b.current_snapshot.created_at).getTime() : 0;
           break;
+        case 'vitally_health':
+          aVal = a.vitally_health_score || 0;
+          bVal = b.vitally_health_score || 0;
+          break;
         default:
           return 0;
       }
@@ -503,6 +507,12 @@ export default function Dashboard() {
                 className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
               >
                 Jira Roadmap
+              </button>
+              <button
+                onClick={() => router.push('/vitally')}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                Customer Health
               </button>
               <button
                 onClick={() => router.push('/integrations')}
@@ -896,6 +906,22 @@ export default function Dashboard() {
                         Last Analyzed {getSortIcon('last_analyzed')}
                       </th>
                       <th
+                        onMouseEnter={() => setHoveredColumn('vitally_health')}
+                        onMouseLeave={() => setHoveredColumn(null)}
+                        className="w-[8%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-tight relative cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('vitally_health')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Vitally {getSortIcon('vitally_health')}
+                        </div>
+                        {hoveredColumn === 'vitally_health' && (
+                          <div className="absolute left-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 z-50 whitespace-normal normal-case font-normal">
+                            Customer health score from Vitally (0-100). Higher scores indicate healthier accounts.
+                            <div className="absolute -top-1 left-6 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                          </div>
+                        )}
+                      </th>
+                      <th
                         onMouseEnter={() => setHoveredColumn('jira_tickets')}
                         onMouseLeave={() => setHoveredColumn(null)}
                         className="w-[14%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-tight relative"
@@ -1037,6 +1063,21 @@ export default function Dashboard() {
                           {account.current_snapshot?.created_at
                             ? new Date(account.current_snapshot.created_at).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
                             : 'Never'}
+                        </td>
+                        <td className="px-2 py-2 whitespace-nowrap">
+                          {account.vitally_health_score !== null && account.vitally_health_score !== undefined ? (
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              account.vitally_health_score >= 80
+                                ? 'bg-green-100 text-green-800'
+                                : account.vitally_health_score >= 60
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {Math.round(account.vitally_health_score)}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-400">-</span>
+                          )}
                         </td>
                         <td className="px-2 py-2 whitespace-nowrap text-xs">
                           {jiraTicketCounts[account.id] ? (

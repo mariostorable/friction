@@ -41,6 +41,11 @@ export interface Account {
   metadata: Record<string, any>;
   last_synced_at: string;
   created_at: string;
+  // Vitally integration fields
+  vitally_health_score: number | null;
+  vitally_nps_score: number | null;
+  vitally_status: string | null;
+  vitally_last_activity_at: string | null;
 }
 
 export interface Portfolio {

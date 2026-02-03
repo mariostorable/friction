@@ -755,6 +755,68 @@ export default function AccountDetailPage() {
           )}
         </div>
 
+        {/* Vitally Customer Health */}
+        {(account?.vitally_health_score !== null || account?.vitally_nps_score !== null) && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Customer Health (Vitally)</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  {account?.vitally_last_activity_at
+                    ? `Last activity: ${new Date(account.vitally_last_activity_at).toLocaleDateString()}`
+                    : 'Synced from Vitally'}
+                </p>
+              </div>
+              <div className="flex gap-6">
+                {account?.vitally_health_score !== null && (
+                  <div className="text-center">
+                    <div className="text-sm font-medium text-gray-600 mb-1">Health Score</div>
+                    <div className={`text-4xl font-bold ${
+                      account.vitally_health_score >= 80 ? 'text-green-600' :
+                      account.vitally_health_score >= 60 ? 'text-yellow-600' :
+                      'text-red-600'
+                    }`}>
+                      {Math.round(account.vitally_health_score)}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {account.vitally_health_score >= 80 ? 'Healthy' :
+                       account.vitally_health_score >= 60 ? 'At Risk' :
+                       'Critical'}
+                    </div>
+                  </div>
+                )}
+                {account?.vitally_nps_score !== null && (
+                  <div className="text-center">
+                    <div className="text-sm font-medium text-gray-600 mb-1">NPS Score</div>
+                    <div className={`text-4xl font-bold ${
+                      account.vitally_nps_score >= 50 ? 'text-green-600' :
+                      account.vitally_nps_score >= 0 ? 'text-yellow-600' :
+                      'text-red-600'
+                    }`}>
+                      {Math.round(account.vitally_nps_score)}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {account.vitally_nps_score >= 50 ? 'Promoter' :
+                       account.vitally_nps_score >= 0 ? 'Passive' :
+                       'Detractor'}
+                    </div>
+                  </div>
+                )}
+                {account?.vitally_status && (
+                  <div className="text-center">
+                    <div className="text-sm font-medium text-gray-600 mb-1">Status</div>
+                    <div className="mt-2">
+                      <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full">
+                        {account.vitally_status}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Case Volume Analysis */}
         {caseVolumeMetrics.current > 0 && (
           <div className="mb-6">
