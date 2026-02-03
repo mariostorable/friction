@@ -51,12 +51,20 @@ export default function VitallyDiagnostics() {
         matchStatus = await matchResponse.json();
       }
 
+      // Check Salesforce account IDs
+      const idsResponse = await fetch('/api/accounts/check-ids');
+      let accountIds = null;
+      if (idsResponse.ok) {
+        accountIds = await idsResponse.json();
+      }
+
       setDiagnostics({
         integration: integration || 'Not found',
         vitallyAccountsCount: vitallyCount,
         sampleAccounts: sampleAccounts || [],
         apiTest: apiTest,
         matchStatus: matchStatus,
+        accountIds: accountIds,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
@@ -118,6 +126,36 @@ export default function VitallyDiagnostics() {
                   <pre className="bg-gray-50 p-4 rounded border border-gray-200 overflow-auto">
                     {JSON.stringify(diagnostics.sampleAccounts, null, 2)}
                   </pre>
+                )}
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Salesforce Account IDs</h3>
+                {diagnostics.accountIds ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="bg-blue-50 p-4 rounded border border-blue-200">
+                        <p className="text-sm text-blue-900 font-medium">Total SF Accounts</p>
+                        <p className="text-2xl font-bold text-blue-900">{diagnostics.accountIds.summary.total_accounts}</p>
+                      </div>
+                      <div className="bg-green-50 p-4 rounded border border-green-200">
+                        <p className="text-sm text-green-900 font-medium">With SF Account ID</p>
+                        <p className="text-2xl font-bold text-green-900">{diagnostics.accountIds.summary.accounts_with_salesforce_id}</p>
+                      </div>
+                      <div className="bg-red-50 p-4 rounded border border-red-200">
+                        <p className="text-sm text-red-900 font-medium">Without SF Account ID</p>
+                        <p className="text-2xl font-bold text-red-900">{diagnostics.accountIds.summary.accounts_without_salesforce_id}</p>
+                      </div>
+                    </div>
+                    <details className="bg-gray-50 p-4 rounded border border-gray-200">
+                      <summary className="cursor-pointer font-medium text-sm">View Sample Accounts</summary>
+                      <pre className="mt-3 text-xs overflow-auto max-h-64">
+                        {JSON.stringify(diagnostics.accountIds.sample_accounts, null, 2)}
+                      </pre>
+                    </details>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-600">Loading account IDs...</p>
                 )}
               </div>
 
