@@ -206,6 +206,7 @@ export async function POST() {
       synced: stored,
       matched: matched,
       total: vitallyAccounts.length,
+      message: `Synced ${stored} of ${vitallyAccounts.length} Vitally accounts${matched > 0 ? `, matched ${matched} to existing Salesforce accounts` : ''}`,
     });
 
   } catch (error) {
