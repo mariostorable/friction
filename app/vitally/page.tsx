@@ -242,7 +242,7 @@ export default function VitallyPage() {
     );
   }
 
-  const uniqueStatuses = Array.from(new Set(accounts.map(a => a.status).filter(Boolean)));
+  const uniqueStatuses = Array.from(new Set(accounts.map(a => a.status).filter((s): s is string => Boolean(s))));
 
   return (
     <div className="min-h-screen bg-gray-50">
