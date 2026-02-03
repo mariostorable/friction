@@ -104,15 +104,25 @@ export default function VitallyConnector() {
 
   async function syncNow() {
     setSyncing(true);
+    setSuccess(null);
+    setError(null);
+
     try {
+      // Create an AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+
       const response = await fetch('/api/vitally/sync', {
         method: 'POST',
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       const result = await response.json();
 
       if (response.ok) {
-        setSuccess(`Successfully synced ${result.data?.results?.length || 0} Vitally accounts!`);
+        setSuccess(`Successfully synced ${result.synced || 0} of ${result.total || 0} Vitally accounts!${result.matched > 0 ? ` Matched ${result.matched} to Salesforce accounts.` : ''}`);
         await checkIntegration();
       } else {
         setError({
@@ -123,11 +133,19 @@ export default function VitallyConnector() {
       }
     } catch (error) {
       console.error('Sync error:', error);
-      setError({
-        title: 'Sync Error',
-        message: 'Failed to sync Vitally data',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      });
+      if (error instanceof Error && error.name === 'AbortError') {
+        setError({
+          title: 'Sync Timeout',
+          message: 'The sync is taking longer than expected. It may still be processing in the background.',
+          details: 'Please refresh the page in a minute to see updated data.'
+        });
+      } else {
+        setError({
+          title: 'Sync Error',
+          message: 'Failed to sync Vitally data',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
     } finally {
       setSyncing(false);
     }

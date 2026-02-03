@@ -56,10 +56,20 @@ export default function IntegrationsPage() {
       const endpoint = syncEndpoints[integrationType];
       if (!endpoint) {
         setSyncMessage({ type: 'error', message: 'Sync not available for this integration' });
+        setSyncing(null);
         return;
       }
 
-      const response = await fetch(endpoint, { method: 'POST' });
+      // Add timeout for long-running syncs
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
       const data = await response.json();
 
       if (response.ok) {
@@ -76,10 +86,17 @@ export default function IntegrationsPage() {
         });
       }
     } catch (error) {
-      setSyncMessage({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Sync failed'
-      });
+      if (error instanceof Error && error.name === 'AbortError') {
+        setSyncMessage({
+          type: 'error',
+          message: 'Sync timeout: The sync is taking longer than expected. It may still be processing in the background. Please refresh in a minute.'
+        });
+      } else {
+        setSyncMessage({
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Sync failed'
+        });
+      }
     } finally {
       setSyncing(null);
     }
