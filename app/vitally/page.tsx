@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Activity } from 'lucide-react';
+import VitallyFieldDiscovery from '@/components/VitallyFieldDiscovery';
 
 interface VitallyAccount {
   id: string;
@@ -310,6 +311,11 @@ export default function VitallyPage() {
             </div>
             <p className="text-xs text-gray-500 mt-2">Health score &lt; 60</p>
           </div>
+        </div>
+
+        {/* Field Discovery */}
+        <div className="mb-8">
+          <VitallyFieldDiscovery />
         </div>
 
         {/* Filters */}
