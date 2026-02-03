@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, CheckCircle, XCircle, Settings, ExternalLink, Activity } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, Settings, ExternalLink, Activity, RefreshCw } from 'lucide-react';
 
 interface Integration {
   id: string;
@@ -17,6 +17,8 @@ interface Integration {
 export default function IntegrationsPage() {
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState<string | null>(null);
+  const [syncMessage, setSyncMessage] = useState<{ type: string; message: string } | null>(null);
   const router = useRouter();
   const supabase = createClientComponentClient();
 
@@ -37,6 +39,49 @@ export default function IntegrationsPage() {
       console.error('Error loading integrations:', error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function syncIntegration(integrationType: string) {
+    setSyncing(integrationType);
+    setSyncMessage(null);
+
+    try {
+      const syncEndpoints: Record<string, string> = {
+        salesforce: '/api/salesforce/sync',
+        jira: '/api/jira/sync',
+        vitally: '/api/vitally/sync',
+      };
+
+      const endpoint = syncEndpoints[integrationType];
+      if (!endpoint) {
+        setSyncMessage({ type: 'error', message: 'Sync not available for this integration' });
+        return;
+      }
+
+      const response = await fetch(endpoint, { method: 'POST' });
+      const data = await response.json();
+
+      if (response.ok) {
+        setSyncMessage({
+          type: 'success',
+          message: data.message || `Successfully synced ${integrationType}`
+        });
+        // Reload integrations to get updated last_synced_at
+        await loadIntegrations();
+      } else {
+        setSyncMessage({
+          type: 'error',
+          message: data.error || `Failed to sync ${integrationType}`
+        });
+      }
+    } catch (error) {
+      setSyncMessage({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Sync failed'
+      });
+    } finally {
+      setSyncing(null);
     }
   }
 
@@ -154,6 +199,17 @@ export default function IntegrationsPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Sync Message */}
+        {syncMessage && (
+          <div className={`mb-6 p-4 rounded-lg ${
+            syncMessage.type === 'success'
+              ? 'bg-green-50 border border-green-200 text-green-800'
+              : 'bg-red-50 border border-red-200 text-red-800'
+          }`}>
+            <p className="text-sm font-medium">{syncMessage.message}</p>
+          </div>
+        )}
+
         {/* Summary */}
         <div className="mb-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -249,6 +305,14 @@ export default function IntegrationsPage() {
                       </div>
 
                       <div className="flex gap-2 mt-4">
+                        <button
+                          onClick={() => syncIntegration(integration.integration_type)}
+                          disabled={syncing === integration.integration_type}
+                          className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <RefreshCw className={`w-4 h-4 ${syncing === integration.integration_type ? 'animate-spin' : ''}`} />
+                          {syncing === integration.integration_type ? 'Syncing...' : 'Sync Now'}
+                        </button>
                         {info.pageLink && (
                           <button
                             onClick={() => router.push(info.pageLink!)}
