@@ -108,9 +108,9 @@ export default function VitallyConnector() {
     setError(null);
 
     try {
-      // Create an AbortController for timeout
+      // Create an AbortController for timeout (6 minutes to allow server to finish)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+      const timeoutId = setTimeout(() => controller.abort(), 360000); // 6 minute timeout
 
       const response = await fetch('/api/vitally/sync', {
         method: 'POST',

@@ -4,6 +4,9 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { getDecryptedToken } from '@/lib/encryption';
 
+// Increase timeout for large Vitally syncs (requires Vercel Pro)
+export const maxDuration = 300; // 5 minutes
+
 export async function POST() {
   try {
     const supabase = createRouteHandlerClient({ cookies });
@@ -134,15 +137,17 @@ export async function POST() {
     });
 
     let matched = 0;
-    let stored = 0;
+    const now = new Date().toISOString();
 
-    // Process each Vitally account
+    // Process each Vitally account and prepare batch data
     console.log(`Processing ${vitallyAccounts.length} Vitally accounts...`);
+    const vitallyRecords: any[] = [];
+    const accountUpdates: Map<string, any> = new Map();
+
     for (const vAccount of vitallyAccounts) {
       try {
         const vitallyId = vAccount.id;
         const accountName = vAccount.name || 'Unknown';
-        console.log(`Processing account: ${accountName} (${vitallyId})`);
 
         // Try multiple possible field names for Salesforce ID
         const salesforceId = vAccount.accountId ||
@@ -173,54 +178,40 @@ export async function POST() {
         let matchedAccount = null;
         if (salesforceId) {
           matchedAccount = accountsBySalesforceId.get(salesforceId);
-          if (matchedAccount) matched++;
         }
         if (!matchedAccount) {
           matchedAccount = accountsByName.get(accountName.toLowerCase().trim());
-          if (matchedAccount) matched++;
         }
-
-        // Store in vitally_accounts table with ALL Vitally data
-        console.log(`Attempting to store account ${accountName} with health_score: ${healthScore}`);
-        const { error: vitallyError } = await supabaseAdmin
-          .from('vitally_accounts')
-          .upsert({
-            user_id: user.id,
-            vitally_account_id: vitallyId,
-            account_id: matchedAccount?.id || null,
-            salesforce_account_id: salesforceId,
-            account_name: accountName,
-            health_score: healthScore,
-            nps_score: npsScore,
-            status: status,
-            mrr: mrr,
-            traits: vAccount, // Store the ENTIRE Vitally account object for analysis
-            last_activity_at: lastActivityAt,
-            synced_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }, {
-            onConflict: 'user_id,vitally_account_id'
-          });
-
-        if (vitallyError) {
-          console.error(`Error storing Vitally account ${vitallyId}:`, JSON.stringify(vitallyError));
-          continue;
-        }
-
-        console.log(`Successfully stored account ${accountName}`);
-        stored++;
-
-        // Update the main accounts table with Vitally data if matched
         if (matchedAccount) {
-          await supabaseAdmin
-            .from('accounts')
-            .update({
-              vitally_health_score: healthScore,
-              vitally_nps_score: npsScore,
-              vitally_status: status,
-              vitally_last_activity_at: lastActivityAt,
-            })
-            .eq('id', matchedAccount.id);
+          matched++;
+        }
+
+        // Prepare vitally_accounts record
+        vitallyRecords.push({
+          user_id: user.id,
+          vitally_account_id: vitallyId,
+          account_id: matchedAccount?.id || null,
+          salesforce_account_id: salesforceId,
+          account_name: accountName,
+          health_score: healthScore,
+          nps_score: npsScore,
+          status: status,
+          mrr: mrr,
+          traits: vAccount, // Store the ENTIRE Vitally account object for analysis
+          last_activity_at: lastActivityAt,
+          synced_at: now,
+          updated_at: now,
+        });
+
+        // Prepare account update if matched
+        if (matchedAccount) {
+          accountUpdates.set(matchedAccount.id, {
+            id: matchedAccount.id,
+            vitally_health_score: healthScore,
+            vitally_nps_score: npsScore,
+            vitally_status: status,
+            vitally_last_activity_at: lastActivityAt,
+          });
         }
       } catch (err) {
         console.error('Error processing Vitally account:', err);
@@ -228,14 +219,48 @@ export async function POST() {
       }
     }
 
-    console.log(`Stored ${stored} Vitally accounts, matched ${matched} to existing accounts`);
+    console.log(`Prepared ${vitallyRecords.length} Vitally records, ${matched} matched to existing accounts`);
+
+    // Batch insert/update all vitally_accounts records
+    const { error: vitallyError } = await supabaseAdmin
+      .from('vitally_accounts')
+      .upsert(vitallyRecords, {
+        onConflict: 'user_id,vitally_account_id'
+      });
+
+    if (vitallyError) {
+      console.error('Error batch storing Vitally accounts:', JSON.stringify(vitallyError));
+      return NextResponse.json({
+        error: 'Failed to store Vitally accounts',
+        details: vitallyError.message,
+      }, { status: 500 });
+    }
+
+    console.log(`Successfully stored ${vitallyRecords.length} Vitally accounts`);
+
+    // Batch update matched accounts with Vitally data
+    if (accountUpdates.size > 0) {
+      const updateRecords = Array.from(accountUpdates.values());
+      const { error: accountsError } = await supabaseAdmin
+        .from('accounts')
+        .upsert(updateRecords, {
+          onConflict: 'id'
+        });
+
+      if (accountsError) {
+        console.error('Error batch updating accounts:', JSON.stringify(accountsError));
+        // Don't fail the whole sync if account updates fail
+      } else {
+        console.log(`Successfully updated ${updateRecords.length} accounts with Vitally data`);
+      }
+    }
 
     return NextResponse.json({
       success: true,
-      synced: stored,
+      synced: vitallyRecords.length,
       matched: matched,
       total: vitallyAccounts.length,
-      message: `Synced ${stored} of ${vitallyAccounts.length} Vitally accounts${matched > 0 ? `, matched ${matched} to existing Salesforce accounts` : ''}`,
+      message: `Synced ${vitallyRecords.length} of ${vitallyAccounts.length} Vitally accounts${matched > 0 ? `, matched ${matched} to existing Salesforce accounts` : ''}`,
     });
 
   } catch (error) {
