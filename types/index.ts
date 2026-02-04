@@ -208,6 +208,7 @@ export interface AccountWithMetrics extends Account {
   current_snapshot?: AccountSnapshot;
   recent_friction_cards?: FrictionCard[];
   alert_count?: number;
+  vitally_account?: Array<{ vitally_account_id: string }>;
 }
 
 export interface DashboardData {
