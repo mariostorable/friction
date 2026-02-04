@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/analyze-portfolio",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/sync-vitally",
+      "schedule": "0 */6 * * *"
     }
   ],
   "functions": {
@@ -13,6 +17,9 @@
       "maxDuration": 300
     },
     "app/api/jira/sync/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/cron/sync-vitally/route.ts": {
       "maxDuration": 300
     }
   }
