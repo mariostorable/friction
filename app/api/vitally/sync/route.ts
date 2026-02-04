@@ -221,38 +221,51 @@ export async function POST() {
 
     console.log(`Prepared ${vitallyRecords.length} Vitally records, ${matched} matched to existing accounts`);
 
-    // Batch insert/update all vitally_accounts records
-    const { error: vitallyError } = await supabaseAdmin
-      .from('vitally_accounts')
-      .upsert(vitallyRecords, {
-        onConflict: 'user_id,vitally_account_id'
-      });
+    // Batch insert/update vitally_accounts records in chunks of 50
+    const chunkSize = 50;
+    for (let i = 0; i < vitallyRecords.length; i += chunkSize) {
+      const chunk = vitallyRecords.slice(i, i + chunkSize);
+      console.log(`Inserting chunk ${Math.floor(i / chunkSize) + 1}/${Math.ceil(vitallyRecords.length / chunkSize)} (${chunk.length} records)`);
 
-    if (vitallyError) {
-      console.error('Error batch storing Vitally accounts:', JSON.stringify(vitallyError));
-      return NextResponse.json({
-        error: 'Failed to store Vitally accounts',
-        details: vitallyError.message,
-      }, { status: 500 });
+      const { error: vitallyError } = await supabaseAdmin
+        .from('vitally_accounts')
+        .upsert(chunk, {
+          onConflict: 'user_id,vitally_account_id'
+        });
+
+      if (vitallyError) {
+        console.error('Error batch storing Vitally accounts:', JSON.stringify(vitallyError));
+        return NextResponse.json({
+          error: 'Failed to store Vitally accounts',
+          details: vitallyError.message,
+        }, { status: 500 });
+      }
     }
 
     console.log(`Successfully stored ${vitallyRecords.length} Vitally accounts`);
 
-    // Batch update matched accounts with Vitally data
+    // Batch update matched accounts with Vitally data in chunks of 50
     if (accountUpdates.size > 0) {
       const updateRecords = Array.from(accountUpdates.values());
-      const { error: accountsError } = await supabaseAdmin
-        .from('accounts')
-        .upsert(updateRecords, {
-          onConflict: 'id'
-        });
+      const chunkSize = 50;
 
-      if (accountsError) {
-        console.error('Error batch updating accounts:', JSON.stringify(accountsError));
-        // Don't fail the whole sync if account updates fail
-      } else {
-        console.log(`Successfully updated ${updateRecords.length} accounts with Vitally data`);
+      for (let i = 0; i < updateRecords.length; i += chunkSize) {
+        const chunk = updateRecords.slice(i, i + chunkSize);
+        console.log(`Updating accounts chunk ${Math.floor(i / chunkSize) + 1}/${Math.ceil(updateRecords.length / chunkSize)} (${chunk.length} records)`);
+
+        const { error: accountsError } = await supabaseAdmin
+          .from('accounts')
+          .upsert(chunk, {
+            onConflict: 'id'
+          });
+
+        if (accountsError) {
+          console.error('Error batch updating accounts:', JSON.stringify(accountsError));
+          // Don't fail the whole sync if account updates fail
+        }
       }
+
+      console.log(`Successfully updated ${updateRecords.length} accounts with Vitally data`);
     }
 
     return NextResponse.json({
