@@ -353,6 +353,15 @@ export async function POST(request: NextRequest) {
 
     console.log(`Stored ${insertedIssues?.length || 0} Jira issues`);
 
+    // Get actual friction themes from the system (not hardcoded!)
+    const { data: frictionCards } = await supabaseAdmin
+      .from('friction_cards')
+      .select('theme_key')
+      .eq('user_id', userId);
+
+    const actualThemes = Array.from(new Set(frictionCards?.map((c: any) => c.theme_key) || []));
+    console.log(`Found ${actualThemes.length} actual friction themes for matching:`, actualThemes);
+
     // Batch link creation for better performance
     const themeLinksToCreate: any[] = [];
     const accountLinksToCreate: any[] = [];
@@ -366,9 +375,10 @@ export async function POST(request: NextRequest) {
 
     // Collect all links to create (batch processing)
     for (const issue of insertedIssues || []) {
-      // Get theme links for this issue
+      // Get theme links for this issue using BOTH hardcoded keywords AND actual themes
       const themeLinks = getThemeLinks(userId, issue);
-      themeLinksToCreate.push(...themeLinks);
+      const actualThemeLinks = getThemeLinksFromActualThemes(userId, issue, actualThemes);
+      themeLinksToCreate.push(...themeLinks, ...actualThemeLinks);
 
       // Get account links for this issue
       const accountLinks = getAccountLinks(userId, issue, accounts || []);
@@ -549,6 +559,63 @@ function getThemeLinks(userId: string, issue: any): any[] {
         confidence: 0.5
       });
       linkedThemes.push(themeKey);
+    }
+  }
+
+  return links;
+}
+
+// Helper: Match Jira issues to ACTUAL friction themes (not hardcoded keywords)
+function getThemeLinksFromActualThemes(userId: string, issue: any, actualThemes: string[]): any[] {
+  const links: any[] = [];
+  const searchText = `${issue.summary} ${issue.description || ''} ${issue.labels?.join(' ') || ''}`.toLowerCase();
+
+  for (const themeKey of actualThemes) {
+    // Convert theme_key to searchable format
+    // Example: "reporting_data_accuracy" -> ["reporting", "data", "accuracy"]
+    const themeWords = themeKey.toLowerCase().split('_').filter(w => w.length > 3);
+
+    // Count how many theme words appear in the Jira issue
+    const matchCount = themeWords.filter(word => searchText.includes(word)).length;
+
+    if (matchCount >= 2) {
+      // Multiple words match - high confidence
+      links.push({
+        user_id: userId,
+        jira_issue_id: issue.id,
+        theme_key: themeKey,
+        jira_key: issue.jira_key,
+        match_type: 'keyword',
+        confidence: 0.8
+      });
+    } else if (matchCount === 1 && themeWords.length === 1) {
+      // Single word theme that matches - medium confidence
+      links.push({
+        user_id: userId,
+        jira_issue_id: issue.id,
+        theme_key: themeKey,
+        jira_key: issue.jira_key,
+        match_type: 'keyword',
+        confidence: 0.6
+      });
+    }
+
+    // Also check for exact label match
+    if (issue.labels) {
+      for (const label of issue.labels) {
+        const labelNormalized = label.toLowerCase().replace(/[_-\s]/g, '_');
+        if (labelNormalized === themeKey.toLowerCase()) {
+          links.push({
+            user_id: userId,
+            jira_issue_id: issue.id,
+            theme_key: themeKey,
+            jira_key: issue.jira_key,
+            match_type: 'label',
+            confidence: 1.0
+          });
+          break;
+        }
+      }
     }
   }
 
