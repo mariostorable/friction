@@ -339,6 +339,14 @@ export default function IntegrationsPage() {
                             View Data
                           </button>
                         )}
+                        {integration.integration_type === 'vitally' && (
+                          <button
+                            onClick={() => router.push('/vitally-diagnostics')}
+                            className="flex-1 px-4 py-2 text-sm font-medium text-purple-700 bg-purple-50 rounded-lg hover:bg-purple-100"
+                          >
+                            Diagnostics
+                          </button>
+                        )}
                         <button
                           onClick={() => router.push('/settings')}
                           className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-50 rounded-lg hover:bg-gray-100"
