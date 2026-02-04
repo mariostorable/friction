@@ -1064,27 +1064,36 @@ export default function Dashboard() {
                         <td className="px-2 py-2 whitespace-nowrap">
                           {account.vitally_health_score !== null && account.vitally_health_score !== undefined ? (
                             <div className="flex items-center gap-1">
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                account.vitally_health_score >= 80
-                                  ? 'bg-green-100 text-green-800'
-                                  : account.vitally_health_score >= 60
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : 'bg-red-100 text-red-800'
-                              }`}>
-                                {Math.round(account.vitally_health_score)}
-                              </span>
-                              {account.vitally_account && Array.isArray(account.vitally_account) && account.vitally_account[0]?.vitally_account_id && (
-                                <a
-                                  href={`https://storable.vitally.io/accounts/${account.vitally_account[0].vitally_account_id}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="text-blue-600 hover:text-blue-800"
-                                  title="View in Vitally"
-                                >
-                                  <ExternalLink className="w-3 h-3" />
-                                </a>
-                              )}
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-1">
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                    account.vitally_health_score >= 80
+                                      ? 'bg-green-100 text-green-800'
+                                      : account.vitally_health_score >= 60
+                                      ? 'bg-yellow-100 text-yellow-800'
+                                      : 'bg-red-100 text-red-800'
+                                  }`}>
+                                    {Math.round(account.vitally_health_score)}
+                                  </span>
+                                  {account.vitally_account && Array.isArray(account.vitally_account) && account.vitally_account[0]?.vitally_account_id && (
+                                    <a
+                                      href={`https://storable.vitally.io/accounts/${account.vitally_account[0].vitally_account_id}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="text-blue-600 hover:text-blue-800"
+                                      title="View in Vitally"
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                    </a>
+                                  )}
+                                </div>
+                                {account.vitally_status && (
+                                  <span className="text-[10px] text-gray-600 mt-0.5">
+                                    {account.vitally_status}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           ) : (
                             <span className="text-xs text-gray-400">-</span>
