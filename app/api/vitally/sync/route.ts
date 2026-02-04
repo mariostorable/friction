@@ -69,10 +69,10 @@ export async function POST() {
     while (pageCount < 100) { // Safety limit of 100 pages
       pageCount++;
 
-      // Build URL with cursor if we have one
+      // Build URL with cursor if we have one, limit to 100 accounts
       const url = nextCursor
-        ? `${integration.instance_url}/resources/accounts?from=${encodeURIComponent(nextCursor)}`
-        : `${integration.instance_url}/resources/accounts`;
+        ? `${integration.instance_url}/resources/accounts?limit=100&from=${encodeURIComponent(nextCursor)}`
+        : `${integration.instance_url}/resources/accounts?limit=100`;
 
       console.log(`Fetching page ${pageCount} from: ${url}`);
 

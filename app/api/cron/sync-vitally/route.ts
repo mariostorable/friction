@@ -70,8 +70,8 @@ export async function GET(request: Request) {
         while (pageCount < 100) {
           pageCount++;
           const url = nextCursor
-            ? `${integration.instance_url}/resources/accounts?from=${encodeURIComponent(nextCursor)}`
-            : `${integration.instance_url}/resources/accounts`;
+            ? `${integration.instance_url}/resources/accounts?limit=100&from=${encodeURIComponent(nextCursor)}`
+            : `${integration.instance_url}/resources/accounts?limit=100`;
 
           const pageResponse = await fetch(url, {
             method: 'GET',
