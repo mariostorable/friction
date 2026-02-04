@@ -30,7 +30,7 @@ export default function Dashboard() {
   const [sortField, setSortField] = useState<string>('arr');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [softwareFilter, setSoftwareFilter] = useState<'all' | 'edge' | 'sitelink'>('all');
-  const [businessUnit, setBusinessUnit] = useState<'all' | 'storage' | 'marine'>('all');
+  const [businessUnit, setBusinessUnit] = useState<'all' | 'storage' | 'marine'>('storage');
   const [isSalesforceConnected, setIsSalesforceConnected] = useState(false);
   const [checkingConnection, setCheckingConnection] = useState(true);
   const [hoveredColumn, setHoveredColumn] = useState<string | null>(null);
@@ -541,16 +541,6 @@ export default function Dashboard() {
             <span className="text-sm font-medium text-gray-700">Business Unit:</span>
             <div className="flex gap-2">
               <button
-                onClick={() => setBusinessUnit('all')}
-                className={`px-4 py-1.5 text-sm rounded-lg font-medium transition-colors ${
-                  businessUnit === 'all'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                All
-              </button>
-              <button
                 onClick={() => setBusinessUnit('storage')}
                 className={`px-4 py-1.5 text-sm rounded-lg font-medium transition-colors ${
                   businessUnit === 'storage'
@@ -821,9 +811,7 @@ export default function Dashboard() {
             <section className="mt-8">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-900">
-                  {businessUnit === 'storage' && 'Storage Accounts (EDGE & SiteLink)'}
-                  {businessUnit === 'marine' && 'Marine Accounts'}
-                  {businessUnit === 'all' && 'All Accounts'}
+                  {businessUnit === 'storage' ? 'Storage Accounts (EDGE & SiteLink)' : 'Marine Accounts'}
                 </h2>
                 <div className="flex items-center gap-2">
                   {businessUnit !== 'marine' && (
