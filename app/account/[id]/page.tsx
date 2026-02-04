@@ -632,6 +632,62 @@ export default function AccountDetailPage() {
                   </>
                 )}
               </div>
+              {/* Vitally Health Metrics */}
+              {(account.vitally_health_score !== null || account.vitally_nps_score !== null || account.vitally_status) && (
+                <div className="flex items-center gap-4 mt-3 text-sm">
+                  {account.vitally_health_score !== null && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-600">Health:</span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        account.vitally_health_score >= 80
+                          ? 'bg-green-100 text-green-800'
+                          : account.vitally_health_score >= 60
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {Math.round(account.vitally_health_score)}/100
+                      </span>
+                    </div>
+                  )}
+                  {account.vitally_nps_score !== null && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-600">NPS:</span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        account.vitally_nps_score >= 9
+                          ? 'bg-green-100 text-green-800'
+                          : account.vitally_nps_score >= 7
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {account.vitally_nps_score}/10
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        ({account.vitally_nps_score >= 9 ? 'Promoter' : account.vitally_nps_score >= 7 ? 'Passive' : 'Detractor'})
+                      </span>
+                    </div>
+                  )}
+                  {account.vitally_status && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-600">Status:</span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        account.vitally_status.toLowerCase().includes('churn') || account.vitally_status.toLowerCase().includes('at risk')
+                          ? 'bg-red-100 text-red-800'
+                          : account.vitally_status.toLowerCase().includes('healthy')
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {account.vitally_status}
+                      </span>
+                    </div>
+                  )}
+                  {account.vitally_last_activity_at && (
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <span>Last Activity:</span>
+                      <span>{new Date(account.vitally_last_activity_at).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-3">
               <button
