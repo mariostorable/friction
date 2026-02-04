@@ -18,6 +18,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Account ID required' }, { status: 400 });
     }
 
+    // Get Vitally data for this account
+    const { data: vitallyData } = await supabase
+      .from('vitally_accounts')
+      .select('health_score, nps_score, status')
+      .eq('account_id', accountId)
+      .eq('user_id', user.id)
+      .single();
+
     const fourteenDaysAgo = new Date();
     fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
 
@@ -116,8 +124,35 @@ export async function POST(request: NextRequest) {
     // Reduced from 2 points/+20 cap to 1.5 points/+15 cap
     const highSeverityBoost = Math.min(15, highSeverityCount * 1.5);
 
-    // Final OFI Score calculation
-    let ofiScore = Math.round(baseScore * densityMultiplier + highSeverityBoost);
+    // Vitally health multipliers (amplify friction for at-risk accounts)
+    let vitallyMultiplier = 1.0;
+    let vitallyExplanation = '';
+
+    if (vitallyData) {
+      const healthScore = vitallyData.health_score;
+      const npsScore = vitallyData.nps_score;
+      const status = vitallyData.status?.toLowerCase();
+
+      // Status-based amplification (highest priority)
+      if (status === 'churning' || status === 'at risk' || status === 'at-risk') {
+        vitallyMultiplier *= 1.3;
+        vitallyExplanation = `Account marked as ${status} in Vitally (+30% friction weight)`;
+      } else if (healthScore !== null && healthScore < 60) {
+        // Low health score amplification
+        vitallyMultiplier *= 1.2;
+        vitallyExplanation = `Low customer health score (${Math.round(healthScore)}/100) (+20% friction weight)`;
+      }
+
+      // NPS detractor amplification (stacks with status)
+      if (npsScore !== null && npsScore < 7) {
+        vitallyMultiplier *= 1.15;
+        vitallyExplanation += vitallyExplanation ? '; ' : '';
+        vitallyExplanation += `Detractor NPS (${npsScore}/10) (+15% friction weight)`;
+      }
+    }
+
+    // Final OFI Score calculation with Vitally amplification
+    let ofiScore = Math.round((baseScore * densityMultiplier + highSeverityBoost) * vitallyMultiplier);
 
     // Apply ceiling at 100
     ofiScore = Math.min(100, Math.max(0, ofiScore));
@@ -187,6 +222,8 @@ export async function POST(request: NextRequest) {
       frictionDensity: frictionDensity.toFixed(2) + '%',
       densityMultiplier: densityMultiplier.toFixed(2),
       highSeverityBoost,
+      vitallyMultiplier: vitallyMultiplier.toFixed(2),
+      vitallyExplanation: vitallyExplanation || 'No Vitally amplification',
       finalOfiScore: ofiScore
     });
 
@@ -209,6 +246,8 @@ export async function POST(request: NextRequest) {
           friction_density: frictionDensity,
           density_multiplier: densityMultiplier,
           high_severity_boost: highSeverityBoost,
+          vitally_multiplier: vitallyMultiplier,
+          vitally_explanation: vitallyExplanation || null,
         },
       })
       .select()
