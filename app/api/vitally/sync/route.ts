@@ -64,12 +64,12 @@ export async function POST() {
     let nextCursor: string | null = null;
     let pageCount = 0;
 
-    console.log('Starting Vitally account fetch with pagination...');
+    console.log('Starting Vitally account fetch (limited to 100 accounts)...');
 
-    while (pageCount < 100) { // Safety limit of 100 pages
+    while (pageCount < 100 && vitallyAccounts.length < 100) { // Stop after 100 accounts
       pageCount++;
 
-      // Build URL with cursor if we have one, limit to 100 accounts
+      // Build URL with cursor if we have one, limit to 100 per page
       const url = nextCursor
         ? `${integration.instance_url}/resources/accounts?limit=100&from=${encodeURIComponent(nextCursor)}`
         : `${integration.instance_url}/resources/accounts?limit=100`;
@@ -98,6 +98,12 @@ export async function POST() {
       vitallyAccounts.push(...pageResults);
 
       console.log(`Page ${pageCount}: fetched ${pageResults.length} accounts. Total so far: ${vitallyAccounts.length}`);
+
+      // Stop if we've reached 100 accounts
+      if (vitallyAccounts.length >= 100) {
+        console.log('Reached 100 account limit, stopping pagination');
+        break;
+      }
 
       // Check if there are more pages
       if (pageData.atEnd || !pageData.next) {
