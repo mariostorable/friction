@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, CheckCircle, XCircle, Settings, ExternalLink, Activity, RefreshCw } from 'lucide-react';
+import JiraFieldDiscovery from '@/components/JiraFieldDiscovery';
 
 interface Integration {
   id: string;
@@ -391,6 +392,13 @@ export default function IntegrationsPage() {
             >
               Go to Settings
             </button>
+          </div>
+        )}
+
+        {/* Jira Field Discovery - Only show if Jira is connected */}
+        {integrations.some(i => i.integration_type === 'jira' && i.status === 'active') && (
+          <div className="mt-8">
+            <JiraFieldDiscovery />
           </div>
         )}
       </main>

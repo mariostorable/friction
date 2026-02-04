@@ -10,7 +10,6 @@ import FavoritesTab from '@/components/FavoritesTab';
 import ReportsHub from '@/components/ReportsHub';
 import ThemesTab from '@/components/ThemesTab';
 import JiraSyncButton from '@/components/JiraSyncButton';
-import JiraFieldDiscovery from '@/components/JiraFieldDiscovery';
 import JiraPortfolioOverview from '@/components/JiraPortfolioOverview';
 
 export default function Dashboard() {
@@ -814,11 +813,6 @@ export default function Dashboard() {
             {/* Jira Portfolio Overview */}
             <div className="mt-6">
               <JiraPortfolioOverview />
-            </div>
-
-            {/* Jira Field Discovery */}
-            <div className="mt-6">
-              <JiraFieldDiscovery />
             </div>
 
             <section className="mt-8">
