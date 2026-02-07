@@ -241,7 +241,21 @@ export async function getDecryptedToken(
 
     // Validate decrypted token structure
     if (!token.access_token) {
-      throw new Error('Decrypted token is missing access_token - data may be corrupted');
+      console.error('Token validation failed:', {
+        integration_id: integrationId,
+        has_token: !!token,
+        token_fields: token ? Object.keys(token) : [],
+        access_token_value: token?.access_token,
+        token_type: token?.token_type,
+      });
+
+      throw new Error(
+        `Decrypted token is missing access_token - data may be corrupted. ` +
+        `Integration ID: ${integrationId}. ` +
+        `This usually means: (1) the ENCRYPTION_KEY has changed, or ` +
+        `(2) the token was stored without encryption. ` +
+        `Run the /api/admin/fix-tokens endpoint to diagnose and fix.`
+      );
     }
 
     return token as DecryptedToken;
