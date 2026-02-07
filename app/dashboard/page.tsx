@@ -11,6 +11,7 @@ import ReportsHub from '@/components/ReportsHub';
 import ThemesTab from '@/components/ThemesTab';
 import JiraSyncButton from '@/components/JiraSyncButton';
 import JiraPortfolioOverview from '@/components/JiraPortfolioOverview';
+import JiraAccountBreakdown from '@/components/JiraAccountBreakdown';
 
 export default function Dashboard() {
   const [top25, setTop25] = useState<AccountWithMetrics[]>([]);
@@ -806,6 +807,11 @@ export default function Dashboard() {
             {/* Jira Portfolio Overview */}
             <div className="mt-6">
               <JiraPortfolioOverview />
+            </div>
+
+            {/* Jira Account Breakdown */}
+            <div className="mt-6">
+              <JiraAccountBreakdown />
             </div>
 
             <section className="mt-8">
