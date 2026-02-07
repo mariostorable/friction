@@ -5,23 +5,19 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import JiraSyncButton from '@/components/JiraSyncButton';
-import JiraFieldDiscovery from '@/components/JiraFieldDiscovery';
-import { ExternalLink } from 'lucide-react';
+import RoadmapTab from '@/components/RoadmapTab';
 
 export default function RoadmapPage() {
   const supabase = createClientComponentClient();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [jiraIntegration, setJiraIntegration] = useState<any>(null);
-  const [accountsWithUnlinkedThemes, setAccountsWithUnlinkedThemes] = useState<any[]>([]);
-  const [accountsWithTickets, setAccountsWithTickets] = useState<any[]>([]);
-  const [themeTickets, setThemeTickets] = useState<any[]>([]);
 
   useEffect(() => {
-    loadRoadmapData();
+    checkJiraIntegration();
   }, []);
 
-  async function loadRoadmapData() {
+  async function checkJiraIntegration() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
@@ -39,142 +35,12 @@ export default function RoadmapPage() {
         .single();
 
       setJiraIntegration(integration);
-
-      if (integration) {
-        // Get accounts with their friction themes that need tickets
-        const { data: accounts } = await supabase
-          .from('accounts')
-          .select(`
-            id,
-            name,
-            arr,
-            friction_theme_summaries:friction_theme_summaries!inner(
-              theme_key,
-              case_count
-            )
-          `)
-          .order('arr', { ascending: false });
-
-        // Get theme-Jira links
-        const { data: themeLinks } = await supabase
-          .from('theme_jira_links')
-          .select('theme_key, jira_key');
-
-        const linkedThemes = new Set(themeLinks?.map(link => link.theme_key) || []);
-
-        // Process accounts to find themes without tickets
-        const unlinked = accounts?.map(account => {
-          const themeSummaries = account.friction_theme_summaries || [];
-          const unlinkedThemes = themeSummaries.filter(
-            (ts: any) => !linkedThemes.has(ts.theme_key)
-          );
-          return {
-            ...account,
-            unlinkedThemes,
-            totalUnlinkedCases: unlinkedThemes.reduce((sum: number, t: any) => sum + t.case_count, 0)
-          };
-        }).filter(a => a.unlinkedThemes.length > 0) || [];
-
-        setAccountsWithUnlinkedThemes(unlinked);
-
-        // Get accounts with linked tickets
-        const { data: withTickets, error: ticketsError } = await supabase
-          .from('accounts')
-          .select(`
-            id,
-            name,
-            arr,
-            account_jira_links:account_jira_links!inner(
-              jira_key,
-              jira_issue:jira_issues!inner(
-                jira_key,
-                summary,
-                status,
-                issue_type,
-                resolution,
-                components,
-                fix_versions,
-                parent_key,
-                priority,
-                issue_url
-              )
-            )
-          `)
-          .order('arr', { ascending: false });
-
-        if (ticketsError) {
-          console.error('Error fetching tickets:', ticketsError);
-        }
-        console.log('Accounts with tickets:', withTickets);
-        setAccountsWithTickets(withTickets || []);
-
-        // Get Jira issues grouped by theme
-        const { data: themeLinksWithIssues, error: themeLinkError } = await supabase
-          .from('theme_jira_links')
-          .select(`
-            theme_key,
-            jira_key,
-            confidence,
-            match_type,
-            jira_issue:jira_issues!inner(
-              jira_key,
-              summary,
-              status,
-              issue_type,
-              resolution,
-              components,
-              fix_versions,
-              parent_key,
-              priority,
-              issue_url,
-              assignee_name
-            )
-          `)
-          .order('confidence', { ascending: false });
-
-        if (themeLinkError) {
-          console.error('Error fetching theme links:', themeLinkError);
-        }
-
-        // Group by theme
-        const groupedByTheme: Record<string, any[]> = {};
-        themeLinksWithIssues?.forEach((link: any) => {
-          if (!groupedByTheme[link.theme_key]) {
-            groupedByTheme[link.theme_key] = [];
-          }
-          groupedByTheme[link.theme_key].push(link);
-        });
-
-        const themeTicketsArray = Object.entries(groupedByTheme).map(([theme_key, links]) => ({
-          theme_key,
-          tickets: links,
-        }));
-
-        setThemeTickets(themeTicketsArray);
-      }
     } catch (error) {
-      console.error('Error loading roadmap data:', error);
+      console.error('Error checking Jira integration:', error);
     } finally {
       setLoading(false);
     }
   }
-
-  const THEME_LABELS: Record<string, string> = {
-    'billing_confusion': 'Billing & Payments',
-    'integration_failures': 'Integration Issues',
-    'ui_confusion': 'UI/UX Confusion',
-    'performance_issues': 'Performance Issues',
-    'missing_features': 'Missing Features',
-    'training_gaps': 'Training & Documentation',
-    'support_response_time': 'Support Response Time',
-    'data_quality': 'Data Quality',
-    'reporting_issues': 'Reporting & Analytics',
-    'access_permissions': 'Access & Permissions',
-    'configuration_problems': 'Configuration Issues',
-    'notification_issues': 'Notifications',
-    'workflow_inefficiency': 'Workflow Inefficiency',
-    'mobile_issues': 'Mobile Issues',
-  };
 
   if (loading) {
     return (
@@ -191,261 +57,34 @@ export default function RoadmapPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-4">
             <Link
               href="/dashboard"
               className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
             >
               ← Back to Dashboard
             </Link>
+            {jiraIntegration && <JiraSyncButton />}
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Jira Roadmap</h1>
-          <p className="text-gray-600">
-            Track friction themes, manage Jira tickets, and prioritize improvements across your portfolio
-          </p>
-        </div>
-
-        {/* Jira Integration Status */}
-        <div className="mb-6 bg-white rounded-lg border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Jira Integration</h2>
-              <p className="text-sm text-gray-600 mt-1">
-                {jiraIntegration
-                  ? `Connected to ${jiraIntegration.instance_url}`
-                  : 'Not connected'}
-              </p>
-            </div>
-            {jiraIntegration ? (
-              <JiraSyncButton />
-            ) : (
-              <Link
-                href="/integrations"
-                className="px-4 py-2 text-sm font-medium text-purple-700 bg-purple-50 border border-purple-300 rounded-lg hover:bg-purple-100"
-              >
-                Connect Jira
-              </Link>
-            )}
-          </div>
-
-          {jiraIntegration && (
-            <div className="pt-4 border-t border-gray-200">
-              <JiraFieldDiscovery />
-            </div>
-          )}
         </div>
 
         {!jiraIntegration && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
             <p className="text-blue-900 font-medium mb-2">Connect Jira to Get Started</p>
-            <p className="text-sm text-blue-700">
+            <p className="text-sm text-blue-700 mb-4">
               Link your Jira instance to track tickets and sync friction themes with your product roadmap
             </p>
+            <Link
+              href="/integrations"
+              className="inline-block px-4 py-2 text-sm font-medium text-purple-700 bg-purple-50 border border-purple-300 rounded-lg hover:bg-purple-100"
+            >
+              Connect Jira
+            </Link>
           </div>
         )}
 
-        {jiraIntegration && (
-          <>
-            {/* Friction Themes Needing Tickets */}
-            <div className="mb-8">
-              <div className="bg-white rounded-lg border border-gray-200">
-                <div className="p-6 border-b border-gray-200">
-                  <h2 className="text-lg font-semibold text-gray-900">Friction Themes Needing Tickets</h2>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {accountsWithUnlinkedThemes.length} accounts have friction themes without linked Jira tickets
-                  </p>
-                </div>
-
-                <div className="divide-y divide-gray-200">
-                  {accountsWithUnlinkedThemes.length === 0 ? (
-                    <div className="p-6 text-center text-gray-500">
-                      <p className="text-sm">All friction themes are linked to Jira tickets</p>
-                    </div>
-                  ) : (
-                    accountsWithUnlinkedThemes.map(account => (
-                      <div key={account.id} className="p-6 hover:bg-gray-50">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex-1">
-                            <Link
-                              href={`/accounts/${account.id}`}
-                              className="text-base font-semibold text-gray-900 hover:text-purple-700"
-                            >
-                              {account.name}
-                            </Link>
-                            <p className="text-sm text-gray-600 mt-1">
-                              ARR: ${(account.arr || 0).toLocaleString()} • {account.totalUnlinkedCases} untracked cases
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          {account.unlinkedThemes.map((theme: any) => (
-                            <div
-                              key={theme.theme_key}
-                              className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-lg"
-                            >
-                              <div className="flex-1">
-                                <p className="text-sm font-medium text-amber-900">
-                                  {THEME_LABELS[theme.theme_key] || theme.theme_key}
-                                </p>
-                                <p className="text-xs text-amber-700 mt-0.5">
-                                  {theme.case_count} case{theme.case_count !== 1 ? 's' : ''}
-                                </p>
-                              </div>
-                              <Link
-                                href={`/accounts/${account.id}?tab=themes&theme=${theme.theme_key}`}
-                                className="text-xs text-amber-700 hover:text-amber-900 flex items-center gap-1"
-                              >
-                                View cases
-                                <ExternalLink className="w-3 h-3" />
-                              </Link>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Tickets Grouped by Theme */}
-            <div>
-              <div className="bg-white rounded-lg border border-gray-200">
-                <div className="p-6 border-b border-gray-200">
-                  <h2 className="text-lg font-semibold text-gray-900">Active Jira Tickets by Theme</h2>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {themeTickets.length} friction themes with linked Jira tickets
-                  </p>
-                </div>
-
-                <div className="divide-y divide-gray-200">
-                  {!themeTickets || themeTickets.length === 0 ? (
-                    <div className="p-6 text-center text-gray-500">
-                      <p className="text-sm">No Jira tickets linked to friction themes yet</p>
-                      <p className="text-xs text-gray-400 mt-1">Run a sync to link tickets based on labels, components, and keywords</p>
-                    </div>
-                  ) : (
-                    themeTickets.map(themeGroup => {
-                      const tickets = themeGroup.tickets || [];
-                      if (tickets.length === 0) return null;
-
-                      return (
-                        <div key={themeGroup.theme_key} className="p-6 hover:bg-gray-50">
-                          <div className="flex items-start justify-between mb-4">
-                            <div className="flex-1">
-                              <h3 className="text-base font-semibold text-gray-900">
-                                {THEME_LABELS[themeGroup.theme_key] || themeGroup.theme_key}
-                              </h3>
-                              <p className="text-sm text-gray-600 mt-1">
-                                {tickets.length} ticket{tickets.length !== 1 ? 's' : ''}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            {tickets.map((link: any) => {
-                              const issue = link.jira_issue;
-                              if (!issue) return null;
-
-                              const statusColor =
-                                issue.status === 'Done' ? 'bg-green-100 text-green-800' :
-                                issue.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                                'bg-gray-100 text-gray-800';
-
-                              const priorityColor =
-                                issue.priority === 'Highest' || issue.priority === 'High' ? 'text-red-600' :
-                                issue.priority === 'Medium' ? 'text-orange-600' :
-                                'text-gray-600';
-
-                              return (
-                                <div
-                                  key={issue.jira_key}
-                                  className="p-3 bg-gray-50 border border-gray-200 rounded-lg"
-                                >
-                                  <div className="flex items-start justify-between gap-3 mb-2">
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                        <a
-                                          href={issue.issue_url}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="text-sm font-medium text-purple-700 hover:text-purple-900 flex items-center gap-1"
-                                        >
-                                          {issue.jira_key}
-                                          <ExternalLink className="w-3 h-3" />
-                                        </a>
-                                        {issue.issue_type && (
-                                          <span className="text-xs px-2 py-0.5 rounded bg-gray-200 text-gray-700">
-                                            {issue.issue_type}
-                                          </span>
-                                        )}
-                                        <span className={`text-xs px-2 py-0.5 rounded-full ${statusColor}`}>
-                                          {issue.status}
-                                        </span>
-                                        {issue.priority && (
-                                          <span className={`text-xs font-medium ${priorityColor}`}>
-                                            {issue.priority}
-                                          </span>
-                                        )}
-                                        {link.match_type && (
-                                          <span
-                                            className="text-xs px-2 py-0.5 rounded bg-purple-100 text-purple-700"
-                                            title={`Matched by ${link.match_type} (${Math.round(link.confidence * 100)}% confidence)`}
-                                          >
-                                            {link.match_type}
-                                          </span>
-                                        )}
-                                      </div>
-                                      <p className="text-sm text-gray-700 mb-2">
-                                        {issue.summary}
-                                      </p>
-
-                                      {/* Additional metadata */}
-                                      <div className="flex items-center gap-3 text-xs text-gray-600 flex-wrap">
-                                        {issue.components && issue.components.length > 0 && (
-                                          <div className="flex items-center gap-1">
-                                            <span className="font-medium">Components:</span>
-                                            <span>{issue.components.join(', ')}</span>
-                                          </div>
-                                        )}
-                                        {issue.fix_versions && issue.fix_versions.length > 0 && (
-                                          <div className="flex items-center gap-1">
-                                            <span className="font-medium">Fix Version:</span>
-                                            <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">
-                                              {issue.fix_versions[0]}
-                                            </span>
-                                          </div>
-                                        )}
-                                        {issue.parent_key && (
-                                          <div className="flex items-center gap-1">
-                                            <span className="font-medium">Parent:</span>
-                                            <span>{issue.parent_key}</span>
-                                          </div>
-                                        )}
-                                        {issue.resolution && (
-                                          <div className="flex items-center gap-1">
-                                            <span className="font-medium">Resolution:</span>
-                                            <span className="text-green-600">{issue.resolution}</span>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            </div>
-          </>
-        )}
+        {jiraIntegration && <RoadmapTab />}
       </div>
     </div>
   );
