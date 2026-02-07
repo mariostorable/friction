@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       .from('accounts')
       .select('salesforce_id, name')
       .eq('id', accountId)
-      .eq('user_id', user.id)
+      .eq('user_id', authenticatedUserId)
       .single();
 
     if (!account) {
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       .from('raw_inputs')
       .select('metadata')
       .eq('account_id', accountId)
-      .eq('user_id', user.id)
+      .eq('user_id', authenticatedUserId)
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
     const { data: integration } = await supabase
       .from('integrations')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', authenticatedUserId)
       .eq('integration_type', 'salesforce')
       .eq('status', 'active')
       .single();
@@ -225,7 +225,7 @@ export async function POST(request: NextRequest) {
         .from('friction_cards')
         .delete()
         .eq('account_id', accountId)
-        .eq('user_id', user.id);
+        .eq('user_id', authenticatedUserId);
 
       if (cardsDeleteError) {
         console.error('Error deleting old friction_cards:', cardsDeleteError);
@@ -236,7 +236,7 @@ export async function POST(request: NextRequest) {
         .from('raw_inputs')
         .delete()
         .eq('account_id', accountId)
-        .eq('user_id', user.id);
+        .eq('user_id', authenticatedUserId);
 
       if (inputsDeleteError) {
         console.error('Error deleting old raw_inputs:', inputsDeleteError);
@@ -261,7 +261,7 @@ export async function POST(request: NextRequest) {
       const origin = sfCase.Origin || sfCase.origin || sfCase.CaseOrigin || 'Unknown';
 
       return {
-        user_id: user.id,
+        user_id: authenticatedUserId,
         account_id: accountId,
         source_type: 'salesforce_case',
         source_id: sfCase.Id,
