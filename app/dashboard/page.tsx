@@ -1065,7 +1065,7 @@ export default function Dashboard() {
                                   </span>
                                   {account.vitally_account && Array.isArray(account.vitally_account) && account.vitally_account[0]?.vitally_account_id && (
                                     <a
-                                      href={`https://storable.vitally.io/customers/${account.vitally_account[0].vitally_account_id}`}
+                                      href={`https://storable.vitally.io/organizations/${account.vitally_account[0].vitally_account_id}/dashboards/0d207a3e-975b-45a2-821c-90b3287a92d7`}
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       onClick={(e) => e.stopPropagation()}
