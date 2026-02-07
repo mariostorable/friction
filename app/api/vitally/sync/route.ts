@@ -172,7 +172,6 @@ export async function POST() {
         // Use the first account to get organization-level data
         const primaryAccount = childAccounts[0];
         const vitallyId = primaryAccount.id;
-        const orgId = primaryAccount.organizationId;
 
         // Extract the corporate/parent account name from SFDC traits
         // Primary source: dL_Product_s_Corporate_Name__c contains the actual corporate name (e.g., "William Warren Group")
@@ -391,8 +390,8 @@ export async function POST() {
           const childName = childAccount.name || 'Unknown';
 
           try {
-            // Fetch notes for this child Vitally account
-            const notesUrl = `${integration.instance_url}/resources/notes?accountId=${vitallyId}&limit=50`;
+            // Fetch notes for this child Vitally account (limited to 10 most recent to avoid timeout)
+            const notesUrl = `${integration.instance_url}/resources/notes?accountId=${vitallyId}&limit=10`;
             const notesResponse = await fetch(notesUrl, {
               method: 'GET',
               headers: {
