@@ -122,9 +122,12 @@ export async function GET(request: NextRequest) {
 
     // Test 3: Full query with all fields (the one used in sync)
     console.log('Test 3: Testing full sync query...');
-    const fullQuery = 'SELECT Id,Name,AnnualRevenue,Industry,Type,Owner.Name,CreatedDate,(SELECT Id FROM Assets) FROM Account WHERE ParentId=null ORDER BY AnnualRevenue DESC NULLS LAST LIMIT 5';
 
-    const fullResponse = await fetch(
+    // Try with custom fields first
+    let fullQuery = 'SELECT Id,Name,dL_Product_s_Corporate_Name__c,MRR_MVR__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,(SELECT Id FROM Assets) FROM Account WHERE ParentId=null AND MRR_MVR__c>0 ORDER BY MRR_MVR__c DESC LIMIT 5';
+    let useStandardFields = false;
+
+    let fullResponse = await fetch(
       `${integration.instance_url}/services/data/v59.0/query?q=${encodeURIComponent(fullQuery)}`,
       {
         headers: {
@@ -134,31 +137,56 @@ export async function GET(request: NextRequest) {
       }
     );
 
+    // If custom fields don't exist, try standard fields
     if (!fullResponse.ok) {
       const errorText = await fullResponse.text();
-      let errorJson;
-      try {
-        errorJson = JSON.parse(errorText);
-      } catch {
-        errorJson = { message: errorText };
-      }
 
-      return NextResponse.json({
-        error: 'Full sync query failed',
-        query: fullQuery,
-        details: errorJson,
-        status: fullResponse.status,
-        help: 'This query is missing fields in your Salesforce org. Check which field is causing the error.',
-        action: 'You may need to adjust the query or add custom fields to Salesforce'
-      }, { status: 500 });
+      if (errorText.includes('INVALID_FIELD') || errorText.includes('No such column')) {
+        console.log('Custom fields not found, trying standard fields...');
+        useStandardFields = true;
+        fullQuery = 'SELECT Id,Name,AnnualRevenue,Industry,Type,Owner.Name,CreatedDate,(SELECT Id FROM Assets) FROM Account WHERE ParentId=null ORDER BY AnnualRevenue DESC NULLS LAST LIMIT 5';
+
+        fullResponse = await fetch(
+          `${integration.instance_url}/services/data/v59.0/query?q=${encodeURIComponent(fullQuery)}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${tokens.access_token}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (!fullResponse.ok) {
+          const fallbackError = await fullResponse.text();
+          return NextResponse.json({
+            error: 'Both custom and standard field queries failed',
+            details: fallbackError,
+            status: fullResponse.status,
+          }, { status: 500 });
+        }
+      } else {
+        let errorJson;
+        try {
+          errorJson = JSON.parse(errorText);
+        } catch {
+          errorJson = { message: errorText };
+        }
+
+        return NextResponse.json({
+          error: 'Full sync query failed',
+          query: fullQuery,
+          details: errorJson,
+          status: fullResponse.status,
+        }, { status: 500 });
+      }
     }
 
     const fullData = await fullResponse.json();
-    console.log('✅ Full query works. Found', fullData.totalSize, 'accounts');
+    console.log(`✅ Full query works. Found ${fullData.totalSize} accounts (${useStandardFields ? 'standard' : 'custom'} fields)`);
 
     return NextResponse.json({
       success: true,
-      message: 'All Salesforce connection tests passed!',
+      message: `All Salesforce connection tests passed! ${useStandardFields ? '(Using standard fields only - custom fields not available)' : '(Using custom Storable fields)'}`,
       integration: {
         status: integration.status,
         instance_url: integration.instance_url,
@@ -173,13 +201,14 @@ export async function GET(request: NextRequest) {
       tests: {
         credentials: '✅ Valid',
         simple_query: `✅ ${simpleData.totalSize} accounts found`,
-        full_query: `✅ ${fullData.totalSize} accounts found`,
+        full_query: `✅ ${fullData.totalSize} accounts found (${useStandardFields ? 'standard fields' : 'custom fields'})`,
       },
       sample_accounts: fullData.records?.slice(0, 3).map((acc: any) => ({
         id: acc.Id,
         name: acc.Name,
-        annual_revenue: acc.AnnualRevenue,
+        annual_revenue: acc.AnnualRevenue || (acc.MRR_MVR__c ? acc.MRR_MVR__c * 12 : null),
         type: acc.Type,
+        products: useStandardFields ? 'N/A (no custom fields)' : 'Detected from custom fields',
       })),
     });
 
