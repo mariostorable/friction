@@ -299,6 +299,35 @@ export async function POST() {
 
     console.log(`Prepared ${vitallyRecords.length} Vitally records, ${matched} matched to existing accounts`);
 
+    // Delete all old Vitally accounts and notes for this user before inserting new organization-grouped records
+    console.log('Deleting old Vitally account records and notes...');
+
+    // Delete notes first (foreign key constraint)
+    const { error: notesDeleteError } = await supabaseAdmin
+      .from('raw_inputs')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('source_type', 'vitally_note');
+
+    if (notesDeleteError) {
+      console.error('Error deleting old Vitally notes:', JSON.stringify(notesDeleteError));
+    } else {
+      console.log('Successfully deleted old Vitally notes');
+    }
+
+    // Delete accounts
+    const { error: deleteError } = await supabaseAdmin
+      .from('vitally_accounts')
+      .delete()
+      .eq('user_id', user.id);
+
+    if (deleteError) {
+      console.error('Error deleting old Vitally accounts:', JSON.stringify(deleteError));
+      // Continue anyway - upsert will handle it
+    } else {
+      console.log('Successfully deleted old Vitally account records');
+    }
+
     // Batch insert/update vitally_accounts records in chunks of 50
     const chunkSize = 50;
     for (let i = 0; i < vitallyRecords.length; i += chunkSize) {
