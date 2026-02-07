@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Get all friction cards to find affected accounts per theme
-    const allThemeKeys = [...new Set(themeLinks?.map(l => l.theme_key) || [])];
+    const allThemeKeys = Array.from(new Set(themeLinks?.map(l => l.theme_key) || []));
     const { data: frictionCards } = await supabase
       .from('friction_cards')
       .select('theme_key, account_id, accounts(name)')
