@@ -12,6 +12,7 @@ import ThemesTab from '@/components/ThemesTab';
 import JiraSyncButton from '@/components/JiraSyncButton';
 import JiraPortfolioOverview from '@/components/JiraPortfolioOverview';
 import JiraAccountBreakdown from '@/components/JiraAccountBreakdown';
+import RoadmapTab from '@/components/RoadmapTab';
 
 export default function Dashboard() {
   const [top25, setTop25] = useState<AccountWithMetrics[]>([]);
@@ -23,7 +24,7 @@ export default function Dashboard() {
   const [totalPortfolioAccounts, setTotalPortfolioAccounts] = useState(0);
   const [portfolioCaseVolumeAvg, setPortfolioCaseVolumeAvg] = useState(0);
   const [portfolioCasesPerFacilityAvg, setPortfolioCasesPerFacilityAvg] = useState(0);
-  const [activeTab, setActiveTab] = useState<'portfolios' | 'favorites' | 'reports' | 'themes'>('portfolios');
+  const [activeTab, setActiveTab] = useState<'portfolios' | 'favorites' | 'reports' | 'themes' | 'roadmap'>('portfolios');
   const [analyzedAccountNames, setAnalyzedAccountNames] = useState<string[]>([]);
   const [pendingAccountNames, setPendingAccountNames] = useState<string[]>([]);
   const [showSyncTooltip, setShowSyncTooltip] = useState(false);
@@ -506,12 +507,6 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center gap-4">
               <button
-                onClick={() => router.push('/roadmap')}
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
-              >
-                Jira Roadmap
-              </button>
-              <button
                 onClick={() => router.push('/vitally')}
                 className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
               >
@@ -608,8 +603,12 @@ export default function Dashboard() {
               Key Friction Themes
             </button>
             <button
-              onClick={() => router.push('/roadmap')}
-              className="px-4 py-2 rounded-lg font-medium bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+              onClick={() => setActiveTab('roadmap')}
+              className={`px-4 py-2 rounded-lg font-medium ${
+                activeTab === 'roadmap'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+              }`}
             >
               Jira Roadmap
             </button>
@@ -1149,6 +1148,10 @@ export default function Dashboard() {
             accounts={filterAccountsByBusinessUnit(top25)}
             initialExpandedTheme={selectedTheme}
           />
+        )}
+
+        {activeTab === 'roadmap' && (
+          <RoadmapTab />
         )}
       </main>
     </div>
