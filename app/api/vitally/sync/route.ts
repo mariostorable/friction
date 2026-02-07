@@ -175,14 +175,15 @@ export async function POST() {
         const orgId = primaryAccount.organizationId;
 
         // Extract the corporate/parent account name from SFDC traits
-        // Look for the parent account name in the Case_Safe_Parent_Account_Id__c field's lookup
-        let accountName = primaryAccount.traits?.['sfdc.Parent_Account_Name__c'] ||
+        // Primary source: dL_Product_s_Corporate_Name__c contains the actual corporate name (e.g., "William Warren Group")
+        // Fallback: extract prefix from facility name (e.g., "SROA - Greenville" -> "SROA")
+        let accountName = primaryAccount.traits?.['sfdc.dL_Product_s_Corporate_Name__c'] ||
                          primaryAccount.name ||
                          'Unknown';
 
-        // If multiple facilities, extract the common parent name from facility names
+        // If no corporate name field and multiple facilities, extract the common parent name from facility names
         // e.g., "SROA - Greenville" -> "SROA"
-        if (childAccounts.length > 1) {
+        if (!primaryAccount.traits?.['sfdc.dL_Product_s_Corporate_Name__c'] && childAccounts.length > 1) {
           // Try to extract common prefix before the dash
           const commonPrefix = primaryAccount.name.split(' - ')[0] || primaryAccount.name.split('-')[0];
           if (commonPrefix && commonPrefix !== primaryAccount.name) {
@@ -356,11 +357,11 @@ export async function POST() {
         const primaryAccount = childAccounts[0];
 
         // Determine the corporate account name (same logic as above)
-        let accountName = primaryAccount.traits?.['sfdc.Parent_Account_Name__c'] ||
+        let accountName = primaryAccount.traits?.['sfdc.dL_Product_s_Corporate_Name__c'] ||
                          primaryAccount.name ||
                          'Unknown';
 
-        if (childAccounts.length > 1) {
+        if (!primaryAccount.traits?.['sfdc.dL_Product_s_Corporate_Name__c'] && childAccounts.length > 1) {
           const commonPrefix = primaryAccount.name.split(' - ')[0] || primaryAccount.name.split('-')[0];
           if (commonPrefix && commonPrefix !== primaryAccount.name) {
             accountName = commonPrefix.trim();
