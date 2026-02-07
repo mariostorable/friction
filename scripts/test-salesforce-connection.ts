@@ -136,9 +136,9 @@ async function main() {
   }
 
   // Test 3: Full sync query
-  console.log('Test 3: Testing full sync query (with all fields)...');
+  console.log('Test 3: Testing full sync query (standard fields only)...');
   try {
-    const fullQuery = 'SELECT Id,Name,dL_Product_s_Corporate_Name__c,MRR_MVR__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,(SELECT Id FROM Assets) FROM Account WHERE ParentId=null AND MRR_MVR__c>0 ORDER BY MRR_MVR__c DESC LIMIT 5';
+    const fullQuery = 'SELECT Id,Name,AnnualRevenue,Industry,Type,Owner.Name,CreatedDate,(SELECT Id FROM Assets) FROM Account WHERE ParentId=null ORDER BY AnnualRevenue DESC NULLS LAST LIMIT 5';
 
     const fullResponse = await fetch(
       `${integration.instance_url}/services/data/v59.0/query?q=${encodeURIComponent(fullQuery)}`,
@@ -181,8 +181,8 @@ async function main() {
     if (fullData.records && fullData.records.length > 0) {
       console.log('\n📊 Sample accounts:');
       fullData.records.slice(0, 3).forEach((acc: any, i: number) => {
-        console.log(`   ${i + 1}. ${acc.Name || acc.dL_Product_s_Corporate_Name__c}`);
-        console.log(`      MRR: $${acc.MRR_MVR__c || 0}`);
+        console.log(`   ${i + 1}. ${acc.Name}`);
+        console.log(`      Annual Revenue: $${acc.AnnualRevenue?.toLocaleString() || 0}`);
         console.log(`      Type: ${acc.Type || 'N/A'}`);
       });
     }

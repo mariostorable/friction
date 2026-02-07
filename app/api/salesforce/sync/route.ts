@@ -96,9 +96,14 @@ export async function POST(request: NextRequest) {
     };
 
     // Helper function to fetch accounts from Salesforce
+    // Using only standard fields that exist in all Salesforce orgs
     const fetchSalesforceAccounts = async (accessToken: string) => {
+      // Note: Removed custom fields that may not exist in all orgs
+      // If you need custom fields, add them to your Salesforce org or modify this query
+      const query = `SELECT Id,Name,AnnualRevenue,Industry,Type,Owner.Name,CreatedDate,(SELECT Id FROM Assets) FROM Account WHERE ParentId=null ORDER BY AnnualRevenue DESC NULLS LAST LIMIT 200`;
+
       return await fetch(
-        `${integration.instance_url}/services/data/v59.0/query?q=SELECT+Id,Name,dL_Product_s_Corporate_Name__c,MRR_MVR__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,(SELECT+Id+FROM+Assets)+FROM+Account+WHERE+ParentId=null+AND+MRR_MVR__c>0+ORDER+BY+MRR_MVR__c+DESC+LIMIT+200`,
+        `${integration.instance_url}/services/data/v59.0/query?q=${encodeURIComponent(query)}`,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -159,71 +164,28 @@ export async function POST(request: NextRequest) {
     // Don't delete accounts - upsert to preserve friction data
     const accountsToUpsert = accountsData.records.map((sfAccount: any) => {
       const businessUnit = mapTypeToVertical(sfAccount.Type);
-      const products = [];
 
-      // Product detection based on business unit and specific ID fields
-      // Storage products
-      if (businessUnit === 'storage') {
-        if (sfAccount.Corp_Code__c) products.push('Software (SiteLink)');
-        if (sfAccount.SE_Company_UUID__c) products.push('Software (EDGE)');
-        if (sfAccount.SpareFoot_Client_Key__c) products.push('Marketplace (SpareFoot)');
-        if (sfAccount.Insurance_ZCRM_ID__c) products.push('Insurance');
-
-        // Legacy fields for storage
-        if (sfAccount.Current_FMS__c && !products.some(p => p.includes(sfAccount.Current_FMS__c))) {
-          products.push(`Software (${sfAccount.Current_FMS__c})`);
-        }
-        if (sfAccount.Online_Listing_Service__c && !products.some(p => p.includes('Marketplace'))) {
-          products.push(`Marketplace (${sfAccount.Online_Listing_Service__c})`);
-        }
-      }
-
-      // Marine products - check Current_FMS__c for Molo or other marine software
-      if (businessUnit === 'marine') {
-        if (sfAccount.Current_FMS__c) {
-          products.push(`Software (${sfAccount.Current_FMS__c})`);
-        }
-        // Add marine marketplace if they have one
-        if (sfAccount.Online_Listing_Service__c) {
-          products.push(`Marketplace (${sfAccount.Online_Listing_Service__c})`);
-        }
-      }
-
-      // Common products across all business units
-      if (sfAccount.Insurance_ZCRM_ID__c && !products.includes('Insurance')) {
-        products.push('Insurance');
-      }
-      if (sfAccount.Current_Website_Provider__c) {
-        products.push(`Website (${sfAccount.Current_Website_Provider__c})`);
-      }
-      if (sfAccount.Current_Payment_Provider__c) {
-        products.push(`Payments (${sfAccount.Current_Payment_Provider__c})`);
-      }
-      if (sfAccount.Insurance_Company__c && !products.includes('Insurance')) {
-        products.push(`Insurance (${sfAccount.Insurance_Company__c})`);
-      }
-      if (sfAccount.Gate_System__c) {
-        products.push(`Gate (${sfAccount.Gate_System__c})`);
-      }
+      // Note: Product detection disabled since custom fields don't exist
+      // If you need product detection, add custom fields to your Salesforce org
+      const products: string[] = [];
 
       return {
         user_id: user.id,
         salesforce_id: sfAccount.Id,
-        name: sfAccount.dL_Product_s_Corporate_Name__c || sfAccount.Name,
-        arr: sfAccount.MRR_MVR__c ? sfAccount.MRR_MVR__c * 12 : null,
+        name: sfAccount.Name,
+        arr: sfAccount.AnnualRevenue || null,
         vertical: businessUnit,
         products: products.length > 0 ? products.join(', ') : null,
         segment: sfAccount.Type || null,
         owner_name: sfAccount.Owner?.Name || null,
         customer_since: sfAccount.CreatedDate || null,
-        facility_count: sfAccount.Locations__c || 0,
-        service_level: sfAccount.LevelOfService__c || null,
-        managed_account: sfAccount.Managed_Account__c || null,
-        cs_segment: sfAccount.VitallyClient_Success_Tier__c || null,
+        facility_count: 0, // Custom field Locations__c not available
+        service_level: null, // Custom field LevelOfService__c not available
+        managed_account: null, // Custom field Managed_Account__c not available
+        cs_segment: null, // Custom field VitallyClient_Success_Tier__c not available
         metadata: {
           industry: sfAccount.Industry,
           type: sfAccount.Type,
-          current_fms: sfAccount.Current_FMS__c,
           location_name: sfAccount.Name
         },
         // Don't set status here - preserve existing status on update, default to 'active' via column default on insert
@@ -245,18 +207,18 @@ export async function POST(request: NextRequest) {
 
     await supabase.from('portfolios').delete().eq('user_id', user.id);
 
-    // Get all accounts with products and vertical fields (active only)
+    // Get all accounts with vertical fields (active only)
     const { data: allAccounts } = await supabase
       .from('accounts')
-      .select('id, vertical, products, arr')
+      .select('id, vertical, arr')
       .eq('user_id', user.id)
       .eq('status', 'active')
       .not('arr', 'is', null)
       .order('arr', { ascending: false });
 
-    // Top 25 Storage Accounts (EDGE + SiteLink)
+    // Top 25 Storage Accounts (all storage accounts)
     const storageAccounts = allAccounts?.filter(a =>
-      a.vertical === 'storage' && a.products && (a.products.includes('EDGE') || a.products.includes('SiteLink'))
+      a.vertical === 'storage'
     ).slice(0, 25);
 
     if (storageAccounts && storageAccounts.length > 0) {
@@ -264,7 +226,7 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         name: 'Top 25 Storage Accounts',
         portfolio_type: 'top_25_edge', // Keep same type for backwards compatibility
-        criteria: { type: 'top_mrr_storage', limit: 25, vertical: 'storage' },
+        criteria: { type: 'top_arr_storage', limit: 25, vertical: 'storage' },
         account_ids: storageAccounts.map(a => a.id),
       });
     }
@@ -279,7 +241,7 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         name: 'Top 25 Marine Accounts',
         portfolio_type: 'top_25_marine',
-        criteria: { type: 'top_mrr_marine', limit: 25, vertical: 'marine' },
+        criteria: { type: 'top_arr_marine', limit: 25, vertical: 'marine' },
         account_ids: marineAccounts.map(a => a.id),
       });
     }
