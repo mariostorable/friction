@@ -1055,13 +1055,23 @@ export default function Dashboard() {
                               <div className="flex flex-col">
                                 <div className="flex items-center gap-1">
                                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                    account.vitally_health_score >= 80
-                                      ? 'bg-green-100 text-green-800'
-                                      : account.vitally_health_score >= 60
-                                      ? 'bg-yellow-100 text-yellow-800'
-                                      : 'bg-red-100 text-red-800'
+                                    // Handle both 0-10 and 0-100 scales: normalize to 0-10 for thresholds
+                                    (() => {
+                                      const normalizedScore = account.vitally_health_score > 20
+                                        ? account.vitally_health_score / 10
+                                        : account.vitally_health_score;
+                                      return normalizedScore >= 8
+                                        ? 'bg-green-100 text-green-800'
+                                        : normalizedScore >= 4
+                                        ? 'bg-yellow-100 text-yellow-800'
+                                        : 'bg-red-100 text-red-800';
+                                    })()
                                   }`}>
-                                    {Math.round(account.vitally_health_score)}
+                                    {/* Display on 0-10 scale with 1 decimal */}
+                                    {(account.vitally_health_score > 20
+                                      ? account.vitally_health_score / 10
+                                      : account.vitally_health_score
+                                    ).toFixed(1)}
                                   </span>
                                   {account.vitally_account && Array.isArray(account.vitally_account) && account.vitally_account[0]?.vitally_account_id && (
                                     <a

@@ -35,6 +35,7 @@ export async function GET(request: Request) {
     // Search accounts table if search term provided
     let accounts: any[] = [];
     let vitallyAccounts: any[] = [];
+    let accountsWithVitally: any[] = [];
 
     if (searchTerm) {
       const { data: accountsData } = await supabase
@@ -52,6 +53,21 @@ export async function GET(request: Request) {
         .or(`account_name.ilike.%${searchTerm}%,salesforce_account_id.ilike.%${searchTerm}%`)
         .limit(20);
       vitallyAccounts = vitallyData || [];
+
+      // Also get accounts with their vitally relationships joined
+      const { data: joinedData } = await supabase
+        .from('accounts')
+        .select(`
+          id,
+          name,
+          salesforce_id,
+          vitally_health_score,
+          vitally_account:vitally_accounts(vitally_account_id, account_name, health_score)
+        `)
+        .eq('user_id', user.id)
+        .or(`name.ilike.%${searchTerm}%,salesforce_id.ilike.%${searchTerm}%`)
+        .limit(20);
+      accountsWithVitally = joinedData || [];
     }
 
     return NextResponse.json({
@@ -59,8 +75,10 @@ export async function GET(request: Request) {
       healthScoreStats: stats,
       accounts: accounts,
       vitallyAccounts: vitallyAccounts,
+      accountsWithVitally: accountsWithVitally,
       accountsCount: accounts.length,
-      vitallyAccountsCount: vitallyAccounts.length
+      vitallyAccountsCount: vitallyAccounts.length,
+      accountsWithVitallyCount: accountsWithVitally.length
     });
 
   } catch (error) {
