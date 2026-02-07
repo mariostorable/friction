@@ -8,6 +8,7 @@ export default function JiraSyncButton() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
   const [syncStats, setSyncStats] = useState<{
     lastSynced: string | null;
     totalIssues: number;
@@ -77,6 +78,12 @@ export default function JiraSyncButton() {
 
       if (response.ok) {
         console.log('✅ Jira sync complete:', result);
+
+        // Show success message
+        const message = `Synced ${result.issuesStored || 0} issues, created ${result.totalLinksCreated || 0} theme links`;
+        setSyncResult(message);
+        setTimeout(() => setSyncResult(null), 5000); // Hide after 5 seconds
+
         // Wait longer for database to propagate changes
         console.log('Waiting 2 seconds for database propagation...');
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -121,23 +128,31 @@ export default function JiraSyncButton() {
 
   return (
     <div className="relative">
-      <button
-        onClick={syncNow}
-        disabled={syncing}
-        onMouseEnter={() => setShowTooltip(true)}
-        onMouseLeave={() => setShowTooltip(false)}
-        className="flex flex-col items-start px-4 py-2 text-sm font-medium text-purple-700 bg-purple-50 border border-purple-300 rounded-lg hover:bg-purple-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-          <span>{syncing ? 'Syncing Jira...' : 'Sync Jira'}</span>
-        </div>
-        {!syncing && (
-          <span className="text-xs text-purple-600 mt-0.5 ml-6">
-            Last synced {timeAgo}
-          </span>
+      <div className="space-y-2">
+        <button
+          onClick={syncNow}
+          disabled={syncing}
+          onMouseEnter={() => setShowTooltip(true)}
+          onMouseLeave={() => setShowTooltip(false)}
+          className="flex flex-col items-start px-4 py-2 text-sm font-medium text-purple-700 bg-purple-50 border border-purple-300 rounded-lg hover:bg-purple-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+            <span>{syncing ? 'Syncing Jira...' : 'Sync Jira'}</span>
+          </div>
+          {!syncing && (
+            <span className="text-xs text-purple-600 mt-0.5 ml-6">
+              Last synced {timeAgo}
+            </span>
+          )}
+        </button>
+
+        {syncResult && (
+          <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+            <p className="text-xs text-green-800">{syncResult}</p>
+          </div>
         )}
-      </button>
+      </div>
 
       {/* Hover Tooltip */}
       {showTooltip && (
