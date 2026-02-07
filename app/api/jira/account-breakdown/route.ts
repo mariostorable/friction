@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
       .in('account_id', Array.from(accountIds))
       .eq('user_id', user.id);
 
-    const themeCaseCounts: Record<string, Record<string, number>> = {};
+    const themeCaseCounts: Record<string, number> = {};
     frictionCardCounts?.forEach(card => {
       const key = `${card.account_id}-${card.theme_key}`;
       themeCaseCounts[key] = (themeCaseCounts[key] || 0) + 1;
