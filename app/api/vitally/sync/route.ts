@@ -274,12 +274,96 @@ export async function POST() {
       console.log(`Successfully updated ${updateRecords.length} accounts with Vitally data`);
     }
 
+    // Fetch notes/conversations for matched accounts
+    let totalNotes = 0;
+    if (matched > 0) {
+      console.log(`Fetching notes for ${matched} matched accounts...`);
+
+      for (const vAccount of vitallyAccounts) {
+        const vitallyId = vAccount.id;
+        const accountName = vAccount.name || 'Unknown';
+
+        // Find if this account was matched
+        const salesforceId = vAccount.accountId || vAccount.externalId || vAccount.salesforceId || null;
+        let matchedAccount = null;
+        if (salesforceId) {
+          matchedAccount = accountsBySalesforceId.get(salesforceId);
+        }
+        if (!matchedAccount) {
+          matchedAccount = accountsByName.get(accountName.toLowerCase().trim());
+        }
+
+        if (!matchedAccount) continue; // Skip unmatched accounts
+
+        try {
+          // Fetch notes for this Vitally account
+          const notesUrl = `${integration.instance_url}/resources/notes?accountId=${vitallyId}&limit=50`;
+          const notesResponse = await fetch(notesUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': authHeader,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (notesResponse.ok) {
+            const notesData = await notesResponse.json();
+            const notes = notesData.results || [];
+
+            if (notes.length > 0) {
+              console.log(`Found ${notes.length} notes for ${accountName}`);
+
+              // Prepare notes as raw_inputs for analysis
+              const noteInputs = notes.map((note: any) => ({
+                user_id: user.id,
+                account_id: matchedAccount.id,
+                source_type: 'vitally_note',
+                source_id: note.id || `vitally-note-${vitallyId}-${Date.now()}`,
+                source_url: `https://storable.vitally.io/organizations/${vitallyId}`,
+                text_content: `${note.title || 'Vitally Note'}\n\n${note.body || note.content || note.text || ''}\n\nAuthor: ${note.authorName || note.author?.name || 'Unknown'}\nDate: ${note.createdAt || note.createdDate || 'Unknown'}`,
+                metadata: {
+                  note_id: note.id,
+                  author: note.authorName || note.author?.name || 'Unknown',
+                  created_date: note.createdAt || note.createdDate,
+                  vitally_account_id: vitallyId,
+                  note_type: note.type || 'note',
+                },
+                processed: false,
+              }));
+
+              // Insert notes in batches
+              if (noteInputs.length > 0) {
+                const { error: notesError } = await supabaseAdmin
+                  .from('raw_inputs')
+                  .upsert(noteInputs, {
+                    onConflict: 'user_id,source_type,source_id',
+                    ignoreDuplicates: false
+                  });
+
+                if (notesError) {
+                  console.error(`Error storing notes for ${accountName}:`, notesError.message);
+                } else {
+                  totalNotes += noteInputs.length;
+                }
+              }
+            }
+          }
+        } catch (noteError) {
+          console.error(`Error fetching notes for ${accountName}:`, noteError);
+          // Continue with other accounts even if one fails
+        }
+      }
+
+      console.log(`Successfully synced ${totalNotes} notes from Vitally`);
+    }
+
     return NextResponse.json({
       success: true,
       synced: vitallyRecords.length,
       matched: matched,
+      notes: totalNotes,
       total: vitallyAccounts.length,
-      message: `Synced ${vitallyRecords.length} of ${vitallyAccounts.length} Vitally accounts${matched > 0 ? `, matched ${matched} to existing Salesforce accounts` : ''}`,
+      message: `Synced ${vitallyRecords.length} Vitally accounts${matched > 0 ? `, matched ${matched} to existing accounts` : ''}${totalNotes > 0 ? `, pulled ${totalNotes} notes` : ''}`,
     });
 
   } catch (error) {

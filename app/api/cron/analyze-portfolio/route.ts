@@ -454,18 +454,32 @@ export async function GET(request: NextRequest) {
 
           const { data: insertedInputs } = await supabase.from('raw_inputs').insert(rawInputs).select();
 
-          if (!insertedInputs || insertedInputs.length === 0) continue;
+          // Also fetch any unprocessed inputs from other sources (e.g., Vitally notes)
+          const { data: unprocessedInputs } = await supabase
+            .from('raw_inputs')
+            .select('*')
+            .eq('account_id', accountId)
+            .eq('processed', false)
+            .neq('source_type', 'salesforce_case'); // Don't duplicate the ones we just inserted
 
-          // Analyze ALL cases with Claude (no limit)
+          // Combine newly inserted Salesforce cases with unprocessed inputs from other sources
+          const allInputsToAnalyze = [...(insertedInputs || []), ...(unprocessedInputs || [])];
+
+          if (allInputsToAnalyze.length === 0) {
+            console.log(`No inputs to analyze for ${account.name}`);
+            continue;
+          }
+
+          // Analyze ALL inputs (Salesforce cases + Vitally notes + other sources)
           const frictionCards = [];
-          console.log(`Analyzing ${insertedInputs.length} cases for ${account.name}...`);
+          console.log(`Analyzing ${allInputsToAnalyze.length} inputs for ${account.name} (${insertedInputs?.length || 0} new Salesforce cases + ${unprocessedInputs?.length || 0} other sources)...`);
 
-          for (let i = 0; i < insertedInputs.length; i++) {
-            const input = insertedInputs[i];
+          for (let i = 0; i < allInputsToAnalyze.length; i++) {
+            const input = allInputsToAnalyze[i];
 
             // Log progress every 20 cases
             if (i % 20 === 0 && i > 0) {
-              console.log(`Progress: ${i}/${insertedInputs.length} cases analyzed for ${account.name}`);
+              console.log(`Progress: ${i}/${allInputsToAnalyze.length} inputs analyzed for ${account.name}`);
             }
 
             // Truncate case text to 2000 characters to avoid hitting API limits
@@ -536,7 +550,7 @@ Return ONLY the JSON object, nothing else.`;
           if (frictionCards.length > 0) {
             await supabase.from('friction_cards').insert(frictionCards);
 
-            const inputIds = insertedInputs.map((i: any) => i.id);
+            const inputIds = allInputsToAnalyze.map((i: any) => i.id);
             console.log(`Marking ${inputIds.length} inputs as processed:`, inputIds);
 
             const { error: updateError } = await supabase
