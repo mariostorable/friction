@@ -57,7 +57,7 @@ export async function GET(request: Request) {
         let newCases = 0;
 
         // Sync cases for each account (incremental - only new cases)
-        for (const accountId of accountIds) {
+        for (const accountId of Array.from(accountIds)) {
           try {
             // The sync-cases endpoint already handles incremental syncing
             // It only pulls cases created since the last sync
