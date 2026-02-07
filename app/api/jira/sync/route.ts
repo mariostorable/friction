@@ -375,10 +375,9 @@ export async function POST(request: NextRequest) {
 
     // Collect all links to create (batch processing)
     for (const issue of insertedIssues || []) {
-      // Get theme links for this issue using BOTH hardcoded keywords AND actual themes
-      const themeLinks = getThemeLinks(userId, issue);
+      // Get theme links using ONLY actual themes from Salesforce (not hardcoded ones)
       const actualThemeLinks = getThemeLinksFromActualThemes(userId, issue, actualThemes);
-      themeLinksToCreate.push(...themeLinks, ...actualThemeLinks);
+      themeLinksToCreate.push(...actualThemeLinks);
 
       // Get account links for this issue
       const accountLinks = getAccountLinks(userId, issue, accounts || []);
