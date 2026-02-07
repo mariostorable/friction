@@ -8,14 +8,29 @@ export const maxDuration = 60; // 60 seconds to handle Salesforce API calls and 
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
-    
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    const { accountId, userId } = await request.json();
+
+    // Support both user session auth and cron job auth
+    let authenticatedUserId: string;
+
+    if (userId) {
+      // Cron job auth - userId passed in body
+      authenticatedUserId = userId;
+    } else {
+      // Regular user auth - check session
+      const supabase = createRouteHandlerClient({ cookies });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+      }
+      authenticatedUserId = user.id;
     }
 
-    const { accountId } = await request.json();
+    // Use admin client for cron jobs, or create user client
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
     if (!accountId) {
       return NextResponse.json({ error: 'Account ID required' }, { status: 400 });

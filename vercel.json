@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/sync-vitally",
       "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/sync-salesforce",
+      "schedule": "0 6,18 * * *"
     }
   ],
   "functions": {
@@ -20,6 +24,9 @@
       "maxDuration": 300
     },
     "app/api/cron/sync-vitally/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/cron/sync-salesforce/route.ts": {
       "maxDuration": 300
     }
   }
