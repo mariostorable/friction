@@ -165,6 +165,7 @@ export async function POST() {
 
     const vitallyRecords: any[] = [];
     const accountUpdates: Map<string, any> = new Map();
+    const matchedOrganizations: Map<string, { matchedAccount: any, accountName: string, childAccounts: any[] }> = new Map();
 
     // Process each organization group
     for (const [orgId, childAccounts] of Array.from(accountsByOrg.entries())) {
@@ -251,6 +252,8 @@ export async function POST() {
         if (matchedAccount) {
           matched++;
           console.log(`  ✓ Matched "${accountName}" (${childAccounts.length} facilities) to Salesforce: ${matchedAccount.name}`);
+          // Store matched organization for notes fetching later
+          matchedOrganizations.set(orgId, { matchedAccount, accountName, childAccounts });
         } else {
           console.log(`  ✗ No match found for "${accountName}" (${childAccounts.length} facilities, SF ID: ${salesforceId})`);
         }
@@ -377,41 +380,12 @@ export async function POST() {
 
     // Fetch notes/conversations for matched organizations
     let totalNotes = 0;
-    if (matched > 0) {
-      console.log(`Fetching notes for ${matched} matched organizations...`);
+    if (matchedOrganizations.size > 0) {
+      console.log(`Fetching notes for ${matchedOrganizations.size} matched organizations...`);
 
-      // Process each organization group that was matched
-      for (const [, childAccounts] of Array.from(accountsByOrg.entries())) {
-        const primaryAccount = childAccounts[0];
-
-        // Determine the corporate account name (same logic as above)
-        let accountName = primaryAccount.traits?.['sfdc.dL_Product_s_Corporate_Name__c'] ||
-                         primaryAccount.name ||
-                         'Unknown';
-
-        if (!primaryAccount.traits?.['sfdc.dL_Product_s_Corporate_Name__c'] && childAccounts.length > 1) {
-          const commonPrefix = primaryAccount.name.split(' - ')[0] || primaryAccount.name.split('-')[0];
-          if (commonPrefix && commonPrefix !== primaryAccount.name) {
-            accountName = commonPrefix.trim();
-          }
-        }
-
-        // Check if this organization was matched
-        const salesforceId = primaryAccount.traits?.['sfdc.Case_Safe_Parent_Account_Id__c'] ||
-                           primaryAccount.externalId ||
-                           null;
-
-        let matchedAccount = null;
-        if (salesforceId) {
-          matchedAccount = accountsBySalesforceId.get(salesforceId);
-        }
-        if (!matchedAccount) {
-          matchedAccount = accountsByName.get(accountName.toLowerCase().trim());
-        }
-
-        if (!matchedAccount) continue; // Skip unmatched accounts
-
-        console.log(`Fetching notes for organization "${accountName}" (${childAccounts.length} facilities)...`);
+      // Process each matched organization
+      for (const [, { matchedAccount, accountName, childAccounts }] of Array.from(matchedOrganizations.entries())) {
+        console.log(`Fetching notes for organization "${accountName}" (${childAccounts.length} facilities) matched to Salesforce account ID: ${matchedAccount.id}...`);
 
         // Fetch notes from ALL facility accounts and associate with parent Salesforce account
         for (const childAccount of childAccounts) {
@@ -433,8 +407,9 @@ export async function POST() {
               const notesData = await notesResponse.json();
               const notes = notesData.results || [];
 
+              console.log(`  Facility "${childName}" (${vitallyId}): ${notes.length} notes found`);
+
               if (notes.length > 0) {
-                console.log(`  Found ${notes.length} notes for facility "${childName}"`);
 
                 // Prepare notes as raw_inputs for analysis - link to corporate Salesforce account
                 const noteInputs = notes.map((note: any) => ({
@@ -458,23 +433,31 @@ export async function POST() {
 
                 // Insert notes in batches
                 if (noteInputs.length > 0) {
-                  const { error: notesError } = await supabaseAdmin
+                  console.log(`  Inserting ${noteInputs.length} notes for facility "${childName}" linked to account ID: ${matchedAccount.id}`);
+
+                  const { data: insertedNotes, error: notesError } = await supabaseAdmin
                     .from('raw_inputs')
                     .upsert(noteInputs, {
                       onConflict: 'user_id,source_type,source_id',
                       ignoreDuplicates: false
-                    });
+                    })
+                    .select('id');
 
                   if (notesError) {
-                    console.error(`  Error storing notes for ${childName}:`, notesError.message);
+                    console.error(`  ✗ Error storing notes for ${childName}:`, notesError.message);
                   } else {
-                    totalNotes += noteInputs.length;
+                    const insertCount = insertedNotes?.length || noteInputs.length;
+                    totalNotes += insertCount;
+                    console.log(`  ✓ Successfully stored ${insertCount} notes for "${childName}"`);
                   }
                 }
               }
+            } else {
+              const errorText = await notesResponse.text();
+              console.error(`  ✗ Vitally API error fetching notes for "${childName}": ${notesResponse.status} - ${errorText}`);
             }
           } catch (noteError) {
-            console.error(`  Error fetching notes for facility ${childName}:`, noteError);
+            console.error(`  ✗ Exception fetching notes for facility "${childName}":`, noteError);
             // Continue with other facilities even if one fails
           }
         }
