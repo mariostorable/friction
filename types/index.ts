@@ -74,7 +74,7 @@ export interface RawInput {
   id: string;
   user_id: string;
   account_id: string | null;
-  source_type: 'salesforce_case' | 'salesforce_note' | 'manual' | 'zendesk' | 'gong' | 'slack';
+  source_type: 'salesforce_case' | 'salesforce_note' | 'manual' | 'zendesk' | 'gong' | 'slack' | 'vitally_note';
   source_id: string | null;
   source_url: string | null;
   text_content: string;
