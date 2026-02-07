@@ -739,6 +739,17 @@ export default function AccountDetailPage() {
               </div>
               <p className="text-sm text-gray-600 mt-1">
                 Last 14 days • Updated daily
+                {latestSnapshot?.created_at && (
+                  <span className="ml-2 text-gray-500">
+                    • Last analyzed {new Date(latestSnapshot.created_at).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit'
+                    })}
+                  </span>
+                )}
               </p>
             </div>
             <div className="text-right">

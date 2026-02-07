@@ -75,13 +75,42 @@ export async function GET() {
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id);
 
+    // Analyze all accounts to find patterns
+    const accounts = data.results || [];
+    const fieldAnalysis: any = {
+      topLevelFields: new Set<string>(),
+      traitsFields: new Set<string>(),
+      sampleAccountsWithStructure: []
+    };
+
+    accounts.forEach((acc: any, idx: number) => {
+      // Collect all top-level keys
+      Object.keys(acc).forEach(key => fieldAnalysis.topLevelFields.add(key));
+
+      // Collect all traits keys
+      if (acc.traits && typeof acc.traits === 'object') {
+        Object.keys(acc.traits).forEach(key => fieldAnalysis.traitsFields.add(key));
+      }
+
+      // Store first 3 accounts with their full structure
+      if (idx < 3) {
+        fieldAnalysis.sampleAccountsWithStructure.push({
+          name: acc.name,
+          id: acc.id,
+          topLevelKeys: Object.keys(acc),
+          traitsKeys: acc.traits ? Object.keys(acc.traits) : [],
+          fullAccount: acc // Include complete account object
+        });
+      }
+    });
+
     return NextResponse.json({
       success: true,
-      vitally_api_response: {
-        structure: Object.keys(data),
-        results_length: data.results?.length || 0,
-        sample_account: data.results?.[0] || null,
-        all_field_keys: data.results?.[0] ? Object.keys(data.results[0]) : [],
+      accountsReturned: accounts.length,
+      fieldAnalysis: {
+        allTopLevelFields: Array.from(fieldAnalysis.topLevelFields).sort(),
+        allTraitsFields: Array.from(fieldAnalysis.traitsFields).sort(),
+        sampleAccounts: fieldAnalysis.sampleAccountsWithStructure
       },
       database_records: {
         vitally_accounts_count: count,
