@@ -41,11 +41,21 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get all theme links for these issues
+    // Get all friction cards first to discover actual themes
+    const { data: frictionCards } = await supabase
+      .from('friction_cards')
+      .select('theme_key, account_id, accounts(name)')
+      .eq('user_id', user.id);
+
+    // Extract actual theme keys that exist in the system
+    const actualThemeKeys = Array.from(new Set(frictionCards?.map(c => c.theme_key) || []));
+
+    // Get theme links ONLY for themes that actually exist in friction_cards
     const { data: themeLinks } = await supabase
       .from('theme_jira_links')
       .select('jira_issue_id, theme_key')
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .in('theme_key', actualThemeKeys);
 
     // Build theme mapping: jira_issue_id -> theme_keys[]
     const issueThemes: Record<string, string[]> = {};
@@ -55,14 +65,6 @@ export async function GET(request: NextRequest) {
       }
       issueThemes[link.jira_issue_id].push(link.theme_key);
     });
-
-    // Get all friction cards to find affected accounts per theme
-    const allThemeKeys = Array.from(new Set(themeLinks?.map(l => l.theme_key) || []));
-    const { data: frictionCards } = await supabase
-      .from('friction_cards')
-      .select('theme_key, account_id, accounts(name)')
-      .in('theme_key', allThemeKeys)
-      .eq('user_id', user.id);
 
     // Build theme -> accounts mapping
     const themeAccounts: Record<string, Set<string>> = {};
