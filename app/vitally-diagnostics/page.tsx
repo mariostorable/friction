@@ -58,6 +58,35 @@ export default function VitallyDiagnostics() {
         accountIds = await idsResponse.json();
       }
 
+      // Check Vitally notes synced
+      const { count: notesCount } = await supabase
+        .from('raw_inputs')
+        .select('*', { count: 'exact', head: true })
+        .eq('source_type', 'vitally_note');
+
+      // Get sample notes
+      const { data: sampleNotes } = await supabase
+        .from('raw_inputs')
+        .select('account_id, text_content, metadata, created_at, processed, accounts(name)')
+        .eq('source_type', 'vitally_note')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      // Count notes per account
+      const { data: notesPerAccount } = await supabase
+        .from('raw_inputs')
+        .select('account_id, accounts(name)')
+        .eq('source_type', 'vitally_note');
+
+      const noteCounts: Record<string, { name: string; count: number }> = {};
+      notesPerAccount?.forEach((note: any) => {
+        const accountName = note.accounts?.name || 'Unknown';
+        if (!noteCounts[note.account_id]) {
+          noteCounts[note.account_id] = { name: accountName, count: 0 };
+        }
+        noteCounts[note.account_id].count++;
+      });
+
       setDiagnostics({
         integration: integration || 'Not found',
         vitallyAccountsCount: vitallyCount,
@@ -65,6 +94,12 @@ export default function VitallyDiagnostics() {
         apiTest: apiTest,
         matchStatus: matchStatus,
         accountIds: accountIds,
+        vitallyNotesCount: notesCount,
+        sampleNotes: sampleNotes || [],
+        notesPerAccount: Object.entries(noteCounts)
+          .map(([id, data]) => ({ account_id: id, account_name: data.name, note_count: data.count }))
+          .sort((a, b) => b.note_count - a.note_count)
+          .slice(0, 10),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
@@ -191,6 +226,76 @@ export default function VitallyDiagnostics() {
                 ) : (
                   <p className="text-sm text-gray-600">Loading match status...</p>
                 )}
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Vitally Notes Synced</h3>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-indigo-50 p-4 rounded border border-indigo-200">
+                      <p className="text-sm text-indigo-900 font-medium">Total Vitally Notes</p>
+                      <p className="text-2xl font-bold text-indigo-900">{diagnostics.vitallyNotesCount || 0}</p>
+                    </div>
+                    <div className="bg-teal-50 p-4 rounded border border-teal-200">
+                      <p className="text-sm text-teal-900 font-medium">Accounts with Notes</p>
+                      <p className="text-2xl font-bold text-teal-900">{diagnostics.notesPerAccount?.length || 0}</p>
+                    </div>
+                  </div>
+
+                  {diagnostics.notesPerAccount && diagnostics.notesPerAccount.length > 0 && (
+                    <details className="bg-gray-50 p-4 rounded border border-gray-200">
+                      <summary className="cursor-pointer font-medium text-sm">Notes Count by Account (Top 10)</summary>
+                      <div className="mt-3 space-y-2">
+                        {diagnostics.notesPerAccount.map((item: any) => (
+                          <div key={item.account_id} className="flex justify-between text-sm">
+                            <span className="text-gray-700">{item.account_name}</span>
+                            <span className="font-medium text-gray-900">{item.note_count} notes</span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+
+                  {diagnostics.sampleNotes && diagnostics.sampleNotes.length > 0 && (
+                    <details className="bg-gray-50 p-4 rounded border border-gray-200">
+                      <summary className="cursor-pointer font-medium text-sm">Sample Notes (Last 5)</summary>
+                      <div className="mt-3 space-y-4">
+                        {diagnostics.sampleNotes.map((note: any, idx: number) => (
+                          <div key={idx} className="border-b border-gray-300 pb-3 last:border-0">
+                            <div className="flex justify-between items-start mb-2">
+                              <p className="text-sm font-medium text-gray-900">
+                                {note.accounts?.name || 'Unknown Account'}
+                              </p>
+                              <span className={`text-xs px-2 py-1 rounded ${
+                                note.processed
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {note.processed ? 'Analyzed' : 'Pending'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-600 mb-2">
+                              {new Date(note.created_at).toLocaleString()}
+                            </p>
+                            <div className="bg-white p-3 rounded border border-gray-200">
+                              <p className="text-sm text-gray-800 whitespace-pre-wrap max-h-32 overflow-auto">
+                                {note.text_content}
+                              </p>
+                            </div>
+                            {note.metadata && (
+                              <details className="mt-2">
+                                <summary className="text-xs text-gray-500 cursor-pointer">View metadata</summary>
+                                <pre className="text-xs mt-1 bg-gray-100 p-2 rounded">
+                                  {JSON.stringify(note.metadata, null, 2)}
+                                </pre>
+                              </details>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </div>
               </div>
 
               <div>
