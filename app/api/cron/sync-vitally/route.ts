@@ -148,10 +148,12 @@ export async function GET(request: Request) {
                              vAccount.traits?.salesforceAccountId ||
                              null;
 
-          const healthScore = vAccount.health?.score ||
-                            vAccount.healthScore ||
-                            vAccount.traits?.health?.score ||
-                            null;
+          // Vitally health scores are 0-10, normalize to 0-100 for consistency
+          const rawHealthScore = vAccount.health?.score ||
+                                vAccount.healthScore ||
+                                vAccount.traits?.health?.score ||
+                                null;
+          const healthScore = rawHealthScore !== null ? rawHealthScore * 10 : null;
           const npsScore = vAccount.nps?.score ||
                          vAccount.npsScore ||
                          vAccount.traits?.nps ||
