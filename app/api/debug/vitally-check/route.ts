@@ -33,8 +33,8 @@ export async function GET(request: Request) {
     } : null;
 
     // Search accounts table if search term provided
-    let accounts = [];
-    let vitallyAccounts = [];
+    let accounts: any[] = [];
+    let vitallyAccounts: any[] = [];
 
     if (searchTerm) {
       const { data: accountsData } = await supabase
