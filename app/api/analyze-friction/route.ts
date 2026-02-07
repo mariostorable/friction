@@ -138,16 +138,35 @@ ${truncatedText}${truncationNote}
 
 Return a single JSON object with these fields:
 
-FIRST, determine if this is actual friction or routine support:
-- is_friction: true/false
-  * TRUE = User is blocked, confused, frustrated, experiencing errors, or encountering product limitations
-  * FALSE = Routine questions, transactional requests (change email/password), positive feedback, simple how-to questions that are easily answered, or feature requests without clear pain
+FIRST, determine if this is actual FRICTION or routine support:
 
-If is_friction is FALSE, stop here and return: {"is_friction": false, "reason": "brief explanation"}
+is_friction: true/false - BE STRICT! Only mark as TRUE if it's a systemic product/UX problem.
 
-If is_friction is TRUE, continue with:
+TRUE = Product Friction (systemic issues requiring engineering/design fixes):
+  - Bugs, errors, system failures, crashes
+  - Features that don't work as expected or are broken
+  - Confusing UI/UX that blocks user workflows
+  - Performance problems (slowness, timeouts, lag)
+  - Integration failures, API errors, sync issues
+  - Missing critical functionality that blocks workflows
+  - Data quality issues caused by the system
+  - Billing system problems or payment processing errors
+
+FALSE = Normal Support (routine requests that don't need product fixes):
+  - Auto-replies, out-of-office messages
+  - Transactional requests: "change my email", "update address", "reset password"
+  - Onboarding tasks: "add new location", "setup new user", "configure settings"
+  - How-to questions easily answered by documentation
+  - Feature requests without demonstrated pain/blocking issues
+  - Positive feedback or thank-you messages
+  - Account cancellations or service changes
+  - Questions about how existing features work (unless user is confused because UI is unclear)
+
+If is_friction is FALSE, return: {"is_friction": false, "summary": "brief 1-sentence description", "reason": "why it's not friction"}
+
+If is_friction is TRUE, continue with full analysis:
 - summary: Brief description of the issue (1 sentence)
-- theme_key: Choose the MOST SPECIFIC theme. "other" should be under 10% of cases:
+- theme_key: Choose the MOST SPECIFIC theme. "other" should be RARE:
   * billing_confusion: Invoice, payment, pricing, subscription issues
   * integration_failures: API issues, third-party app connections, data sync problems
   * ui_confusion: Interface unclear, hard to find features, confusing workflow
@@ -195,30 +214,31 @@ If is_friction is TRUE, continue with:
       try {
         const analysis = JSON.parse(responseText);
 
-        // Skip if not actual friction
-        if (analysis.is_friction === false) {
+        // Track non-friction count for reporting
+        const isFriction = analysis.is_friction !== false; // Default to true if not specified
+        if (!isFriction) {
           nonFrictionCount++;
-          console.log(`Skipping non-friction case ${input.id}: ${analysis.reason || 'Not friction'}`);
-          // Still count as processed but don't create a friction card
-          await sleep(300);
-          continue;
+          console.log(`Non-friction case ${input.id}: ${analysis.reason || 'Normal support'}`);
         }
 
+        // Create card for ALL cases (both friction and non-friction)
+        // This allows us to track full case volume and filter later
         frictionCards.push({
           user_id: user.id,
           account_id: accountId,
           raw_input_id: input.id,
-          summary: analysis.summary,
-          theme_key: analysis.theme_key || 'other',
+          summary: analysis.summary || 'Support request', // Summary required even for non-friction
+          theme_key: isFriction ? (analysis.theme_key || 'other') : 'normal_support',
           product_area: null,
-          severity: Math.min(5, Math.max(1, analysis.severity)),
+          severity: isFriction ? Math.min(5, Math.max(1, analysis.severity || 1)) : 1,
           sentiment: analysis.sentiment || 'neutral',
-          root_cause_hypothesis: analysis.root_cause || 'Unknown',
+          root_cause_hypothesis: isFriction ? (analysis.root_cause || 'Unknown') : (analysis.reason || 'Normal support request'),
           evidence_snippets: analysis.evidence || [],
           confidence_score: 0.8,
-          reasoning: 'Analyzed by Claude Sonnet 4.5',
+          reasoning: isFriction ? 'Analyzed by Claude Sonnet 4.5' : `Non-friction: ${analysis.reason || 'Normal support'}`,
           lifecycle_stage: null,
           is_new_theme: false,
+          is_friction: isFriction, // NEW: Flag to distinguish friction from support
         });
 
         // Delay between API calls to avoid rate limiting (300ms = ~3 requests/second)
@@ -229,7 +249,8 @@ If is_friction is TRUE, continue with:
       }
     }
 
-    console.log(`Analyzed ${frictionCards.length} friction cases, ${nonFrictionCount} non-friction filtered, ${parseErrorCount} parse errors, ${apiErrorCount} API errors`);
+    const actualFrictionCount = frictionCards.length - nonFrictionCount;
+    console.log(`Analyzed ${frictionCards.length} total cases: ${actualFrictionCount} friction, ${nonFrictionCount} normal support, ${parseErrorCount} parse errors, ${apiErrorCount} API errors`);
 
     // IMPORTANT: Mark ALL cases as processed, even if they failed
     // This prevents cases from getting stuck in an infinite loop
@@ -253,23 +274,11 @@ If is_friction is TRUE, continue with:
       console.log(`Successfully marked ${inputIds.length} inputs as processed`);
     }
 
-    // If no cards were created, return error but cases are already marked processed
+    // If no cards were created at all, it's an error
     if (frictionCards.length === 0) {
-      // If all cases were non-friction, that's actually success
-      if (nonFrictionCount === rawInputs.length) {
-        return NextResponse.json({
-          success: true,
-          analyzed: 0,
-          filtered: nonFrictionCount,
-          remaining: 0,
-          message: `All ${nonFrictionCount} cases were routine support (not friction). Cases marked as processed.`
-        });
-      }
-
       return NextResponse.json({
-        error: `No friction cases found. Tried ${rawInputs.length} cases. Non-friction filtered: ${nonFrictionCount}, API errors: ${apiErrorCount}, Parse errors: ${parseErrorCount}. ${errors[0] || 'Unknown error'}`,
+        error: `No cases could be analyzed. API errors: ${apiErrorCount}, Parse errors: ${parseErrorCount}. ${errors[0] || 'Unknown error'}`,
         analyzed: 0,
-        filtered: nonFrictionCount,
         parse_errors: parseErrorCount,
         api_errors: apiErrorCount,
         sample_error: errors[0],
@@ -299,15 +308,17 @@ If is_friction is TRUE, continue with:
       .eq('user_id', user.id)
       .eq('processed', false);
 
+    const frictionCount = (insertedCards?.length || 0) - nonFrictionCount;
     const message = remainingCount && remainingCount > 0
-      ? `Processed ${rawInputs.length} cases: ${insertedCards?.length} friction cards created, ${nonFrictionCount} routine support filtered. ${remainingCount} more cases remaining - click Analyze again to continue.`
-      : `Processed ${rawInputs.length} cases: ${insertedCards?.length} friction cards created, ${nonFrictionCount} routine support filtered. All cases processed!`;
+      ? `Processed ${rawInputs.length} cases: ${frictionCount} friction issues, ${nonFrictionCount} normal support. ${remainingCount} more cases remaining - click Analyze again to continue.`
+      : `Processed ${rawInputs.length} cases: ${frictionCount} friction issues, ${nonFrictionCount} normal support. All cases processed!`;
 
     return NextResponse.json({
       success: true,
       analyzed: insertedCards?.length || 0,
+      friction_count: frictionCount,
+      support_count: nonFrictionCount,
       processed: rawInputs.length, // Total cases processed in this batch
-      filtered: nonFrictionCount,
       remaining: remainingCount || 0,
       message
     });

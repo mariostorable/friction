@@ -96,6 +96,9 @@ export interface FrictionCard {
   severity: 1 | 2 | 3 | 4 | 5;
   sentiment: 'frustrated' | 'confused' | 'angry' | 'neutral' | 'satisfied' | null;
 
+  // Friction classification
+  is_friction: boolean; // True = systemic product/UX issue, False = normal support request
+
   // Explainability - KEY for user trust
   root_cause_hypothesis: string | null;
   evidence_snippets: string[];
