@@ -12,7 +12,13 @@ interface ProgressData {
   fix_rate_30d: number;
 }
 
-export default function AccountIssueProgress({ accountId }: { accountId: string }) {
+export default function AccountIssueProgress({
+  accountId,
+  onFilterChange
+}: {
+  accountId: string;
+  onFilterChange?: (filter: 'all' | 'fixed' | 'in_progress' | 'open') => void;
+}) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ProgressData | null>(null);
   const supabase = createClientComponentClient();
@@ -53,52 +59,71 @@ export default function AccountIssueProgress({ accountId }: { accountId: string 
   const remaining = data.open + data.in_progress;
   const percentFixed = ((data.fixed / data.total_issues) * 100).toFixed(0);
 
+  const handleFilterClick = (filter: 'all' | 'fixed' | 'in_progress' | 'open') => {
+    onFilterChange?.(filter);
+    // Scroll to friction cards section
+    const frictionSection = document.getElementById('friction-cards-section');
+    frictionSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <div className="mb-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-1">Issue Resolution Progress</h3>
         <p className="text-sm text-gray-600">
-          Your team's progress fixing customer-reported issues
+          Your team's progress fixing customer-reported issues (click to filter)
         </p>
       </div>
 
       {/* Summary Stats */}
       <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-gray-50 rounded-lg p-4">
+        <button
+          onClick={() => handleFilterClick('all')}
+          className="bg-gray-50 rounded-lg p-4 text-left hover:bg-gray-100 transition-colors cursor-pointer"
+        >
           <div className="flex items-center gap-2 mb-1">
             <AlertCircle className="w-4 h-4 text-gray-600" />
             <span className="text-xs font-medium text-gray-700">Total Issues</span>
           </div>
           <div className="text-2xl font-bold text-gray-900">{data.total_issues}</div>
           <div className="text-xs text-gray-600 mt-1">Customer-reported</div>
-        </div>
+        </button>
 
-        <div className="bg-green-50 rounded-lg p-4">
+        <button
+          onClick={() => handleFilterClick('fixed')}
+          className="bg-green-50 rounded-lg p-4 text-left hover:bg-green-100 transition-colors cursor-pointer"
+        >
           <div className="flex items-center gap-2 mb-1">
             <CheckCircle2 className="w-4 h-4 text-green-600" />
             <span className="text-xs font-medium text-green-700">Fixed</span>
           </div>
           <div className="text-2xl font-bold text-green-900">{data.fixed}</div>
           <div className="text-xs text-green-600 mt-1">{percentFixed}% resolved</div>
-        </div>
+        </button>
 
-        <div className="bg-blue-50 rounded-lg p-4">
+        <button
+          onClick={() => handleFilterClick('in_progress')}
+          className="bg-blue-50 rounded-lg p-4 text-left hover:bg-blue-100 transition-colors cursor-pointer"
+        >
           <div className="flex items-center gap-2 mb-1">
             <Rocket className="w-4 h-4 text-blue-600" />
             <span className="text-xs font-medium text-blue-700">In Progress</span>
           </div>
           <div className="text-2xl font-bold text-blue-900">{data.in_progress}</div>
           <div className="text-xs text-blue-600 mt-1">Being worked on</div>
-        </div>
+        </button>
 
-        <div className="bg-orange-50 rounded-lg p-4">
+        <button
+          onClick={() => handleFilterClick('open')}
+          className="bg-orange-50 rounded-lg p-4 text-left hover:bg-orange-100 transition-colors cursor-pointer"
+        >
           <div className="flex items-center gap-2 mb-1">
             <AlertCircle className="w-4 h-4 text-orange-600" />
             <span className="text-xs font-medium text-orange-700">Remaining</span>
           </div>
           <div className="text-2xl font-bold text-orange-900">{remaining}</div>
           <div className="text-xs text-orange-600 mt-1">To be addressed</div>
-        </div>
+        </button>
       </div>
 
       {/* Progress Bar */}

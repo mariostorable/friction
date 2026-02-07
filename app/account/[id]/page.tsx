@@ -40,6 +40,8 @@ export default function AccountDetailPage() {
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [showScoreExplanation, setShowScoreExplanation] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'fixed' | 'in_progress' | 'open'>('all');
+  const [themeJiraMap, setThemeJiraMap] = useState<Map<string, { status: string; key: string }>>(new Map());
   const [caseVolumeMetrics, setCaseVolumeMetrics] = useState({
     current: 0,
     accountAvg: 0,
@@ -132,6 +134,28 @@ export default function AccountDetailPage() {
         .eq('is_active', true);
 
       if (themesData) setThemes(themesData);
+
+      // Load theme-Jira mappings for issue resolution progress filtering
+      const { data: jiraLinksData } = await supabase
+        .from('theme_jira_links')
+        .select(`
+          theme_key,
+          jira_ticket_key,
+          jira_tickets(status)
+        `)
+        .eq('account_id', accountId);
+
+      if (jiraLinksData) {
+        const jiraMap = new Map<string, { status: string; key: string }>();
+        jiraLinksData.forEach((link: any) => {
+          const status = link.jira_tickets?.status || 'Open';
+          jiraMap.set(link.theme_key, {
+            status,
+            key: link.jira_ticket_key
+          });
+        });
+        setThemeJiraMap(jiraMap);
+      }
 
       // Calculate case volume metrics
       if (snapshotsData && snapshotsData.length > 0) {
@@ -413,6 +437,10 @@ export default function AccountDetailPage() {
     document.body.removeChild(link);
   }
 
+  function handleFilterChange(filter: 'all' | 'fixed' | 'in_progress' | 'open') {
+    setStatusFilter(filter);
+  }
+
   async function analyzeFriction() {
     if (!confirm('This will:\n1. Sync Salesforce Cases (last 90 days)\n2. Analyze unprocessed cases with Claude (processes in batches)\n3. Calculate OFI score\n4. Link friction themes to Jira tickets\n\nFor accounts with many cases, you may need to click Analyze multiple times. Continue?')) {
       return;
@@ -557,6 +585,34 @@ export default function AccountDetailPage() {
     date: new Date(s.snapshot_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
     ofi: s.ofi_score,
   }));
+
+  // Filter friction cards based on Jira status
+  const filteredFrictionCards = statusFilter === 'all'
+    ? frictionCards
+    : frictionCards.filter(card => {
+        const jiraInfo = themeJiraMap.get(card.theme_key);
+
+        if (!jiraInfo) {
+          // Cards without Jira tickets are considered "open"
+          return statusFilter === 'open';
+        }
+
+        const status = jiraInfo.status.toLowerCase();
+
+        if (statusFilter === 'fixed') {
+          return status === 'done' || status === 'closed' || status === 'resolved';
+        }
+
+        if (statusFilter === 'in_progress') {
+          return status === 'in progress' || status === 'in development' || status === 'in review';
+        }
+
+        if (statusFilter === 'open') {
+          return status === 'to do' || status === 'backlog' || status === 'open' || status === 'new';
+        }
+
+        return false;
+      });
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -922,7 +978,10 @@ export default function AccountDetailPage() {
 
         {/* Issue Resolution Progress */}
         <div className="mb-6">
-          <AccountIssueProgress accountId={accountId} />
+          <AccountIssueProgress
+            accountId={accountId}
+            onFilterChange={handleFilterChange}
+          />
         </div>
 
         {/* Support & Roadmap */}
@@ -967,32 +1026,53 @@ export default function AccountDetailPage() {
         </div>
 
         {/* Friction Signals with Smart Clustering */}
-        {themeFilter && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Info className="w-5 h-5 text-blue-600" />
-              <div>
-                <p className="text-sm font-medium text-blue-900">
-                  Filtered by theme: {themeFilter.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
-                </p>
-                <p className="text-xs text-blue-700">
-                  Showing {frictionCards.filter(card => card.theme_key === themeFilter).length} of {frictionCards.length} friction cards
-                </p>
+        <div id="friction-cards-section">
+          {(themeFilter || statusFilter !== 'all') && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Info className="w-5 h-5 text-blue-600" />
+                <div>
+                  {themeFilter && (
+                    <>
+                      <p className="text-sm font-medium text-blue-900">
+                        Filtered by theme: {themeFilter.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                      </p>
+                      <p className="text-xs text-blue-700">
+                        Showing {frictionCards.filter(card => card.theme_key === themeFilter).length} of {frictionCards.length} friction cards
+                      </p>
+                    </>
+                  )}
+                  {statusFilter !== 'all' && !themeFilter && (
+                    <>
+                      <p className="text-sm font-medium text-blue-900">
+                        Filtered by status: {statusFilter === 'in_progress' ? 'In Progress' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
+                      </p>
+                      <p className="text-xs text-blue-700">
+                        Showing {filteredFrictionCards.length} of {frictionCards.length} friction cards
+                      </p>
+                    </>
+                  )}
+                </div>
               </div>
+              <button
+                onClick={() => {
+                  if (themeFilter) {
+                    router.push(`/account/${accountId}`);
+                  }
+                  setStatusFilter('all');
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-700 bg-white rounded-lg hover:bg-blue-100 border border-blue-300"
+              >
+                <X className="w-4 h-4" />
+                Clear Filter
+              </button>
             </div>
-            <button
-              onClick={() => router.push(`/account/${accountId}`)}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-700 bg-white rounded-lg hover:bg-blue-100 border border-blue-300"
-            >
-              <X className="w-4 h-4" />
-              Clear Filter
-            </button>
-          </div>
-        )}
-        <FrictionClusters
-          frictionCards={themeFilter ? frictionCards.filter(card => card.theme_key === themeFilter) : frictionCards}
-          themes={themes}
-        />
+          )}
+          <FrictionClusters
+            frictionCards={themeFilter ? frictionCards.filter(card => card.theme_key === themeFilter) : filteredFrictionCards}
+            themes={themes}
+          />
+        </div>
       </main>
 
       {/* Analysis Result Modal */}
