@@ -404,7 +404,7 @@ export async function POST(request: NextRequest) {
           accountLinksToCreate.push({
             user_id: userId,
             account_id: accountId,
-            jira_key: issue.jira_key,
+            jira_issue_id: issue.id,
             match_confidence: 1.0 // 100% confidence
           });
         }
@@ -460,7 +460,7 @@ export async function POST(request: NextRequest) {
           themeBasedAccountLinks.push({
             user_id: userId,
             account_id: accountId,
-            jira_key: themeLink.jira_key,
+            jira_issue_id: themeLink.jira_issue_id,
             match_confidence: 0.7 // Medium confidence - linked via theme
           });
         });
@@ -473,11 +473,16 @@ export async function POST(request: NextRequest) {
     // Batch insert account links (includes both direct Case ID links AND theme-based links)
     let accountLinksCreated = 0;
     if (accountLinksToCreate.length > 0) {
-      const { data: createdAccountLinks } = await supabaseAdmin
+      const { data: createdAccountLinks, error: accountLinksError } = await supabaseAdmin
         .from('account_jira_links')
-        .upsert(accountLinksToCreate, { onConflict: 'user_id,account_id,jira_key', ignoreDuplicates: true })
+        .upsert(accountLinksToCreate, { onConflict: 'account_id,jira_issue_id', ignoreDuplicates: true })
         .select();
-      accountLinksCreated = createdAccountLinks?.length || accountLinksToCreate.length;
+
+      if (accountLinksError) {
+        console.error('Failed to create account links:', accountLinksError);
+      }
+
+      accountLinksCreated = createdAccountLinks?.length || 0;
     }
 
     const issuesSynced = allIssues.length; // Use actual fetched count, not DB return count
@@ -709,7 +714,7 @@ function getAccountLinks(userId: string, issue: any, accounts: any[]): any[] {
       links.push({
         user_id: userId,
         account_id: account.id,
-        jira_key: issue.jira_key,
+        jira_issue_id: issue.id,
         match_confidence: 0.9
       });
     }
