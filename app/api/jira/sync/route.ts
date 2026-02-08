@@ -234,6 +234,18 @@ export async function POST(request: NextRequest) {
       const allFieldKeys = Object.keys(issue.fields || {});
       const totalCustomFields = allFieldKeys.filter(k => k.startsWith('customfield_')).length;
 
+      // DEBUG: Check for customfield_17254 specifically
+      const field17254 = issue.fields['customfield_17254'];
+      if (field17254 !== undefined) {
+        console.log(`DEBUG ${issue.key}: customfield_17254 EXISTS in raw data`);
+        console.log(`DEBUG ${issue.key}: customfield_17254 type = ${typeof field17254}`);
+        console.log(`DEBUG ${issue.key}: customfield_17254 value = ${JSON.stringify(field17254)?.substring(0, 200)}`);
+        console.log(`DEBUG ${issue.key}: customfield_17254 is null? ${field17254 === null}`);
+        console.log(`DEBUG ${issue.key}: customfield_17254 is empty string? ${field17254 === ''}`);
+      } else {
+        console.log(`DEBUG ${issue.key}: customfield_17254 is UNDEFINED (not present in response)`);
+      }
+
       Object.entries(issue.fields || {}).forEach(([key, value]) => {
         // Capture customfields AND Salesforce fields
         const isCustomField = key.startsWith('customfield_');
