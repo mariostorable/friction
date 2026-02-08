@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
       console.log(`Fetching from startAt=${startAt}, maxResults=${maxResults}`);
 
       const jiraResponse = await fetch(
-        `${integration.instance_url}/rest/api/3/search?jql=${encodeURIComponent(jql)}&startAt=${startAt}&maxResults=${maxResults}&fields=*all`,
+        `${integration.instance_url}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&startAt=${startAt}&maxResults=${maxResults}&fields=*all`,
         {
           headers: {
             'Authorization': jiraAuthHeader,
