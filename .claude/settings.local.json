@@ -18,7 +18,8 @@
       "Bash(grep:*)",
       "Bash(vercel ls:*)",
       "Bash(git push:*)",
-      "Bash(vercel logs:*)"
+      "Bash(vercel logs:*)",
+      "Bash(find:*)"
     ]
   }
 }

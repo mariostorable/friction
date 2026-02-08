@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch recent issues from Jira with pagination
     // Limit to avoid Vercel timeout (10s on Hobby plan)
-    const MAX_ISSUES_PER_SYNC = 200; // Process most recent 200 issues per sync
+    const MAX_ISSUES_PER_SYNC = 500; // Process up to 500 issues per sync
     const jql = `updated >= -90d ORDER BY updated DESC`;
     const maxResults = 100; // Jira's max per request
     let startAt = 0;
@@ -212,11 +212,12 @@ export async function POST(request: NextRequest) {
 
       // Continue if we got a full page AND haven't hit our limit
       hasMorePages = fetchedCount === maxResults && allIssues.length < MAX_ISSUES_PER_SYNC;
+      console.log(`Pagination check: fetchedCount=${fetchedCount}, maxResults=${maxResults}, allIssues.length=${allIssues.length}, MAX=${MAX_ISSUES_PER_SYNC}, hasMorePages=${hasMorePages}`);
       startAt += maxResults;
 
     } while (hasMorePages);
 
-    console.log(`Finished fetching ${allIssues.length} Jira issues`);
+    console.log(`Finished fetching ${allIssues.length} Jira issues (${totalIssues} total available)`);
 
     // If we never got a total count, use the actual number we fetched
     if (totalIssues === 0 && allIssues.length > 0) {
