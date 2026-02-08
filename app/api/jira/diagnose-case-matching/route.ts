@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     console.log('\n=== DIAGNOSTIC: Salesforce Case → Jira Matching ===\n');
 
     // Step 1: Get friction cards with Salesforce Case IDs (what we're looking FOR)
-    const { data: frictionCardsWithCases } = await supabaseAdmin
+    const { data: frictionCardsWithCases, error: frictionError } = await supabaseAdmin
       .from('friction_cards')
       .select(`
         id,
@@ -35,6 +35,14 @@ export async function GET(request: NextRequest) {
       .eq('is_friction', true)
       .not('raw_inputs.source_id', 'is', null)
       .limit(100);
+
+    if (frictionError) {
+      console.error('Error fetching friction cards:', frictionError);
+      return NextResponse.json({
+        error: 'Failed to fetch friction cards',
+        details: frictionError.message
+      }, { status: 500 });
+    }
 
     // Build the same map the sync code uses
     const caseIdToThemes = new Map<string, Set<string>>();
@@ -58,12 +66,20 @@ export async function GET(request: NextRequest) {
     console.log('Sample Salesforce Case IDs:', sampleCaseIds.join(', '));
 
     // Step 2: Get Jira tickets with custom fields (what we're searching IN)
-    const { data: jiraIssues } = await supabaseAdmin
+    const { data: jiraIssues, error: jiraError } = await supabaseAdmin
       .from('jira_issues')
       .select('id, jira_key, summary, description, metadata')
       .eq('user_id', userId)
       .not('metadata->custom_fields', 'is', null)
       .limit(200);
+
+    if (jiraError) {
+      console.error('Error fetching Jira issues:', jiraError);
+      return NextResponse.json({
+        error: 'Failed to fetch Jira issues',
+        details: jiraError.message
+      }, { status: 500 });
+    }
 
     console.log(`Found ${jiraIssues?.length || 0} Jira tickets with custom fields`);
 
@@ -203,7 +219,8 @@ export async function GET(request: NextRequest) {
     console.error('Diagnostic error:', error);
     return NextResponse.json({
       error: 'Diagnostic failed',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      details: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
     }, { status: 500 });
   }
 }

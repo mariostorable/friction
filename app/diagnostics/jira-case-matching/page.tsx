@@ -13,12 +13,15 @@ export default function JiraCaseMatchingDiagnostic() {
     async function fetchDiagnostic() {
       try {
         const response = await fetch('/api/jira/diagnose-case-matching');
-        if (!response.ok) {
-          throw new Error('Failed to fetch diagnostic data');
-        }
         const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || result.details || `HTTP ${response.status}: Failed to fetch diagnostic data`);
+        }
+
         setData(result);
       } catch (err) {
+        console.error('Diagnostic fetch error:', err);
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
         setLoading(false);
