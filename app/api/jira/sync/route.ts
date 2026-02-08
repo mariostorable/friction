@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
       console.log(`Fetching from startAt=${startAt}, maxResults=${maxResults}`);
 
       const jiraResponse = await fetch(
-        `${integration.instance_url}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&startAt=${startAt}&maxResults=${maxResults}&fields=summary,description,status,priority,assignee,labels,created,updated,resolutiondate,resolution,comment,sprint,components,fixVersions,parent,issuetype,reporter,customfield_*`,
+        `${integration.instance_url}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&startAt=${startAt}&maxResults=${maxResults}&fields=*all`,
         {
           headers: {
             'Authorization': jiraAuthHeader,
@@ -213,11 +213,16 @@ export async function POST(request: NextRequest) {
       const reporterName = issue.fields.reporter?.displayName || null;
       const reporterEmail = issue.fields.reporter?.emailAddress || null;
 
-      // Extract all custom fields for discovery
+      // Extract ALL fields including Salesforce fields (not just customfield_*)
       const customFields: Record<string, any> = {};
       Object.entries(issue.fields || {}).forEach(([key, value]) => {
-        if (key.startsWith('customfield_') && value !== null && value !== undefined && value !== '') {
-          // Store custom field with simplified value
+        // Capture customfields AND Salesforce fields
+        const isCustomField = key.startsWith('customfield_');
+        const isSalesforceField = key.toLowerCase().includes('salesforce') ||
+                                   key.toLowerCase().includes('client');
+
+        if ((isCustomField || isSalesforceField) && value !== null && value !== undefined && value !== '') {
+          // Store field with simplified value
           if (typeof value === 'object') {
             // For objects, try to extract meaningful value
             const objValue = value as any;
@@ -351,19 +356,30 @@ export async function POST(request: NextRequest) {
       const customFields = issue.metadata?.custom_fields || {};
       let salesforceCaseId: string | null = null;
 
-      // Look for Salesforce Case ID in custom fields
+      // Look for Salesforce Case ID in all captured fields
       // Common field names: Case ID, Salesforce Case, SF Case, Case Number, etc.
       for (const [key, value] of Object.entries(customFields)) {
-        if (value && typeof value === 'string') {
-          const fieldValue = value.toString();
+        if (!value) continue;
 
-          // Check if this looks like a Salesforce Case ID (format: 500XXXXXXXXXXXXX)
-          if (fieldValue.match(/^500[a-zA-Z0-9]{15}$/) ||
-              fieldValue.match(/^500[a-zA-Z0-9]{12}$/)) {
-            salesforceCaseId = fieldValue;
-            console.log(`Found Salesforce Case ID in ${key}: ${salesforceCaseId}`);
+        const fieldValue = value.toString();
+        const keyLower = key.toLowerCase();
+
+        // Check if field name suggests it contains Case ID
+        if (keyLower.includes('salesforce') && (keyLower.includes('case') || keyLower.includes('number'))) {
+          // Extract first Case ID from value (might be pipe-separated like "03717747 | 03718049")
+          const caseMatch = fieldValue.match(/\b\d{8}\b/); // 8-digit numeric case number
+          if (caseMatch) {
+            salesforceCaseId = caseMatch[0];
+            console.log(`Found Salesforce Case Number in ${key}: ${salesforceCaseId}`);
             break;
           }
+        }
+
+        // Also check for 15/18-char Salesforce IDs (format: 500XXXXXXXXXXXXX)
+        if (fieldValue.match(/^500[a-zA-Z0-9]{12,15}$/)) {
+          salesforceCaseId = fieldValue;
+          console.log(`Found Salesforce Case ID in ${key}: ${salesforceCaseId}`);
+          break;
         }
       }
 
