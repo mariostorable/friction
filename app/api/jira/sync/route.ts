@@ -353,20 +353,46 @@ export async function POST(request: NextRequest) {
 
     console.log(`Stored ${insertedIssues?.length || 0} Jira issues`);
 
-    // Get actual friction themes from the system (not hardcoded!)
+    // Get actual friction cards with their Salesforce Case IDs for direct linking
     // IMPORTANT: Only link Jira tickets to real friction (not normal support)
-    const { data: frictionCards } = await supabaseAdmin
+    const { data: frictionCardsWithCases } = await supabaseAdmin
       .from('friction_cards')
-      .select('theme_key')
+      .select(`
+        id,
+        theme_key,
+        account_id,
+        raw_input:raw_inputs!inner(source_id)
+      `)
       .eq('user_id', userId)
-      .eq('is_friction', true); // Only real friction, not normal support
+      .eq('is_friction', true) // Only real friction, not normal support
+      .not('raw_inputs.source_id', 'is', null); // Only cards with Salesforce Case IDs
 
-    const actualThemes = Array.from(new Set(frictionCards?.map((c: any) => c.theme_key) || []));
-    console.log(`Found ${actualThemes.length} actual friction themes for matching:`, actualThemes);
+    // Build map: Salesforce Case ID → Friction Themes
+    const caseIdToThemes = new Map<string, Set<string>>();
+    const caseIdToAccountId = new Map<string, string>();
+
+    frictionCardsWithCases?.forEach((card: any) => {
+      const caseId = card.raw_input?.source_id;
+      if (caseId) {
+        if (!caseIdToThemes.has(caseId)) {
+          caseIdToThemes.set(caseId, new Set());
+        }
+        caseIdToThemes.get(caseId)!.add(card.theme_key);
+        caseIdToAccountId.set(caseId, card.account_id);
+      }
+    });
+
+    console.log(`Built case mapping: ${caseIdToThemes.size} Salesforce Cases with friction themes`);
+
+    // Also get actual themes for fallback keyword matching
+    const actualThemes = Array.from(new Set(frictionCardsWithCases?.map((c: any) => c.theme_key) || []));
+    console.log(`Found ${actualThemes.length} actual friction themes`);
 
     // Batch link creation for better performance
     const themeLinksToCreate: any[] = [];
     const accountLinksToCreate: any[] = [];
+    let directLinksCount = 0;
+    let keywordLinksCount = 0;
 
     // Get all Top 25 accounts for name matching
     const { data: accounts } = await supabaseAdmin
@@ -377,14 +403,71 @@ export async function POST(request: NextRequest) {
 
     // Collect all links to create (batch processing)
     for (const issue of insertedIssues || []) {
-      // Get theme links using ONLY actual themes from Salesforce (not hardcoded ones)
-      const actualThemeLinks = getThemeLinksFromActualThemes(userId, issue, actualThemes);
-      themeLinksToCreate.push(...actualThemeLinks);
+      // STRATEGY 1 (BEST): Direct link via Salesforce Case ID
+      // Check if this Jira ticket has a Salesforce Case ID in custom fields
+      const customFields = issue.metadata?.custom_fields || {};
+      let salesforceCaseId: string | null = null;
 
-      // Get account links for this issue
+      // Look for Salesforce Case ID in custom fields
+      // Common field names: Case ID, Salesforce Case, SF Case, Case Number, etc.
+      for (const [key, value] of Object.entries(customFields)) {
+        if (value && typeof value === 'string') {
+          const fieldValue = value.toString();
+
+          // Check if this looks like a Salesforce Case ID (format: 500XXXXXXXXXXXXX)
+          if (fieldValue.match(/^500[a-zA-Z0-9]{15}$/) ||
+              fieldValue.match(/^500[a-zA-Z0-9]{12}$/)) {
+            salesforceCaseId = fieldValue;
+            console.log(`Found Salesforce Case ID in ${key}: ${salesforceCaseId}`);
+            break;
+          }
+        }
+      }
+
+      // If we found a Case ID and have themes for it, create DIRECT links
+      if (salesforceCaseId && caseIdToThemes.has(salesforceCaseId)) {
+        const themes = Array.from(caseIdToThemes.get(salesforceCaseId)!);
+        const accountId = caseIdToAccountId.get(salesforceCaseId);
+
+        themes.forEach(themeKey => {
+          themeLinksToCreate.push({
+            user_id: userId,
+            jira_issue_id: issue.id,
+            theme_key: themeKey,
+            jira_key: issue.jira_key,
+            match_type: 'salesforce_case', // NEW: Direct link via Case ID
+            confidence: 1.0 // 100% confidence - it's a direct link!
+          });
+        });
+
+        // Also link to the account directly
+        if (accountId) {
+          accountLinksToCreate.push({
+            user_id: userId,
+            account_id: accountId,
+            jira_key: issue.jira_key,
+            match_confidence: 1.0 // 100% confidence
+          });
+        }
+
+        directLinksCount++;
+        console.log(`Direct link: ${issue.jira_key} → Case ${salesforceCaseId} → Themes: ${themes.join(', ')}`);
+        continue; // Skip keyword matching - we have a direct link!
+      }
+
+      // STRATEGY 2 (FALLBACK): Keyword matching (less accurate but better than nothing)
+      const keywordThemeLinks = getThemeLinksFromActualThemes(userId, issue, actualThemes);
+      themeLinksToCreate.push(...keywordThemeLinks);
+      if (keywordThemeLinks.length > 0) {
+        keywordLinksCount++;
+      }
+
+      // Get account links for this issue (name matching)
       const accountLinks = getAccountLinks(userId, issue, accounts || []);
       accountLinksToCreate.push(...accountLinks);
     }
+
+    console.log(`Link strategies: ${directLinksCount} direct (via Case ID), ${keywordLinksCount} keyword-based`);
 
     // Batch insert theme links
     let linksCreated = 0;
