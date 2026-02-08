@@ -422,7 +422,39 @@ export async function POST(request: NextRequest) {
       linksCreated = createdThemeLinks?.length || themeLinksToCreate.length;
     }
 
-    // Batch insert account links
+    // STRATEGY 3: Link accounts via themes (Jira→Theme→Account transitive linking)
+    // For each Jira ticket that matched a theme, link to accounts that have friction in that theme
+    console.log('Creating account links via theme associations...');
+
+    // Build map: theme_key → Set of account_ids that have friction in that theme
+    const themeToAccounts = new Map<string, Set<string>>();
+    frictionCardsWithCases?.forEach((card: any) => {
+      if (!themeToAccounts.has(card.theme_key)) {
+        themeToAccounts.set(card.theme_key, new Set());
+      }
+      themeToAccounts.get(card.theme_key)!.add(card.account_id);
+    });
+
+    // For each theme link, create account links to all accounts with that theme
+    const themeBasedAccountLinks: any[] = [];
+    for (const themeLink of themeLinksToCreate) {
+      const accountsForTheme = themeToAccounts.get(themeLink.theme_key);
+      if (accountsForTheme) {
+        accountsForTheme.forEach(accountId => {
+          themeBasedAccountLinks.push({
+            user_id: userId,
+            account_id: accountId,
+            jira_key: themeLink.jira_key,
+            match_confidence: 0.7 // Medium confidence - linked via theme
+          });
+        });
+      }
+    }
+
+    console.log(`Created ${themeBasedAccountLinks.length} account links via theme associations`);
+    accountLinksToCreate.push(...themeBasedAccountLinks);
+
+    // Batch insert account links (includes both direct Case ID links AND theme-based links)
     let accountLinksCreated = 0;
     if (accountLinksToCreate.length > 0) {
       const { data: createdAccountLinks } = await supabaseAdmin
