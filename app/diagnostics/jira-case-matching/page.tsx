@@ -61,15 +61,22 @@ export default function JiraCaseMatchingDiagnostic() {
 
         if (jiraError) throw jiraError;
 
-        // Step 3: Try to match
+        // Step 3: Comprehensive search
         const matches: any[] = [];
         const nonMatches: any[] = [];
         const customFieldSamples: any[] = [];
         const descriptionMatches: any[] = [];
+        const summaryMatches: any[] = [];
+        const allCustomFieldNames = new Set<string>();
+        const ticketsWithEightDigits: any[] = [];
 
         for (const issue of jiraIssues || []) {
           const customFields = issue.metadata?.custom_fields || {};
           const salesforceCaseIds: string[] = [];
+          const eightDigitLocations: string[] = [];
+
+          // Track all custom field names
+          Object.keys(customFields).forEach(key => allCustomFieldNames.add(key));
 
           // Extract 8-digit patterns from ALL custom fields
           for (const [key, value] of Object.entries(customFields)) {
@@ -79,15 +86,38 @@ export default function JiraCaseMatchingDiagnostic() {
             const caseMatches = fieldValue.match(/\b\d{8}\b/g);
             if (caseMatches) {
               salesforceCaseIds.push(...caseMatches);
+              eightDigitLocations.push(`custom_field: ${key}`);
             }
 
-            if (customFieldSamples.length < 5) {
+            if (customFieldSamples.length < 20) {
               customFieldSamples.push({
                 jira_key: issue.jira_key,
                 field_name: key,
                 field_value: fieldValue.substring(0, 200),
                 has_8_digits: !!caseMatches
               });
+            }
+          }
+
+          // Check summary field
+          if (issue.summary) {
+            const summaryCaseMatches = issue.summary.match(/\b\d{8}\b/g);
+            if (summaryCaseMatches) {
+              const uniqueSummaryMatches = Array.from(new Set(summaryCaseMatches));
+              for (const caseIdMatch of uniqueSummaryMatches) {
+                const caseId = String(caseIdMatch);
+                salesforceCaseIds.push(caseId);
+                eightDigitLocations.push('summary');
+                if (caseIdToThemes.has(caseId)) {
+                  summaryMatches.push({
+                    jira_key: issue.jira_key,
+                    summary: issue.summary,
+                    case_id_in_summary: caseId,
+                    themes: Array.from(caseIdToThemes.get(caseId)!),
+                    note: 'Found in summary field'
+                  });
+                }
+              }
             }
           }
 
@@ -112,6 +142,17 @@ export default function JiraCaseMatchingDiagnostic() {
           }
 
           const uniqueCaseIds = Array.from(new Set(salesforceCaseIds));
+
+          // Track tickets with 8-digit patterns
+          if (uniqueCaseIds.length > 0) {
+            ticketsWithEightDigits.push({
+              jira_key: issue.jira_key,
+              summary: issue.summary.substring(0, 100),
+              case_ids: uniqueCaseIds,
+              locations: eightDigitLocations,
+              matches_friction: uniqueCaseIds.some(id => caseIdToThemes.has(id))
+            });
+          }
 
           // Check matches
           let foundMatch = false;
@@ -151,27 +192,38 @@ export default function JiraCaseMatchingDiagnostic() {
             total_friction_cards: frictionCardsWithCases?.length || 0,
             unique_case_ids_in_map: caseIdToThemes.size,
             jira_tickets_with_custom_fields: jiraIssues?.length || 0,
+            tickets_with_8_digit_patterns: ticketsWithEightDigits.length,
             matches_found_in_custom_fields: matches.length,
             matches_found_in_descriptions: descriptionMatches.length,
-            non_matches: nonMatches.length
+            matches_found_in_summary: summaryMatches.length,
+            non_matches: nonMatches.length,
+            unique_custom_field_names: allCustomFieldNames.size
           },
           sample_case_ids: sampleCaseIds.slice(0, 10),
           case_id_formats: caseIdFormats.slice(0, 10),
           custom_field_samples: customFieldSamples,
+          all_custom_field_names: Array.from(allCustomFieldNames).sort(),
+          tickets_with_8_digits: ticketsWithEightDigits.slice(0, 20),
           matches_via_custom_fields: matches.slice(0, 10),
           matches_via_description: descriptionMatches.slice(0, 10),
+          matches_via_summary: summaryMatches.slice(0, 10),
           non_matches: nonMatches.slice(0, 10),
           diagnosis: {
             case_ids_available: caseIdToThemes.size > 0,
             jira_custom_fields_available: (jiraIssues?.length || 0) > 0,
+            eight_digit_patterns_found: ticketsWithEightDigits.length > 0,
             custom_field_matches_working: matches.length > 0,
             description_matches_found: descriptionMatches.length > 0,
+            summary_matches_found: summaryMatches.length > 0,
             possible_issues: [
-              matches.length === 0 && descriptionMatches.length > 0
-                ? 'Case IDs are in DESCRIPTION field, not custom fields - sync code needs update'
+              matches.length === 0 && (summaryMatches.length > 0 || descriptionMatches.length > 0)
+                ? 'Case IDs are in summary/description fields, not custom fields - sync code needs update'
                 : null,
-              matches.length === 0 && descriptionMatches.length === 0 && caseIdToThemes.size > 0 && (jiraIssues?.length || 0) > 0
-                ? 'Case IDs exist, Jira custom fields exist, but NO MATCHES - likely format mismatch or wrong field'
+              ticketsWithEightDigits.length > 0 && matches.length === 0 && descriptionMatches.length === 0 && summaryMatches.length === 0
+                ? `Found ${ticketsWithEightDigits.length} tickets with 8-digit patterns, but NONE match friction case IDs - the Jira tickets reference different cases`
+                : null,
+              ticketsWithEightDigits.length === 0 && (jiraIssues?.length || 0) > 0
+                ? 'NO 8-digit patterns found in ANY Jira tickets - case numbers are not in custom fields, summary, or description'
                 : null,
               caseIdToThemes.size === 0
                 ? 'No Salesforce case IDs found in friction_cards'
@@ -227,7 +279,7 @@ export default function JiraCaseMatchingDiagnostic() {
         {/* Summary */}
         <div className="bg-white p-6 rounded-lg shadow">
           <h2 className="text-xl font-semibold mb-4">Summary</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
               <div className="text-sm text-gray-600">Friction Cards</div>
               <div className="text-2xl font-bold">{data.summary.total_friction_cards}</div>
@@ -237,8 +289,12 @@ export default function JiraCaseMatchingDiagnostic() {
               <div className="text-2xl font-bold">{data.summary.unique_case_ids_in_map}</div>
             </div>
             <div>
-              <div className="text-sm text-gray-600">Jira w/ Custom Fields</div>
+              <div className="text-sm text-gray-600">Jira Tickets</div>
               <div className="text-2xl font-bold">{data.summary.jira_tickets_with_custom_fields}</div>
+            </div>
+            <div className="bg-purple-50 p-4 rounded">
+              <div className="text-sm text-purple-700">Tickets w/ 8-Digit Patterns</div>
+              <div className="text-2xl font-bold text-purple-900">{data.summary.tickets_with_8_digit_patterns}</div>
             </div>
             <div className="bg-green-50 p-4 rounded">
               <div className="text-sm text-green-700">Matches (Custom Fields)</div>
@@ -247,6 +303,10 @@ export default function JiraCaseMatchingDiagnostic() {
             <div className="bg-blue-50 p-4 rounded">
               <div className="text-sm text-blue-700">Matches (Description)</div>
               <div className="text-2xl font-bold text-blue-900">{data.summary.matches_found_in_descriptions}</div>
+            </div>
+            <div className="bg-teal-50 p-4 rounded">
+              <div className="text-sm text-teal-700">Matches (Summary)</div>
+              <div className="text-2xl font-bold text-teal-900">{data.summary.matches_found_in_summary}</div>
             </div>
             <div className="bg-yellow-50 p-4 rounded">
               <div className="text-sm text-yellow-700">Non-Matches</div>
@@ -281,6 +341,50 @@ export default function JiraCaseMatchingDiagnostic() {
             ))}
           </div>
         </div>
+
+        {/* All Custom Field Names */}
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-4">All Custom Field Names ({data.summary.unique_custom_field_names} total)</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+            {data.all_custom_field_names?.map((fieldName: string, idx: number) => (
+              <div key={idx} className="font-mono text-xs bg-gray-50 p-2 rounded truncate" title={fieldName}>
+                {fieldName}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Tickets with 8-Digit Patterns */}
+        {data.tickets_with_8_digits && data.tickets_with_8_digits.length > 0 && (
+          <div className="bg-purple-50 border border-purple-200 p-6 rounded-lg">
+            <h2 className="text-xl font-semibold mb-4 text-purple-900">
+              Tickets with 8-Digit Patterns ({data.summary.tickets_with_8_digit_patterns} found)
+            </h2>
+            <div className="space-y-3">
+              {data.tickets_with_8_digits.map((ticket: any, idx: number) => (
+                <div key={idx} className={`bg-white p-4 rounded border ${ticket.matches_friction ? 'border-green-500' : 'border-gray-200'}`}>
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="font-mono text-sm font-bold">{ticket.jira_key}</span>
+                    {ticket.matches_friction && (
+                      <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-800">
+                        ✓ Matches Friction Case
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-sm text-gray-700 mb-2">{ticket.summary}</div>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <span className="bg-gray-100 px-2 py-1 rounded">
+                      Case IDs: <span className="font-mono font-bold">{ticket.case_ids.join(', ')}</span>
+                    </span>
+                    <span className="bg-blue-100 px-2 py-1 rounded">
+                      Found in: {ticket.locations.join(', ')}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Custom Field Samples */}
         <div className="bg-white p-6 rounded-lg shadow">
@@ -336,6 +440,26 @@ export default function JiraCaseMatchingDiagnostic() {
                     <span>Themes: {match.themes.join(', ')}</span>
                   </div>
                   <div className="mt-2 text-xs text-blue-700">{match.note}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Matches via Summary */}
+        {data.matches_via_summary && data.matches_via_summary.length > 0 && (
+          <div className="bg-teal-50 border border-teal-200 p-6 rounded-lg">
+            <h2 className="text-xl font-semibold mb-4 text-teal-900">✓ Matches Found (Summary Field)</h2>
+            <div className="space-y-3">
+              {data.matches_via_summary.map((match: any, idx: number) => (
+                <div key={idx} className="bg-white p-4 rounded border border-teal-200">
+                  <div className="font-mono text-sm font-bold mb-2">{match.jira_key}</div>
+                  <div className="text-sm text-gray-700 mb-2">{match.summary}</div>
+                  <div className="flex gap-4 text-sm">
+                    <span>Case ID: <span className="font-mono font-bold">{match.case_id_in_summary}</span></span>
+                    <span>Themes: {match.themes.join(', ')}</span>
+                  </div>
+                  <div className="mt-2 text-xs text-teal-700">{match.note}</div>
                 </div>
               ))}
             </div>
