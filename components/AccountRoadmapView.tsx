@@ -226,7 +226,7 @@ export default function AccountRoadmapView() {
 
                     {/* Empty state for each tab */}
                     {expandedStatus === 'resolved' && account.resolved.length === 0 && (
-                      <p className="text-sm text-gray-500 text-center py-4">No resolved tickets in the last 7 days</p>
+                      <p className="text-sm text-gray-500 text-center py-4">No resolved tickets in the last 14 days</p>
                     )}
                     {expandedStatus === 'in_progress' && account.in_progress.length === 0 && (
                       <p className="text-sm text-gray-500 text-center py-4">No tickets in progress</p>

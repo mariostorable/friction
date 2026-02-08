@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
 
     // Categorize issues and calculate counts for each account
     const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
 
     const accountSummaries = Object.values(accountIssues)
       .filter(entry => entry.issues.length > 0) // Only accounts with issues
@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
         entry.issues.forEach(issue => {
           if (issue.resolution_date) {
             const resolvedDate = new Date(issue.resolution_date);
-            if (resolvedDate >= sevenDaysAgo) {
+            if (resolvedDate >= fourteenDaysAgo) {
               resolved.push(issue);
             }
           } else {
