@@ -452,6 +452,7 @@ export async function POST(request: NextRequest) {
                 user_id: userId,
                 account_id: accountId,
                 jira_issue_id: issue.id,
+                match_type: 'salesforce_case',
                 match_confidence: 1.0
               });
             }
@@ -512,6 +513,7 @@ export async function POST(request: NextRequest) {
             user_id: userId,
             account_id: accountId,
             jira_issue_id: themeLink.jira_issue_id,
+            match_type: 'theme_association',
             match_confidence: 0.7 // Medium confidence - linked via theme
           });
         });
@@ -766,6 +768,7 @@ function getAccountLinks(userId: string, issue: any, accounts: any[]): any[] {
         user_id: userId,
         account_id: account.id,
         jira_issue_id: issue.id,
+        match_type: 'account_name',
         match_confidence: 0.9
       });
     }
