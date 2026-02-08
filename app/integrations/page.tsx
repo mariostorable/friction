@@ -5,6 +5,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, CheckCircle, XCircle, Settings, ExternalLink, Activity, RefreshCw } from 'lucide-react';
 import JiraFieldDiscovery from '@/components/JiraFieldDiscovery';
+import JiraCleanupButton from '@/components/JiraCleanupButton';
 
 interface Integration {
   id: string;
@@ -403,10 +404,20 @@ export default function IntegrationsPage() {
           </div>
         )}
 
-        {/* Jira Field Discovery - Only show if Jira is connected */}
+        {/* Jira Tools - Only show if Jira is connected */}
         {integrations.some(i => i.integration_type === 'jira' && i.status === 'active') && (
-          <div className="mt-8">
+          <div className="mt-8 space-y-4">
             <JiraFieldDiscovery />
+
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">
+                Reset Theme Links
+              </h3>
+              <p className="text-xs text-gray-600 mb-3">
+                Delete all existing theme-to-Jira links and re-sync to use updated theme matching logic
+              </p>
+              <JiraCleanupButton />
+            </div>
           </div>
         )}
       </main>
