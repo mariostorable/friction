@@ -356,23 +356,19 @@ export async function POST(request: NextRequest) {
       const customFields = issue.metadata?.custom_fields || {};
       const salesforceCaseIds: string[] = [];
 
-      // Look for Salesforce Case ID in all captured fields
-      // Common field names: Case ID, Salesforce Case, SF Case, Case Number, etc.
+      // Look for Salesforce Case ID in ALL custom fields by checking the VALUE
+      // Don't filter by field name - just scan all field values for case numbers
       for (const [key, value] of Object.entries(customFields)) {
         if (!value) continue;
 
         const fieldValue = value.toString();
-        const keyLower = key.toLowerCase();
 
-        // Check if field name suggests it contains Case ID
-        if (keyLower.includes('salesforce') && (keyLower.includes('case') || keyLower.includes('number'))) {
-          // Extract ALL Case IDs from value (pipe-separated like "03717747 | 03718049 |")
-          const caseMatches = fieldValue.match(/\b\d{8}\b/g); // All 8-digit numeric case numbers
-          if (caseMatches) {
-            salesforceCaseIds.push(...caseMatches);
-            console.log(`Found ${caseMatches.length} Salesforce Case Number(s) in ${key}: ${caseMatches.join(', ')}`);
-            break;
-          }
+        // Check if VALUE contains 8-digit case numbers (format: 03717747)
+        const caseMatches = fieldValue.match(/\b\d{8}\b/g);
+        if (caseMatches) {
+          salesforceCaseIds.push(...caseMatches);
+          console.log(`Found ${caseMatches.length} Salesforce Case Number(s) in ${key}: ${caseMatches.join(', ')}`);
+          // Don't break - keep looking in case multiple fields have case numbers
         }
 
         // Also check for 15/18-char Salesforce IDs (format: 500XXXXXXXXXXXXX)
@@ -380,9 +376,14 @@ export async function POST(request: NextRequest) {
         if (longIdMatch) {
           salesforceCaseIds.push(...longIdMatch);
           console.log(`Found ${longIdMatch.length} Salesforce Case ID(s) in ${key}: ${longIdMatch.join(', ')}`);
-          break;
+          // Don't break - keep looking
         }
       }
+
+      // Deduplicate case IDs
+      const uniqueCaseIds = Array.from(new Set(salesforceCaseIds));
+      salesforceCaseIds.length = 0;
+      salesforceCaseIds.push(...uniqueCaseIds);
 
       // If we found Case IDs, create DIRECT links for ALL of them
       if (salesforceCaseIds.length > 0) {
