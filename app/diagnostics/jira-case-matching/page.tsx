@@ -51,13 +51,12 @@ export default function JiraCaseMatchingDiagnostic() {
 
         const sampleCaseIds = Array.from(caseIdToThemes.keys()).slice(0, 20);
 
-        // Step 2: Get Jira tickets with custom fields
+        // Step 2: Get ALL Jira tickets (no limit to see full picture)
         const { data: jiraIssues, error: jiraError } = await supabase
           .from('jira_issues')
           .select('id, jira_key, summary, description, metadata')
           .eq('user_id', user.id)
-          .not('metadata->custom_fields', 'is', null)
-          .limit(200);
+          .not('metadata->custom_fields', 'is', null);
 
         if (jiraError) throw jiraError;
 
@@ -69,6 +68,8 @@ export default function JiraCaseMatchingDiagnostic() {
         const summaryMatches: any[] = [];
         const allCustomFieldNames = new Set<string>();
         const ticketsWithEightDigits: any[] = [];
+        const knownLinkedTickets = ['CRM-17', 'CRM-34', 'EDGE-4153', 'EDGE-4289', 'EDGE-4073', 'BUGS-11985'];
+        const foundKnownTickets: any[] = [];
 
         for (const issue of jiraIssues || []) {
           const customFields = issue.metadata?.custom_fields || {};
@@ -77,6 +78,17 @@ export default function JiraCaseMatchingDiagnostic() {
 
           // Track all custom field names
           Object.keys(customFields).forEach(key => allCustomFieldNames.add(key));
+
+          // Track if this is one of the known linked tickets from Looker dashboard
+          if (knownLinkedTickets.includes(issue.jira_key)) {
+            foundKnownTickets.push({
+              jira_key: issue.jira_key,
+              summary: issue.summary,
+              has_customfield_17254: !!customFields['customfield_17254'],
+              customfield_17254_value: customFields['customfield_17254'] || null,
+              all_custom_fields: Object.keys(customFields)
+            });
+          }
 
           // Extract 8-digit patterns from ALL custom fields
           for (const [key, value] of Object.entries(customFields)) {
@@ -197,8 +209,10 @@ export default function JiraCaseMatchingDiagnostic() {
             matches_found_in_descriptions: descriptionMatches.length,
             matches_found_in_summary: summaryMatches.length,
             non_matches: nonMatches.length,
-            unique_custom_field_names: allCustomFieldNames.size
+            unique_custom_field_names: allCustomFieldNames.size,
+            known_tickets_found: foundKnownTickets.length
           },
+          found_known_tickets: foundKnownTickets,
           sample_case_ids: sampleCaseIds.slice(0, 10),
           case_id_formats: caseIdFormats.slice(0, 10),
           custom_field_samples: customFieldSamples,
@@ -275,6 +289,39 @@ export default function JiraCaseMatchingDiagnostic() {
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-6xl mx-auto space-y-6">
         <h1 className="text-2xl font-bold">Salesforce → Jira Case Matching Diagnostic</h1>
+
+        {/* Known Linked Tickets (from Looker dashboard) */}
+        {data.found_known_tickets && data.found_known_tickets.length > 0 && (
+          <div className="bg-indigo-50 border-2 border-indigo-300 p-6 rounded-lg">
+            <h2 className="text-xl font-semibold mb-4 text-indigo-900">
+              🔍 Known Linked Tickets (from Looker Dashboard)
+            </h2>
+            <p className="text-sm text-indigo-700 mb-4">
+              Found {data.found_known_tickets.length} out of 6 tickets that Looker shows as linked to Salesforce cases
+            </p>
+            <div className="space-y-3">
+              {data.found_known_tickets.map((ticket: any, idx: number) => (
+                <div key={idx} className="bg-white p-4 rounded border border-indigo-200">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="font-mono text-sm font-bold">{ticket.jira_key}</span>
+                    <span className={`text-xs px-2 py-1 rounded ${ticket.has_customfield_17254 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {ticket.has_customfield_17254 ? '✓ Has customfield_17254' : '✗ No customfield_17254'}
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-700 mb-2">{ticket.summary}</div>
+                  {ticket.customfield_17254_value && (
+                    <div className="text-xs bg-gray-50 p-2 rounded mb-2">
+                      <span className="font-semibold">customfield_17254:</span> {ticket.customfield_17254_value}
+                    </div>
+                  )}
+                  <div className="text-xs text-gray-600">
+                    Custom fields present: {ticket.all_custom_fields.length}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Summary */}
         <div className="bg-white p-6 rounded-lg shadow">
