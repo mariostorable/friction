@@ -137,22 +137,26 @@ export default function AccountDetailPage() {
       if (themesData) setThemes(themesData);
 
       // Load theme-Jira mappings for issue resolution progress filtering
-      const { data: jiraLinksData } = await supabase
+      const { data: jiraLinksData, error: jiraLinksError } = await supabase
         .from('theme_jira_links')
         .select(`
           theme_key,
-          jira_ticket_key,
-          jira_tickets(status)
+          jira_key,
+          jira_issues(status)
         `)
-        .eq('account_id', accountId);
+        .eq('user_id', user?.id);
+
+      if (jiraLinksError) {
+        console.error('Error loading Jira links:', jiraLinksError);
+      }
 
       if (jiraLinksData) {
         const jiraMap = new Map<string, { status: string; key: string }>();
         jiraLinksData.forEach((link: any) => {
-          const status = link.jira_tickets?.status || 'Open';
+          const status = link.jira_issues?.status || 'Open';
           jiraMap.set(link.theme_key, {
             status,
-            key: link.jira_ticket_key
+            key: link.jira_key
           });
         });
         setThemeJiraMap(jiraMap);
