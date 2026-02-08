@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
       .from('portfolios')
       .select('account_ids')
       .eq('user_id', user.id)
-      .in('portfolio_type', ['top_25_edge', 'top_25_marine']);
+      .in('portfolio_type', ['top_25_edge', 'top_25_marine', 'top_25_sitelink']);
 
     if (!portfolios || portfolios.length === 0) {
       return NextResponse.json({ accounts: [] });
@@ -41,37 +41,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ accounts: [] });
     }
 
-    // Get friction cards for these accounts
-    const { data: frictionCards } = await supabase
-      .from('friction_cards')
-      .select('account_id, theme_key')
-      .in('account_id', Array.from(accountIds))
-      .eq('user_id', user.id);
-
-    // Group themes by account
-    const accountThemes: Record<string, Set<string>> = {};
-    frictionCards?.forEach(card => {
-      if (!accountThemes[card.account_id]) {
-        accountThemes[card.account_id] = new Set();
-      }
-      accountThemes[card.account_id].add(card.theme_key);
-    });
-
-    // Get all unique themes
-    const allThemes = new Set<string>();
-    Object.values(accountThemes).forEach(themes => {
-      themes.forEach(theme => allThemes.add(theme));
-    });
-
-    if (allThemes.size === 0) {
-      return NextResponse.json({ accounts: [] });
-    }
-
-    // Get Jira issues linked to these themes
-    const { data: jiraLinks } = await supabase
-      .from('theme_jira_links')
+    // Get Jira tickets linked to these accounts via account_jira_links table
+    const { data: accountJiraLinks, error: linksError } = await supabase
+      .from('account_jira_links')
       .select(`
-        theme_key,
+        account_id,
+        match_type,
+        match_confidence,
         jira_issues!inner(
           id,
           jira_key,
@@ -81,34 +57,58 @@ export async function GET(request: NextRequest) {
           issue_url
         )
       `)
-      .in('theme_key', Array.from(allThemes))
-      .eq('user_id', user.id);
-
-    // Build theme -> tickets mapping
-    const themeTickets: Record<string, any[]> = {};
-    jiraLinks?.forEach((link: any) => {
-      const theme = link.theme_key;
-      const ticket = link.jira_issues;
-      if (!themeTickets[theme]) {
-        themeTickets[theme] = [];
-      }
-      // Avoid duplicates
-      if (!themeTickets[theme].find(t => t.jira_key === ticket.jira_key)) {
-        themeTickets[theme].push(ticket);
-      }
-    });
-
-    // Get case counts for each theme-account combination
-    const { data: frictionCardCounts } = await supabase
-      .from('friction_cards')
-      .select('account_id, theme_key, id')
       .in('account_id', Array.from(accountIds))
       .eq('user_id', user.id);
 
-    const themeCaseCounts: Record<string, number> = {};
-    frictionCardCounts?.forEach(card => {
-      const key = `${card.account_id}-${card.theme_key}`;
-      themeCaseCounts[key] = (themeCaseCounts[key] || 0) + 1;
+    if (linksError) {
+      console.error('Error fetching account Jira links:', linksError);
+      return NextResponse.json({ accounts: [] });
+    }
+
+    if (!accountJiraLinks || accountJiraLinks.length === 0) {
+      return NextResponse.json({ accounts: [] });
+    }
+
+    // Get theme links for tickets (for display purposes)
+    const jiraIssueIds = new Set(accountJiraLinks.map((link: any) => link.jira_issues.id));
+    const { data: themeLinks } = await supabase
+      .from('theme_jira_links')
+      .select('jira_issue_id, theme_key')
+      .in('jira_issue_id', Array.from(jiraIssueIds))
+      .eq('user_id', user.id);
+
+    // Build ticket -> themes mapping
+    const ticketThemes = new Map<string, Set<string>>();
+    themeLinks?.forEach((link: any) => {
+      if (!ticketThemes.has(link.jira_issue_id)) {
+        ticketThemes.set(link.jira_issue_id, new Set());
+      }
+      ticketThemes.get(link.jira_issue_id)!.add(link.theme_key);
+    });
+
+    // Get case counts for each account-ticket combination
+    const { data: frictionCards } = await supabase
+      .from('friction_cards')
+      .select(`
+        account_id,
+        theme_key,
+        raw_input:raw_inputs!inner(source_id)
+      `)
+      .in('account_id', Array.from(accountIds))
+      .eq('user_id', user.id)
+      .eq('is_friction', true)
+      .not('raw_inputs.source_id', 'is', null);
+
+    // Build account -> case IDs mapping
+    const accountCaseIds = new Map<string, Set<string>>();
+    frictionCards?.forEach((card: any) => {
+      const caseId = card.raw_input?.source_id;
+      if (caseId) {
+        if (!accountCaseIds.has(card.account_id)) {
+          accountCaseIds.set(card.account_id, new Set());
+        }
+        accountCaseIds.get(card.account_id)!.add(caseId);
+      }
     });
 
     // Build account-level data
@@ -116,30 +116,22 @@ export async function GET(request: NextRequest) {
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     const accountData = accounts.map(account => {
-      const themes = accountThemes[account.id] || new Set();
+      const accountLinks = accountJiraLinks.filter((link: any) => link.account_id === account.id);
       const tickets = new Map<string, any>(); // jira_key -> ticket details
-      const ticketThemes = new Map<string, Set<string>>(); // jira_key -> themes
-      const ticketCaseCounts = new Map<string, number>(); // jira_key -> case count
 
       let resolved_7d = 0;
       let in_progress = 0;
       let open = 0;
 
-      // For each theme this account has, collect related tickets
-      themes.forEach(theme => {
-        const themeTicketList = themeTickets[theme] || [];
-        themeTicketList.forEach(ticket => {
-          if (!tickets.has(ticket.jira_key)) {
-            tickets.set(ticket.jira_key, ticket);
-            ticketThemes.set(ticket.jira_key, new Set());
-            ticketCaseCounts.set(ticket.jira_key, 0);
-          }
-          ticketThemes.get(ticket.jira_key)!.add(theme);
-
-          // Add case count for this theme-account combination
-          const caseCountKey = `${account.id}-${theme}`;
-          const caseCount = themeCaseCounts[caseCountKey] || 0;
-          ticketCaseCounts.set(ticket.jira_key, ticketCaseCounts.get(ticket.jira_key)! + caseCount);
+      accountLinks.forEach((link: any) => {
+        const ticket = link.jira_issues;
+        if (!tickets.has(ticket.jira_key)) {
+          tickets.set(ticket.jira_key, {
+            ...ticket,
+            themes: ticketThemes.get(ticket.id) || new Set(),
+            match_type: link.match_type,
+            match_confidence: link.match_confidence
+          });
 
           // Count ticket status
           if (ticket.resolution_date) {
@@ -155,16 +147,20 @@ export async function GET(request: NextRequest) {
               open++;
             }
           }
-        });
+        }
       });
+
+      const accountCases = accountCaseIds.get(account.id) || new Set();
 
       const ticketList = Array.from(tickets.values()).map(ticket => ({
         jira_key: ticket.jira_key,
         summary: ticket.summary,
         status: ticket.status,
         issue_url: ticket.issue_url,
-        theme_keys: Array.from(ticketThemes.get(ticket.jira_key) || []),
-        case_count: ticketCaseCounts.get(ticket.jira_key) || 0
+        theme_keys: Array.from(ticket.themes),
+        case_count: accountCases.size, // Total cases for this account
+        match_type: ticket.match_type,
+        match_confidence: ticket.match_confidence
       }));
 
       return {
