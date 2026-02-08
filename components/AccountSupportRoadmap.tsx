@@ -131,7 +131,7 @@ export default function AccountSupportRoadmap({ accountId }: { accountId: string
     );
   }
 
-  if (!data || (data.recentlyResolved.length === 0 && data.onRadar.length === 0 && data.shouldPrioritize.length === 0)) {
+  if (!data || !data.summary || (data.recentlyResolved.length === 0 && data.onRadar.length === 0 && data.shouldPrioritize.length === 0)) {
     return (
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-2">Support & Roadmap</h3>
