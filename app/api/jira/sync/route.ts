@@ -145,7 +145,12 @@ export async function POST(request: NextRequest) {
 
     // Paginate through all results
     let hasMorePages = true;
+    let loopIteration = 0;
     do {
+      loopIteration++;
+      console.log(`\n=== Pagination Loop Iteration #${loopIteration} ===`);
+      console.log(`Fetching from startAt=${startAt}, maxResults=${maxResults}`);
+
       const jiraResponse = await fetch(
         `${integration.instance_url}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&startAt=${startAt}&maxResults=${maxResults}&fields=summary,description,status,priority,assignee,labels,created,updated,resolutiondate,resolution,comment,sprint,components,fixVersions,parent,issuetype,reporter,customfield_*`,
         {
@@ -215,7 +220,14 @@ export async function POST(request: NextRequest) {
       console.log(`Pagination check: fetchedCount=${fetchedCount}, maxResults=${maxResults}, allIssues.length=${allIssues.length}, MAX=${MAX_ISSUES_PER_SYNC}, hasMorePages=${hasMorePages}`);
       startAt += maxResults;
 
+      if (!hasMorePages) {
+        console.log(`Stopping pagination: ${fetchedCount < maxResults ? 'got partial page' : 'reached limit'}`);
+      }
+
     } while (hasMorePages);
+
+    console.log(`\n=== Pagination Complete ===`);
+    console.log(`Total loop iterations: ${loopIteration}`);
 
     console.log(`Finished fetching ${allIssues.length} Jira issues (${totalIssues} total available)`);
 
