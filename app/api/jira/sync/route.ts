@@ -354,7 +354,7 @@ export async function POST(request: NextRequest) {
       // STRATEGY 1 (BEST): Direct link via Salesforce Case ID
       // Check if this Jira ticket has a Salesforce Case ID in custom fields
       const customFields = issue.metadata?.custom_fields || {};
-      let salesforceCaseId: string | null = null;
+      const salesforceCaseIds: string[] = [];
 
       // Look for Salesforce Case ID in all captured fields
       // Common field names: Case ID, Salesforce Case, SF Case, Case Number, etc.
@@ -366,52 +366,67 @@ export async function POST(request: NextRequest) {
 
         // Check if field name suggests it contains Case ID
         if (keyLower.includes('salesforce') && (keyLower.includes('case') || keyLower.includes('number'))) {
-          // Extract first Case ID from value (might be pipe-separated like "03717747 | 03718049")
-          const caseMatch = fieldValue.match(/\b\d{8}\b/); // 8-digit numeric case number
-          if (caseMatch) {
-            salesforceCaseId = caseMatch[0];
-            console.log(`Found Salesforce Case Number in ${key}: ${salesforceCaseId}`);
+          // Extract ALL Case IDs from value (pipe-separated like "03717747 | 03718049 |")
+          const caseMatches = fieldValue.match(/\b\d{8}\b/g); // All 8-digit numeric case numbers
+          if (caseMatches) {
+            salesforceCaseIds.push(...caseMatches);
+            console.log(`Found ${caseMatches.length} Salesforce Case Number(s) in ${key}: ${caseMatches.join(', ')}`);
             break;
           }
         }
 
         // Also check for 15/18-char Salesforce IDs (format: 500XXXXXXXXXXXXX)
-        if (fieldValue.match(/^500[a-zA-Z0-9]{12,15}$/)) {
-          salesforceCaseId = fieldValue;
-          console.log(`Found Salesforce Case ID in ${key}: ${salesforceCaseId}`);
+        const longIdMatch = fieldValue.match(/\b500[a-zA-Z0-9]{12,15}\b/g);
+        if (longIdMatch) {
+          salesforceCaseIds.push(...longIdMatch);
+          console.log(`Found ${longIdMatch.length} Salesforce Case ID(s) in ${key}: ${longIdMatch.join(', ')}`);
           break;
         }
       }
 
-      // If we found a Case ID and have themes for it, create DIRECT links
-      if (salesforceCaseId && caseIdToThemes.has(salesforceCaseId)) {
-        const themes = Array.from(caseIdToThemes.get(salesforceCaseId)!);
-        const accountId = caseIdToAccountId.get(salesforceCaseId);
+      // If we found Case IDs, create DIRECT links for ALL of them
+      if (salesforceCaseIds.length > 0) {
+        let hasDirectLink = false;
+        const allThemes = new Set<string>();
+        const allAccountIds = new Set<string>();
 
-        themes.forEach(themeKey => {
-          themeLinksToCreate.push({
-            user_id: userId,
-            jira_issue_id: issue.id,
-            theme_key: themeKey,
-            jira_key: issue.jira_key,
-            match_type: 'salesforce_case', // NEW: Direct link via Case ID
-            confidence: 1.0 // 100% confidence - it's a direct link!
-          });
-        });
+        // Process each Case ID
+        for (const caseId of salesforceCaseIds) {
+          if (caseIdToThemes.has(caseId)) {
+            hasDirectLink = true;
+            const themes = Array.from(caseIdToThemes.get(caseId)!);
+            const accountId = caseIdToAccountId.get(caseId);
 
-        // Also link to the account directly
-        if (accountId) {
-          accountLinksToCreate.push({
-            user_id: userId,
-            account_id: accountId,
-            jira_issue_id: issue.id,
-            match_confidence: 1.0 // 100% confidence
-          });
+            themes.forEach(themeKey => {
+              allThemes.add(themeKey);
+              themeLinksToCreate.push({
+                user_id: userId,
+                jira_issue_id: issue.id,
+                theme_key: themeKey,
+                jira_key: issue.jira_key,
+                match_type: 'salesforce_case',
+                confidence: 1.0
+              });
+            });
+
+            // Link to the account directly
+            if (accountId) {
+              allAccountIds.add(accountId);
+              accountLinksToCreate.push({
+                user_id: userId,
+                account_id: accountId,
+                jira_issue_id: issue.id,
+                match_confidence: 1.0
+              });
+            }
+          }
         }
 
-        directLinksCount++;
-        console.log(`Direct link: ${issue.jira_key} → Case ${salesforceCaseId} → Themes: ${themes.join(', ')}`);
-        continue; // Skip keyword matching - we have a direct link!
+        if (hasDirectLink) {
+          directLinksCount++;
+          console.log(`Direct link: ${issue.jira_key} → Cases [${salesforceCaseIds.join(', ')}] → ${allAccountIds.size} accounts, ${allThemes.size} themes`);
+          continue; // Skip keyword matching - we have direct links!
+        }
       }
 
       // STRATEGY 2 (FALLBACK): Keyword matching (less accurate but better than nothing)
