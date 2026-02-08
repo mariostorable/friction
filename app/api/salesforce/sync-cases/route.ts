@@ -263,11 +263,12 @@ export async function POST(request: NextRequest) {
       return {
         user_id: authenticatedUserId,
         account_id: accountId,
-        source_type: 'salesforce_case',
-        source_id: sfCase.Id,
+        source_type: 'salesforce', // Changed from 'salesforce_case' to match Jira sync
+        source_id: sfCase.CaseNumber, // Changed from Id to CaseNumber to match Jira tickets
         source_url: `${integration.instance_url}/${sfCase.Id}`,
         text_content: `Case #${sfCase.CaseNumber}: ${sfCase.Subject}\n\n${sfCase.Description || 'No description'}\n\nStatus: ${sfCase.Status}\nPriority: ${sfCase.Priority}\nOrigin: ${origin}`,
         metadata: {
+          salesforce_id: sfCase.Id, // Store the Salesforce ID here for reference
           case_number: sfCase.CaseNumber,
           subject: sfCase.Subject,
           status: sfCase.Status,
