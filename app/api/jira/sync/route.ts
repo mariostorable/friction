@@ -97,51 +97,15 @@ export async function POST(request: NextRequest) {
     const jiraAuthHeader = `Basic ${Buffer.from(`${email}:${tokens.access_token}`).toString('base64')}`;
 
     // Fetch recent issues from Jira with pagination
-    // Limit to avoid Vercel timeout (10s on Hobby plan)
-    const MAX_ISSUES_PER_SYNC = 500; // Process up to 500 issues per sync
-    const jql = `updated >= -90d ORDER BY updated DESC`;
+    // Fetch most recent issues (Pro plan has 60s timeout, can handle more)
+    const MAX_ISSUES_PER_SYNC = 1000; // Process most recent 1000 issues per sync
+    const jql = `updated >= -90d ORDER BY updated DESC`; // Most recent first
     const maxResults = 100; // Jira's max per request
     let startAt = 0;
     let allIssues: any[] = [];
     let totalIssues = 0;
 
-    console.log(`Fetching Jira issues with JQL: ${jql} (max ${MAX_ISSUES_PER_SYNC})`);
-
-    // Fetch field metadata on first run to discover custom fields
-    if (startAt === 0) {
-      try {
-        const fieldsResponse = await fetch(
-          `${integration.instance_url}/rest/api/3/field`,
-          {
-            headers: {
-              'Authorization': jiraAuthHeader,
-              'Accept': 'application/json',
-            },
-          }
-        );
-
-        if (fieldsResponse.ok) {
-          const fields = await fieldsResponse.json();
-          console.log('Available Jira fields that might contain account info:');
-          const relevantFields = fields.filter((f: any) => {
-            const nameLower = (f.name || '').toLowerCase();
-            return nameLower.includes('account') ||
-                   nameLower.includes('customer') ||
-                   nameLower.includes('salesforce') ||
-                   nameLower.includes('organization') ||
-                   nameLower.includes('company');
-          });
-          console.log('Potentially relevant fields:', relevantFields.map((f: any) => ({
-            id: f.id,
-            name: f.name,
-            custom: f.custom,
-            schema: f.schema
-          })));
-        }
-      } catch (error) {
-        console.error('Failed to fetch field metadata:', error);
-      }
-    }
+    console.log(`Fetching most recent Jira issues with JQL: ${jql} (max ${MAX_ISSUES_PER_SYNC})`);
 
     // Paginate through all results
     let hasMorePages = true;
@@ -172,41 +136,7 @@ export async function POST(request: NextRequest) {
 
       const jiraData = await jiraResponse.json();
 
-      // Log the full response structure to debug total count
-      console.log('Full Jira API response (first 500 chars):', JSON.stringify(jiraData).substring(0, 500));
-      console.log('All top-level keys:', Object.keys(jiraData));
-      console.log('Looking for total in different fields:', {
-        total: jiraData.total,
-        totalResults: jiraData.totalResults,
-        count: jiraData.count,
-        size: jiraData.size,
-        maxResults: jiraData.maxResults,
-        startAt: jiraData.startAt,
-        issuesLength: jiraData.issues?.length
-      });
-
-      // Log first issue's field structure to discover custom fields
-      if (startAt === 0 && jiraData.issues && jiraData.issues.length > 0) {
-        const firstIssue = jiraData.issues[0];
-        console.log('\n=== First Issue Field Analysis ===');
-        console.log('Issue Key:', firstIssue.key);
-        console.log('All available field keys:', Object.keys(firstIssue.fields || {}));
-
-        // Look for custom fields that might contain account info
-        const customFields = Object.entries(firstIssue.fields || {})
-          .filter(([key]) => key.startsWith('customfield_'))
-          .map(([key, value]) => ({
-            key,
-            value: value,
-            type: typeof value,
-            hasValue: value !== null && value !== undefined && value !== ''
-          }));
-
-        console.log('Custom fields found:', customFields);
-        console.log('Custom fields with values:', customFields.filter(f => f.hasValue));
-      }
-
-      // Try different field names for total count
+      // Get total count
       totalIssues = jiraData.total || jiraData.totalResults || jiraData.count || totalIssues;
 
       const fetchedCount = jiraData.issues?.length || 0;
