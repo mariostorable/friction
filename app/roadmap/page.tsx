@@ -4,14 +4,17 @@ import { useEffect, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Building2, Tag } from 'lucide-react';
 import JiraSyncButton from '@/components/JiraSyncButton';
 import RoadmapTab from '@/components/RoadmapTab';
+import AccountRoadmapView from '@/components/AccountRoadmapView';
 
 export default function RoadmapPage() {
   const supabase = createClientComponentClient();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [jiraIntegration, setJiraIntegration] = useState<any>(null);
+  const [viewMode, setViewMode] = useState<'account' | 'theme'>('account');
 
   useEffect(() => {
     checkJiraIntegration();
@@ -84,7 +87,38 @@ export default function RoadmapPage() {
           </div>
         )}
 
-        {jiraIntegration && <RoadmapTab />}
+        {jiraIntegration && (
+          <div className="space-y-6">
+            {/* View Toggle */}
+            <div className="bg-white border border-gray-200 rounded-lg p-1 inline-flex gap-1">
+              <button
+                onClick={() => setViewMode('account')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'account'
+                    ? 'bg-purple-100 text-purple-700'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                <Building2 className="w-4 h-4" />
+                By Account
+              </button>
+              <button
+                onClick={() => setViewMode('theme')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'theme'
+                    ? 'bg-purple-100 text-purple-700'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                <Tag className="w-4 h-4" />
+                By Theme
+              </button>
+            </div>
+
+            {/* Render appropriate view */}
+            {viewMode === 'account' ? <AccountRoadmapView /> : <RoadmapTab />}
+          </div>
+        )}
       </div>
     </div>
   );
