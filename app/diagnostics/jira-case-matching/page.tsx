@@ -18,7 +18,7 @@ export default function JiraCaseMatchingDiagnostic() {
           throw new Error('Not authenticated - please log in');
         }
 
-        // Step 1: Get friction cards with Salesforce Case IDs
+        // Step 1: Get ALL friction cards with Salesforce Case IDs (no limit)
         const { data: frictionCardsWithCases, error: frictionError } = await supabase
           .from('friction_cards')
           .select(`
@@ -29,8 +29,7 @@ export default function JiraCaseMatchingDiagnostic() {
           `)
           .eq('user_id', user.id)
           .eq('is_friction', true)
-          .not('raw_inputs.source_id', 'is', null)
-          .limit(100);
+          .not('raw_inputs.source_id', 'is', null);
 
         if (frictionError) throw frictionError;
 
