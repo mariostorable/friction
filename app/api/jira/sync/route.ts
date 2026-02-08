@@ -354,10 +354,12 @@ export async function POST(request: NextRequest) {
     console.log(`Stored ${insertedIssues?.length || 0} Jira issues`);
 
     // Get actual friction themes from the system (not hardcoded!)
+    // IMPORTANT: Only link Jira tickets to real friction (not normal support)
     const { data: frictionCards } = await supabaseAdmin
       .from('friction_cards')
       .select('theme_key')
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .eq('is_friction', true); // Only real friction, not normal support
 
     const actualThemes = Array.from(new Set(frictionCards?.map((c: any) => c.theme_key) || []));
     console.log(`Found ${actualThemes.length} actual friction themes for matching:`, actualThemes);

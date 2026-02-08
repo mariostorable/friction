@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
       .select('*')
       .eq('account_id', accountId)
       .eq('user_id', user.id)
+      .eq('is_friction', true) // Only count real friction in OFI score
       .gte('created_at', fourteenDaysAgo.toISOString());
 
     if (!recentCards || recentCards.length === 0) {

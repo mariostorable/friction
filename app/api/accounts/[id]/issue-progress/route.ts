@@ -16,12 +16,13 @@ export async function GET(
 
     const accountId = params.id;
 
-    // Get all friction cards for this account
+    // Get all REAL friction cards for this account (exclude normal support)
     const { data: frictionCards } = await supabase
       .from('friction_cards')
       .select('id, theme_key, severity, created_at')
       .eq('account_id', accountId)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .eq('is_friction', true); // Only count real friction, not normal support
 
     if (!frictionCards || frictionCards.length === 0) {
       return NextResponse.json({

@@ -96,7 +96,7 @@ export default function AccountDetailPage() {
 
       if (snapshotsData) setSnapshots(snapshotsData);
 
-      // Load ALL friction cards (no date filter for debugging)
+      // Load ALL friction cards (only real friction, exclude normal support)
       const { data: cardsData, error: cardsError } = await supabase
         .from('friction_cards')
         .select(`
@@ -105,12 +105,13 @@ export default function AccountDetailPage() {
         `)
         .eq('account_id', accountId)
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .eq('is_friction', true) // Only show real friction, not normal support
+        .order('created_at', { ascending: false});
 
       console.log('Friction cards query params:', {
         account_id: accountId,
         user_id: user.id,
-        note: 'Loading ALL friction cards (no date filter)'
+        note: 'Loading friction cards (is_friction=true only)'
       });
 
       if (cardsError) {
