@@ -11,33 +11,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    // Get all friction cards with theme and account info
-    const { data: frictionCards } = await supabase
-      .from('friction_cards')
-      .select(`
-        theme_key,
-        account_id,
-        accounts (
-          id,
-          name,
-          status
-        )
-      `)
+    // Get all active accounts
+    const { data: accounts } = await supabase
+      .from('accounts')
+      .select('id, name')
       .eq('user_id', user.id)
-      .eq('accounts.status', 'active');
+      .eq('status', 'active');
 
-    if (!frictionCards || frictionCards.length === 0) {
+    if (!accounts || accounts.length === 0) {
       return NextResponse.json({ accounts: [] });
     }
 
-    // Get all theme links with their Jira issues
-    const actualThemeKeys = Array.from(new Set(frictionCards.map(c => c.theme_key)));
+    const accountIds = accounts.map(a => a.id);
 
-    const { data: themeLinks } = await supabase
-      .from('theme_jira_links')
+    // Get all Jira issues linked to these accounts via account_jira_links
+    const { data: accountJiraLinks } = await supabase
+      .from('account_jira_links')
       .select(`
-        theme_key,
-        jira_issue:jira_issues!inner (
+        account_id,
+        jira_issues!inner(
           id,
           jira_key,
           summary,
@@ -48,48 +40,54 @@ export async function GET(request: NextRequest) {
           issue_url
         )
       `)
-      .eq('user_id', user.id)
-      .in('theme_key', actualThemeKeys);
+      .in('account_id', accountIds)
+      .eq('user_id', user.id);
 
-    // Build account -> issues mapping
+    if (!accountJiraLinks || accountJiraLinks.length === 0) {
+      return NextResponse.json({ accounts: [] });
+    }
+
+    // Get theme associations for display purposes
+    const jiraIssueIds = new Set(accountJiraLinks.map((link: any) => link.jira_issues.id));
+    const { data: themeLinks } = await supabase
+      .from('theme_jira_links')
+      .select('jira_issue_id, theme_key')
+      .in('jira_issue_id', Array.from(jiraIssueIds))
+      .eq('user_id', user.id);
+
+    // Build issue -> themes mapping
+    const issueThemes = new Map<string, string[]>();
+    themeLinks?.forEach((link: any) => {
+      if (!issueThemes.has(link.jira_issue_id)) {
+        issueThemes.set(link.jira_issue_id, []);
+      }
+      issueThemes.get(link.jira_issue_id)!.push(link.theme_key);
+    });
+
+    // Build account -> issues mapping from account_jira_links
     const accountIssues: Record<string, {
       account: any;
       issues: any[];
     }> = {};
 
-    // Map themes to accounts
-    const themeToAccounts: Record<string, Set<string>> = {};
-    frictionCards.forEach((card: any) => {
-      if (!themeToAccounts[card.theme_key]) {
-        themeToAccounts[card.theme_key] = new Set();
-      }
-      themeToAccounts[card.theme_key].add(card.account_id);
-
-      // Initialize account entry
-      if (!accountIssues[card.account_id]) {
-        accountIssues[card.account_id] = {
-          account: card.accounts,
-          issues: []
-        };
-      }
+    // Initialize accounts
+    accounts.forEach(account => {
+      accountIssues[account.id] = {
+        account,
+        issues: []
+      };
     });
 
-    // Add issues to accounts based on theme links
-    const addedIssues = new Set<string>(); // Track unique issue-account pairs
-    themeLinks?.forEach((link: any) => {
-      const accountIds = themeToAccounts[link.theme_key];
-      if (accountIds) {
-        accountIds.forEach(accountId => {
-          const issueKey = `${accountId}-${link.jira_issue.id}`;
-          if (!addedIssues.has(issueKey)) {
-            accountIssues[accountId]?.issues.push({
-              ...link.jira_issue,
-              theme_key: link.theme_key
-            });
-            addedIssues.add(issueKey);
-          }
-        });
-      }
+    // Add issues to accounts
+    accountJiraLinks.forEach((link: any) => {
+      const issue = link.jira_issues;
+      const themes = issueThemes.get(issue.id) || [];
+
+      accountIssues[link.account_id]?.issues.push({
+        ...issue,
+        theme_keys: themes,
+        theme_key: themes[0] || 'general' // Primary theme for compatibility
+      });
     });
 
     // Categorize issues and calculate counts for each account

@@ -36,21 +36,38 @@ export async function GET(
 
     const total_issues = frictionCards.length;
 
-    // Get unique theme keys
+    // Get unique theme keys for counting issues without tickets
     const themeKeys = Array.from(new Set(frictionCards.map(c => c.theme_key)));
 
-    // Get Jira tickets linked to these themes
-    const { data: jiraLinks } = await supabase
-      .from('theme_jira_links')
+    // Get Jira tickets linked to this account via account_jira_links
+    const { data: accountJiraLinks } = await supabase
+      .from('account_jira_links')
       .select(`
-        theme_key,
         jira_issues!inner(
+          id,
           status,
           resolution_date
         )
       `)
-      .in('theme_key', themeKeys)
-      .eq('jira_issues.user_id', user.id);
+      .eq('account_id', accountId)
+      .eq('user_id', user.id);
+
+    // Get theme associations for these tickets (for display purposes)
+    const jiraIssueIds = accountJiraLinks?.map((link: any) => link.jira_issues.id) || [];
+    const { data: themeLinks } = await supabase
+      .from('theme_jira_links')
+      .select('jira_issue_id, theme_key')
+      .in('jira_issue_id', jiraIssueIds)
+      .eq('user_id', user.id);
+
+    // Build ticket -> themes mapping
+    const ticketThemes = new Map<string, Set<string>>();
+    themeLinks?.forEach((link: any) => {
+      if (!ticketThemes.has(link.jira_issue_id)) {
+        ticketThemes.set(link.jira_issue_id, new Set());
+      }
+      ticketThemes.get(link.jira_issue_id)!.add(link.theme_key);
+    });
 
     // Count ticket statuses
     let fixed = 0;
@@ -60,16 +77,14 @@ export async function GET(
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     let fix_rate_30d = 0;
 
-    const ticketsByTheme: Record<string, any[]> = {};
+    const themesWithTickets = new Set<string>();
 
-    jiraLinks?.forEach((link: any) => {
+    accountJiraLinks?.forEach((link: any) => {
       const ticket = link.jira_issues;
-      const themeKey = link.theme_key;
 
-      if (!ticketsByTheme[themeKey]) {
-        ticketsByTheme[themeKey] = [];
-      }
-      ticketsByTheme[themeKey].push(ticket);
+      // Track which themes have tickets
+      const themes = ticketThemes.get(ticket.id) || new Set();
+      themes.forEach(theme => themesWithTickets.add(theme));
 
       if (ticket.resolution_date) {
         fixed++;
@@ -88,7 +103,6 @@ export async function GET(
     });
 
     // Count themes with no Jira tickets as open
-    const themesWithTickets = new Set(Object.keys(ticketsByTheme));
     const themesWithoutTickets = themeKeys.filter(key => !themesWithTickets.has(key));
     open += themesWithoutTickets.length;
 
