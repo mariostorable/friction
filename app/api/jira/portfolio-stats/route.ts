@@ -159,33 +159,47 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.impact_score - a.impact_score)
       .slice(0, 20);
 
-    // Per-account ticket counts
+    // Per-account ticket counts (using account_jira_links as single source of truth)
+    const accountIds = Array.from(new Set(allThemes.map((t: any) => t.account_id)));
+
+    const { data: accountJiraLinks } = await supabase
+      .from('account_jira_links')
+      .select(`
+        account_id,
+        jira_issues!inner(
+          id,
+          status,
+          resolution_date
+        )
+      `)
+      .in('account_id', accountIds)
+      .eq('user_id', user.id);
+
     const accountTicketCounts: Record<string, { resolved_7d: number; in_progress: number; open: number }> = {};
 
-    allThemes.forEach((item: any) => {
-      const accountId = item.account_id;
-      if (!accountTicketCounts[accountId]) {
-        accountTicketCounts[accountId] = { resolved_7d: 0, in_progress: 0, open: 0 };
-      }
+    // Initialize all accounts with zero counts
+    accountIds.forEach(accountId => {
+      accountTicketCounts[accountId] = { resolved_7d: 0, in_progress: 0, open: 0 };
+    });
 
-      const theme = item.theme_key;
-      const tickets = issuesByTheme[theme] || [];
+    // Count tickets per account
+    accountJiraLinks?.forEach((link: any) => {
+      const accountId = link.account_id;
+      const ticket = link.jira_issues;
 
-      tickets.forEach((ticket: any) => {
-        if (ticket.resolution_date) {
-          const resolvedDate = new Date(ticket.resolution_date);
-          if (resolvedDate >= sevenDaysAgo) {
-            accountTicketCounts[accountId].resolved_7d++;
-          }
-        } else {
-          const statusLower = ticket.status?.toLowerCase() || '';
-          if (statusLower.includes('progress') || statusLower.includes('development')) {
-            accountTicketCounts[accountId].in_progress++;
-          } else {
-            accountTicketCounts[accountId].open++;
-          }
+      if (ticket.resolution_date) {
+        const resolvedDate = new Date(ticket.resolution_date);
+        if (resolvedDate >= sevenDaysAgo) {
+          accountTicketCounts[accountId].resolved_7d++;
         }
-      });
+      } else {
+        const statusLower = ticket.status?.toLowerCase() || '';
+        if (statusLower.includes('progress') || statusLower.includes('development') || statusLower.includes('review')) {
+          accountTicketCounts[accountId].in_progress++;
+        } else {
+          accountTicketCounts[accountId].open++;
+        }
+      }
     });
 
     return NextResponse.json({
