@@ -39,10 +39,10 @@ export async function GET(request: NextRequest) {
 
     const jiraAuthHeader = `Bearer ${accessToken}`;
 
-    // Fetch ONE recent issue with ALL fields
+    // Fetch ONE recent issue with same fields as sync endpoint
     const jql = `updated >= -90d ORDER BY updated DESC`;
     const jiraResponse = await fetch(
-      `${integration.instance_url}/rest/api/3/search?jql=${encodeURIComponent(jql)}&maxResults=1&fields=*all`,
+      `${integration.instance_url}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&maxResults=1&fields=summary,description,status,priority,assignee,labels,created,updated,resolutiondate,resolution,comment,sprint,components,fixVersions,parent,issuetype,reporter,customfield_*`,
       {
         headers: {
           'Authorization': jiraAuthHeader,
