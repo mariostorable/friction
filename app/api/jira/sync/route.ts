@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
       console.log(`Fetching from startAt=${startAt}, maxResults=${maxResults}`);
 
       const jiraResponse = await fetch(
-        `${integration.instance_url}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&startAt=${startAt}&maxResults=${maxResults}&fields=*all`,
+        `${integration.instance_url}/rest/api/3/search?jql=${encodeURIComponent(jql)}&startAt=${startAt}&maxResults=${maxResults}&expand=names`,
         {
           headers: {
             'Authorization': jiraAuthHeader,
@@ -135,6 +135,22 @@ export async function POST(request: NextRequest) {
       }
 
       const jiraData = await jiraResponse.json();
+
+      // Debug: Log field names for first issue
+      if (loopIteration === 1 && jiraData.issues?.length > 0) {
+        const firstIssue = jiraData.issues[0];
+        const fieldKeys = Object.keys(firstIssue.fields || {});
+        const customFieldKeys = fieldKeys.filter(k => k.startsWith('customfield_'));
+        console.log(`DEBUG: First issue has ${fieldKeys.length} total fields, ${customFieldKeys.length} custom fields`);
+        console.log(`DEBUG: Custom fields: ${customFieldKeys.slice(0, 10).join(', ')}${customFieldKeys.length > 10 ? '...' : ''}`);
+
+        // Log a sample custom field value
+        if (customFieldKeys.length > 0) {
+          const sampleField = customFieldKeys[0];
+          const sampleValue = firstIssue.fields[sampleField];
+          console.log(`DEBUG: Sample custom field ${sampleField}:`, typeof sampleValue === 'object' ? JSON.stringify(sampleValue).substring(0, 200) : sampleValue);
+        }
+      }
 
       // Get total count
       totalIssues = jiraData.total || jiraData.totalResults || jiraData.count || totalIssues;
@@ -215,6 +231,9 @@ export async function POST(request: NextRequest) {
 
       // Extract ALL fields including Salesforce fields (not just customfield_*)
       const customFields: Record<string, any> = {};
+      const allFieldKeys = Object.keys(issue.fields || {});
+      const totalCustomFields = allFieldKeys.filter(k => k.startsWith('customfield_')).length;
+
       Object.entries(issue.fields || {}).forEach(([key, value]) => {
         // Capture customfields AND Salesforce fields
         const isCustomField = key.startsWith('customfield_');
@@ -239,6 +258,22 @@ export async function POST(request: NextRequest) {
           }
         }
       });
+
+      // Debug logging for first issue only
+      if (issue.key === allIssues[0].key) {
+        console.log(`DEBUG: Issue ${issue.key} - Found ${totalCustomFields} custom fields in Jira API response`);
+        console.log(`DEBUG: Issue ${issue.key} - Extracted ${Object.keys(customFields).length} custom fields after filtering`);
+        if (Object.keys(customFields).length > 0) {
+          const sampleKeys = Object.keys(customFields).slice(0, 3);
+          console.log(`DEBUG: Sample extracted fields: ${sampleKeys.join(', ')}`);
+          sampleKeys.forEach(key => {
+            const val = customFields[key];
+            console.log(`DEBUG: ${key} = ${typeof val === 'string' ? val.substring(0, 100) : JSON.stringify(val).substring(0, 100)}`);
+          });
+        } else {
+          console.log(`DEBUG: No custom fields extracted - all were null/undefined/empty`);
+        }
+      }
 
       return {
         user_id: userId,
