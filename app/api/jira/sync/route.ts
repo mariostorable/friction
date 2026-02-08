@@ -294,7 +294,7 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    console.log(`Stored ${insertedIssues?.length || 0} Jira issues`);
+    console.log(`Stored ${insertedIssues?.length || 0} Jira issues (fetched ${allIssues.length}, deduped to ${uniqueJiraIssues.length})`);
 
     // Get actual friction cards with their Salesforce Case IDs for direct linking
     // IMPORTANT: Only link Jira tickets to real friction (not normal support)
@@ -432,16 +432,17 @@ export async function POST(request: NextRequest) {
       accountLinksCreated = createdAccountLinks?.length || accountLinksToCreate.length;
     }
 
-    console.log(`Sync complete: ${insertedIssues?.length} issues, ${linksCreated} theme links, ${accountLinksCreated} account links created`);
+    const issuesSynced = allIssues.length; // Use actual fetched count, not DB return count
+    console.log(`Sync complete: fetched ${issuesSynced} issues, DB returned ${insertedIssues?.length}, ${linksCreated} theme links, ${accountLinksCreated} account links created`);
 
-    const hasMoreIssues = totalIssues > (insertedIssues?.length || 0);
+    const hasMoreIssues = totalIssues > issuesSynced;
     const message = hasMoreIssues
-      ? `Synced ${insertedIssues?.length} most recent issues (${totalIssues} total available). Run sync again to fetch more.`
-      : `Synced all ${insertedIssues?.length} issues (${accountLinksCreated} linked to accounts)`;
+      ? `Synced ${issuesSynced} most recent issues (${totalIssues} total available). Run sync again to fetch more.`
+      : `Synced all ${issuesSynced} issues (${accountLinksCreated} linked to accounts)`;
 
     return NextResponse.json({
       success: true,
-      synced: insertedIssues?.length || 0,
+      synced: issuesSynced,
       total_available: totalIssues,
       links_created: linksCreated,
       account_links_created: accountLinksCreated,
