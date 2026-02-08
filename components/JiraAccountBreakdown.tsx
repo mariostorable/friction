@@ -8,7 +8,7 @@ interface AccountTicketData {
   accountId: string;
   accountName: string;
   arr: number;
-  resolved_7d: number;
+  resolved_30d: number;
   in_progress: number;
   open: number;
   total: number;
@@ -125,13 +125,13 @@ export default function JiraAccountBreakdown() {
                 <div className="flex-1 flex items-center gap-2">
                   {/* Bar segments */}
                   <div className="flex-1 flex items-center h-8 bg-gray-100 rounded-lg overflow-hidden">
-                    {account.resolved_7d > 0 && (
+                    {account.resolved_30d > 0 && (
                       <div
                         className="h-full bg-green-500 flex items-center justify-center text-xs font-medium text-white"
-                        style={{ width: `${(account.resolved_7d / maxTotal) * 100}%` }}
-                        title={`${account.resolved_7d} resolved (7d)`}
+                        style={{ width: `${(account.resolved_30d / maxTotal) * 100}%` }}
+                        title={`${account.resolved_30d} resolved (30d)`}
                       >
-                        {account.resolved_7d}
+                        {account.resolved_30d}
                       </div>
                     )}
                     {account.in_progress > 0 && (
@@ -224,7 +224,7 @@ export default function JiraAccountBreakdown() {
       <div className="px-6 pb-6 flex items-center justify-center gap-6 text-sm">
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-green-500 rounded"></div>
-          <span className="text-gray-600">Resolved (7d)</span>
+          <span className="text-gray-600">Resolved (30d)</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-blue-500 rounded"></div>

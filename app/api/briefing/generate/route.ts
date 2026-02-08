@@ -154,7 +154,6 @@ function generateQuickBriefingPrompt(account: any, snapshot: any, frictionCards:
     jiraSection = `
 
 JIRA ROADMAP PROGRESS:
-- Recently Resolved (7d): ${summary.resolved_7d} tickets
 - Recently Resolved (30d): ${summary.resolved_30d} tickets
 - In Progress: ${summary.in_progress} tickets
 - On Radar: ${summary.open_count - summary.in_progress} tickets

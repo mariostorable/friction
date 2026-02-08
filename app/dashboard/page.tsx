@@ -36,7 +36,7 @@ export default function Dashboard() {
   const [checkingConnection, setCheckingConnection] = useState(true);
   const [hoveredColumn, setHoveredColumn] = useState<string | null>(null);
   const [hoveredCaseIcon, setHoveredCaseIcon] = useState<string | null>(null);
-  const [jiraTicketCounts, setJiraTicketCounts] = useState<Record<string, { resolved_7d: number; in_progress: number; open: number }>>({});
+  const [jiraTicketCounts, setJiraTicketCounts] = useState<Record<string, { resolved_30d: number; in_progress: number; open: number }>>({});
   const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
   const supabase = createClientComponentClient();
   const router = useRouter();
@@ -916,7 +916,7 @@ export default function Dashboard() {
                         </div>
                         {hoveredColumn === 'jira_tickets' && (
                           <div className="absolute left-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 z-50 whitespace-normal normal-case font-normal">
-                            Product roadmap tickets linked to this account's friction themes. Shows resolved (7d) / in progress / open.
+                            Product roadmap tickets linked to this account's friction themes. Shows resolved (30d) / in progress / open.
                             <div className="absolute -top-1 left-6 w-2 h-2 bg-gray-900 transform rotate-45"></div>
                           </div>
                         )}
@@ -1100,8 +1100,8 @@ export default function Dashboard() {
                         <td className="px-2 py-2 whitespace-nowrap text-xs">
                           {jiraTicketCounts[account.id] ? (
                             <div className="flex items-center gap-1">
-                              <span className="text-green-700 font-medium" title="Resolved (7 days)">
-                                {jiraTicketCounts[account.id].resolved_7d}
+                              <span className="text-green-700 font-medium" title="Resolved (30 days)">
+                                {jiraTicketCounts[account.id].resolved_30d}
                               </span>
                               <span className="text-gray-300">/</span>
                               <span className="text-blue-700 font-medium" title="In Progress">

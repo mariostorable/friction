@@ -51,10 +51,11 @@ export async function GET(
 
     const accountThemeKeys = Object.keys(themeWeights);
 
-    // 2a. Get Jira issues linked directly to this account by name
-    const { data: accountJiraIssues } = await supabase
+    // 2. Get all Jira issues linked to this account via account_jira_links table
+    const { data: accountJiraLinks } = await supabase
       .from('account_jira_links')
       .select(`
+        match_type,
         match_confidence,
         jira_issues!inner(
           id,
@@ -74,51 +75,7 @@ export async function GET(
       .eq('account_id', accountId)
       .eq('jira_issues.user_id', user.id);
 
-    // 2b. Get all Jira issues linked to these themes
-    const { data: themeJiraIssues } = await supabase
-      .from('theme_jira_links')
-      .select(`
-        theme_key,
-        match_confidence,
-        jira_issues!inner(
-          id,
-          jira_key,
-          summary,
-          description,
-          status,
-          priority,
-          assignee_name,
-          resolution_date,
-          updated_date,
-          issue_url,
-          labels,
-          ai_summary
-        )
-      `)
-      .in('theme_key', accountThemeKeys)
-      .eq('jira_issues.user_id', user.id);
-
-    // Combine both sources (prioritize direct account links)
-    const accountIssuesMap = new Map();
-    (accountJiraIssues || []).forEach((link: any) => {
-      const issue = link.jira_issues;
-      accountIssuesMap.set(issue.id, {
-        ...link,
-        theme_key: 'account_specific', // Special marker for account-specific tickets
-        is_account_specific: true
-      });
-    });
-
-    (themeJiraIssues || []).forEach((link: any) => {
-      const issue = link.jira_issues;
-      if (!accountIssuesMap.has(issue.id)) {
-        accountIssuesMap.set(issue.id, { ...link, is_account_specific: false });
-      }
-    });
-
-    const jiraIssues = Array.from(accountIssuesMap.values());
-
-    if (!jiraIssues || jiraIssues.length === 0) {
+    if (!accountJiraLinks || accountJiraLinks.length === 0) {
       // No tickets yet - all themes should be prioritized
       const shouldPrioritize = accountThemeKeys
         .map(theme => ({
@@ -136,9 +93,45 @@ export async function GET(
         onRadar: [],
         shouldPrioritize,
         comingSoon: [],
+        summary: {
+          resolved_30d: 0,
+          resolved_90d: 0,
+          open_count: 0,
+          in_progress: 0,
+          needs_ticket: shouldPrioritize.length
+        },
         themeStats: themeWeights
       });
     }
+
+    // Get theme links for these Jira issues (for display purposes)
+    const jiraIssueIds = accountJiraLinks.map((link: any) => link.jira_issues.id);
+    const { data: themeLinks } = await supabase
+      .from('theme_jira_links')
+      .select('jira_issue_id, theme_key')
+      .in('jira_issue_id', jiraIssueIds)
+      .eq('user_id', user.id);
+
+    // Build issue ID -> themes mapping
+    const issueThemes = new Map<string, string[]>();
+    themeLinks?.forEach((link: any) => {
+      if (!issueThemes.has(link.jira_issue_id)) {
+        issueThemes.set(link.jira_issue_id, []);
+      }
+      issueThemes.get(link.jira_issue_id)!.push(link.theme_key);
+    });
+
+    // Transform to include theme info
+    const jiraIssues = accountJiraLinks.map((link: any) => {
+      const issue = link.jira_issues;
+      const themes = issueThemes.get(issue.id) || [];
+      return {
+        ...link,
+        theme_key: themes[0] || 'general', // Primary theme
+        all_themes: themes,
+        is_account_specific: link.match_type === 'salesforce_case' || link.match_type === 'account_name'
+      };
+    });
 
     // 3. Categorize issues
     const now = new Date();
@@ -230,8 +223,7 @@ export async function GET(
       comingSoon: comingSoon.slice(0, 10),
       themeStats: themeWeights,
       summary: {
-        resolved_7d: recentlyResolved.filter(i => i.time_period === '7d').length,
-        resolved_30d: recentlyResolved.filter(i => i.time_period === '30d').length,
+        resolved_30d: recentlyResolved.filter(i => i.time_period === '30d' || i.time_period === '7d').length,
         resolved_90d: recentlyResolved.length,
         open_count: onRadar.length + comingSoon.length,
         in_progress: comingSoon.length,

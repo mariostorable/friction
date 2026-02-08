@@ -113,13 +113,13 @@ export async function GET(request: NextRequest) {
 
     // Build account-level data
     const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     const accountData = accounts.map(account => {
       const accountLinks = accountJiraLinks.filter((link: any) => link.account_id === account.id);
       const tickets = new Map<string, any>(); // jira_key -> ticket details
 
-      let resolved_7d = 0;
+      let resolved_30d = 0;
       let in_progress = 0;
       let open = 0;
 
@@ -136,8 +136,8 @@ export async function GET(request: NextRequest) {
           // Count ticket status
           if (ticket.resolution_date) {
             const resolvedDate = new Date(ticket.resolution_date);
-            if (resolvedDate >= sevenDaysAgo) {
-              resolved_7d++;
+            if (resolvedDate >= thirtyDaysAgo) {
+              resolved_30d++;
             }
           } else {
             const statusLower = ticket.status?.toLowerCase() || '';
@@ -167,10 +167,10 @@ export async function GET(request: NextRequest) {
         accountId: account.id,
         accountName: account.name,
         arr: account.arr,
-        resolved_7d,
+        resolved_30d,
         in_progress,
         open,
-        total: resolved_7d + in_progress + open,
+        total: resolved_30d + in_progress + open,
         tickets: ticketList
       };
     });

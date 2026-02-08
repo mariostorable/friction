@@ -175,11 +175,11 @@ export async function GET(request: NextRequest) {
       .in('account_id', accountIds)
       .eq('user_id', user.id);
 
-    const accountTicketCounts: Record<string, { resolved_7d: number; in_progress: number; open: number }> = {};
+    const accountTicketCounts: Record<string, { resolved_30d: number; in_progress: number; open: number }> = {};
 
     // Initialize all accounts with zero counts
     accountIds.forEach(accountId => {
-      accountTicketCounts[accountId] = { resolved_7d: 0, in_progress: 0, open: 0 };
+      accountTicketCounts[accountId] = { resolved_30d: 0, in_progress: 0, open: 0 };
     });
 
     // Count tickets per account
@@ -189,8 +189,8 @@ export async function GET(request: NextRequest) {
 
       if (ticket.resolution_date) {
         const resolvedDate = new Date(ticket.resolution_date);
-        if (resolvedDate >= sevenDaysAgo) {
-          accountTicketCounts[accountId].resolved_7d++;
+        if (resolvedDate >= thirtyDaysAgo) {
+          accountTicketCounts[accountId].resolved_30d++;
         }
       } else {
         const statusLower = ticket.status?.toLowerCase() || '';
