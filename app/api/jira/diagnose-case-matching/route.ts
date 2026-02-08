@@ -105,7 +105,8 @@ export async function GET(request: NextRequest) {
         const descCaseMatches = issue.description.match(/\b\d{8}\b/g);
         if (descCaseMatches) {
           const uniqueDescMatches = Array.from(new Set(descCaseMatches));
-          for (const caseId of uniqueDescMatches) {
+          for (const caseIdMatch of uniqueDescMatches) {
+            const caseId = String(caseIdMatch);
             if (caseIdToThemes.has(caseId)) {
               descriptionMatches.push({
                 jira_key: issue.jira_key,
