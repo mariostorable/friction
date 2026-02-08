@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Decrypt token
-    const decryptedMetadata = await getDecryptedToken(integration.id);
+    const decryptedMetadata = await getDecryptedToken(supabase, integration.id);
     const accessToken = decryptedMetadata?.access_token;
 
     if (!accessToken) {
