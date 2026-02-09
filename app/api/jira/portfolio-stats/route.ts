@@ -160,7 +160,16 @@ export async function GET(request: NextRequest) {
       .slice(0, 20);
 
     // Per-account ticket counts (using account_jira_links as single source of truth)
-    const accountIds = Array.from(new Set(allThemes.map((t: any) => t.account_id)));
+    // Get ALL accounts from portfolios, not just those with friction_cards
+    const { data: portfolios } = await supabase
+      .from('portfolios')
+      .select('account_ids')
+      .eq('user_id', user.id)
+      .in('portfolio_type', ['top_25_edge', 'top_25_marine', 'top_25_sitelink']);
+
+    const allAccountIds = new Set<string>();
+    portfolios?.forEach(p => p.account_ids.forEach((id: string) => allAccountIds.add(id)));
+    const accountIds = Array.from(allAccountIds);
 
     const { data: accountJiraLinks } = await supabase
       .from('account_jira_links')
