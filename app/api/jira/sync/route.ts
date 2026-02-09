@@ -348,8 +348,35 @@ export async function POST(request: NextRequest) {
 
     console.log(`Stored ${insertedIssues?.length || 0} Jira issues (fetched ${allIssues.length}, deduped to ${uniqueJiraIssues.length})`);
 
-    // Get actual friction cards with their Salesforce Case IDs for direct linking
-    // IMPORTANT: Only link Jira tickets to real friction (not normal support)
+    // EXPANDED STRATEGY: Match against ALL Salesforce cases, not just friction=true
+    // This ensures Jira tickets link even if the case hasn't been analyzed for friction yet
+
+    // Step 1: Get ALL Salesforce cases from friction_cards (includes both friction and non-friction)
+    const { data: allSalesforceCases } = await supabaseAdmin
+      .from('friction_cards')
+      .select(`
+        id,
+        account_id,
+        raw_input:raw_inputs!inner(source_id, source_type)
+      `)
+      .eq('user_id', userId)
+      .eq('raw_inputs.source_type', 'salesforce')
+      .not('raw_inputs.source_id', 'is', null);
+
+    // Build map: Salesforce Case ID → Account ID (for ALL cases, not just friction)
+    const caseIdToAccountId = new Map<string, string>();
+
+    allSalesforceCases?.forEach((card: any) => {
+      const caseId = card.raw_input?.source_id;
+      const accountId = card.account_id;
+      if (caseId && accountId) {
+        caseIdToAccountId.set(caseId, accountId);
+      }
+    });
+
+    console.log(`Built case mapping: ${caseIdToAccountId.size} total Salesforce Cases (all types)`);
+
+    // Step 2: Get friction cards for theme linking
     const { data: frictionCardsWithCases } = await supabaseAdmin
       .from('friction_cards')
       .select(`
@@ -359,12 +386,11 @@ export async function POST(request: NextRequest) {
         raw_input:raw_inputs!inner(source_id)
       `)
       .eq('user_id', userId)
-      .eq('is_friction', true) // Only real friction, not normal support
-      .not('raw_inputs.source_id', 'is', null); // Only cards with Salesforce Case IDs
+      .eq('is_friction', true)
+      .not('raw_inputs.source_id', 'is', null');
 
-    // Build map: Salesforce Case ID → Friction Themes
+    // Build map: Salesforce Case ID → Friction Themes (only for friction cases)
     const caseIdToThemes = new Map<string, Set<string>>();
-    const caseIdToAccountId = new Map<string, string>();
 
     frictionCardsWithCases?.forEach((card: any) => {
       const caseId = card.raw_input?.source_id;
@@ -373,11 +399,10 @@ export async function POST(request: NextRequest) {
           caseIdToThemes.set(caseId, new Set());
         }
         caseIdToThemes.get(caseId)!.add(card.theme_key);
-        caseIdToAccountId.set(caseId, card.account_id);
       }
     });
 
-    console.log(`Built case mapping: ${caseIdToThemes.size} Salesforce Cases with friction themes`);
+    console.log(`  - ${caseIdToThemes.size} cases have friction themes`);
 
     // Also get actual themes for fallback keyword matching
     const actualThemes = Array.from(new Set(frictionCardsWithCases?.map((c: any) => c.theme_key) || []));
@@ -440,32 +465,36 @@ export async function POST(request: NextRequest) {
 
         // Process each Case ID
         for (const caseId of salesforceCaseIds) {
-          if (caseIdToThemes.has(caseId)) {
-            hasDirectLink = true;
-            const themes = Array.from(caseIdToThemes.get(caseId)!);
-            const accountId = caseIdToAccountId.get(caseId);
+          // Check if this case exists in our database (regardless of friction status)
+          const accountId = caseIdToAccountId.get(caseId);
 
-            themes.forEach(themeKey => {
-              allThemes.add(themeKey);
-              themeLinksToCreate.push({
-                user_id: userId,
-                jira_issue_id: issue.id,
-                theme_key: themeKey,
-                jira_key: issue.jira_key,
-                match_type: 'salesforce_case',
-                confidence: 1.0
-              });
+          if (accountId) {
+            hasDirectLink = true;
+            allAccountIds.add(accountId);
+
+            // Always create account link
+            accountLinksToCreate.push({
+              user_id: userId,
+              account_id: accountId,
+              jira_issue_id: issue.id,
+              match_type: 'salesforce_case',
+              match_confidence: 1.0
             });
 
-            // Link to the account directly
-            if (accountId) {
-              allAccountIds.add(accountId);
-              accountLinksToCreate.push({
-                user_id: userId,
-                account_id: accountId,
-                jira_issue_id: issue.id,
-                match_type: 'salesforce_case',
-                match_confidence: 1.0
+            // If this case also has friction themes, create theme links
+            if (caseIdToThemes.has(caseId)) {
+              const themes = Array.from(caseIdToThemes.get(caseId)!);
+
+              themes.forEach(themeKey => {
+                allThemes.add(themeKey);
+                themeLinksToCreate.push({
+                  user_id: userId,
+                  jira_issue_id: issue.id,
+                  theme_key: themeKey,
+                  jira_key: issue.jira_key,
+                  match_type: 'salesforce_case',
+                  confidence: 1.0
+                });
               });
             }
           }
