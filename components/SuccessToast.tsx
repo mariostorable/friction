@@ -26,12 +26,12 @@ export default function SuccessToast({ message, onClose, autoClose = true }: Suc
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 max-w-md animate-slide-up">
+    <div className="fixed bottom-4 right-4 z-50 max-w-lg animate-slide-up">
       <div className="bg-green-50 border-l-4 border-green-500 rounded-lg shadow-lg p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 flex-1">
-            <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
-            <p className="text-sm text-green-900 font-medium">{message}</p>
+        <div className="flex items-start gap-3">
+          <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <pre className="text-sm text-green-900 font-medium whitespace-pre-wrap font-sans">{message}</pre>
           </div>
           <div className="flex gap-1 flex-shrink-0">
             <button

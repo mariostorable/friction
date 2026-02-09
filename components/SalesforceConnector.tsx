@@ -55,20 +55,27 @@ export default function SalesforceConnector() {
 
   async function syncNow() {
     setSyncing(true);
+    setError(null);
+    setSuccess(null);
+
     try {
       const response = await fetch('/api/salesforce/sync', {
         method: 'POST',
       });
-      
+
       const result = await response.json();
-      
+
       if (response.ok) {
-        let message = `Successfully synced ${result.synced} accounts! Top 25: ${result.portfolios.top25}, Random Sample: ${result.portfolios.randomSample}`;
-        let details = result.debug ? JSON.stringify(result.debug, null, 2) : undefined;
+        const message =
+          `✓ Salesforce Sync Complete!\n\n` +
+          `Accounts synced: ${result.synced}\n` +
+          `Top 25 ARR accounts: ${result.portfolios.top25}\n` +
+          `Random sample accounts: ${result.portfolios.randomSample}\n\n` +
+          `Address/location data has been updated.\n` +
+          `Refresh the dashboard to see latest data.`;
 
         setSuccess(message);
         await checkIntegration();
-        setTimeout(() => window.location.reload(), 1000);
       } else {
         setError({
           title: 'Sync Failed',

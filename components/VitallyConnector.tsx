@@ -122,7 +122,17 @@ export default function VitallyConnector() {
       const result = await response.json();
 
       if (response.ok) {
-        setSuccess(`Successfully synced ${result.synced || 0} of ${result.total || 0} Vitally accounts!${result.matched > 0 ? ` Matched ${result.matched} to Salesforce accounts.` : ''}`);
+        const matchMsg = result.matched > 0
+          ? `\nMatched ${result.matched} to Salesforce accounts`
+          : '';
+
+        const message =
+          `✓ Vitally Sync Complete!\n\n` +
+          `Accounts synced: ${result.synced || 0} of ${result.total || 0}${matchMsg}\n\n` +
+          `Customer health data has been updated.\n` +
+          `Check account pages for Vitally data.`;
+
+        setSuccess(message);
         await checkIntegration();
       } else {
         setError({

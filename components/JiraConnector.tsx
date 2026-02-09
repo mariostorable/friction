@@ -108,6 +108,9 @@ export default function JiraConnector() {
 
   async function syncNow() {
     setSyncing(true);
+    setError(null);
+    setSuccess(null);
+
     try {
       const response = await fetch('/api/jira/sync', {
         method: 'POST',
@@ -117,9 +120,17 @@ export default function JiraConnector() {
 
       if (response.ok) {
         const totalMsg = result.total_available > result.synced
-          ? ` (${result.total_available} total available - rerun sync to get more)`
-          : ` (all ${result.total_available} available)`;
-        setSuccess(`Successfully synced ${result.synced} Jira issues${totalMsg}! Theme links created: ${result.links_created}`);
+          ? `\n${result.total_available} total available - rerun sync to get more`
+          : `\nAll ${result.total_available} available issues synced`;
+
+        const message =
+          `✓ Jira Sync Complete!\n\n` +
+          `Issues synced: ${result.synced}${totalMsg}\n` +
+          `Theme links created: ${result.links_created}\n\n` +
+          `Jira tickets are now linked to friction themes.\n` +
+          `View them on the Jira Roadmap page.`;
+
+        setSuccess(message);
         await checkIntegration();
       } else {
         setError({
