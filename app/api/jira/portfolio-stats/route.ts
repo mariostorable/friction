@@ -182,24 +182,39 @@ export async function GET(request: NextRequest) {
       accountTicketCounts[accountId] = { resolved_30d: 0, in_progress: 0, open: 0 };
     });
 
-    // Count tickets per account
+    // Group links by account and deduplicate tickets by ID
+    const accountTickets: Record<string, Map<string, any>> = {};
     accountJiraLinks?.forEach((link: any) => {
       const accountId = link.account_id;
       const ticket = link.jira_issues;
 
-      if (ticket.resolution_date) {
-        const resolvedDate = new Date(ticket.resolution_date);
-        if (resolvedDate >= thirtyDaysAgo) {
-          accountTicketCounts[accountId].resolved_30d++;
-        }
-      } else {
-        const statusLower = ticket.status?.toLowerCase() || '';
-        if (statusLower.includes('progress') || statusLower.includes('development') || statusLower.includes('review')) {
-          accountTicketCounts[accountId].in_progress++;
-        } else {
-          accountTicketCounts[accountId].open++;
-        }
+      if (!accountTickets[accountId]) {
+        accountTickets[accountId] = new Map();
       }
+
+      // Deduplicate by ticket ID - only count each unique ticket once
+      if (!accountTickets[accountId].has(ticket.id)) {
+        accountTickets[accountId].set(ticket.id, ticket);
+      }
+    });
+
+    // Count deduplicated tickets per account
+    Object.entries(accountTickets).forEach(([accountId, ticketsMap]) => {
+      ticketsMap.forEach((ticket) => {
+        if (ticket.resolution_date) {
+          const resolvedDate = new Date(ticket.resolution_date);
+          if (resolvedDate >= thirtyDaysAgo) {
+            accountTicketCounts[accountId].resolved_30d++;
+          }
+        } else {
+          const statusLower = ticket.status?.toLowerCase() || '';
+          if (statusLower.includes('progress') || statusLower.includes('development') || statusLower.includes('review')) {
+            accountTicketCounts[accountId].in_progress++;
+          } else {
+            accountTicketCounts[accountId].open++;
+          }
+        }
+      });
     });
 
     return NextResponse.json({
