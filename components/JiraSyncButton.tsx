@@ -3,12 +3,15 @@
 import { useEffect, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { RefreshCw } from 'lucide-react';
+import SuccessToast from './SuccessToast';
+import ErrorToast from './ErrorToast';
 
 export default function JiraSyncButton() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
-  const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [error, setError] = useState<{ title: string; message: string; details?: string } | null>(null);
   const [syncStats, setSyncStats] = useState<{
     lastSynced: string | null;
     totalIssues: number;
@@ -56,6 +59,9 @@ export default function JiraSyncButton() {
 
   async function syncNow() {
     setSyncing(true);
+    setError(null);
+    setSuccess(null);
+
     try {
       console.log('Starting Jira sync...');
       const response = await fetch('/api/jira/sync', {
@@ -70,7 +76,11 @@ export default function JiraSyncButton() {
       if (!contentType || !contentType.includes('application/json')) {
         const textResponse = await response.text();
         console.error('Non-JSON response:', textResponse.substring(0, 500));
-        alert(`Sync failed: Server returned ${response.status} error. Check console for details.`);
+        setError({
+          title: 'Sync Failed',
+          message: `Server returned ${response.status} error`,
+          details: textResponse.substring(0, 500)
+        });
         return;
       }
 
@@ -79,25 +89,35 @@ export default function JiraSyncButton() {
       if (response.ok) {
         console.log('✅ Jira sync complete:', result);
 
-        // Show success message
-        const message = `Synced ${result.issuesStored || 0} issues, created ${result.totalLinksCreated || 0} theme links`;
-        setSyncResult(message);
-        setTimeout(() => setSyncResult(null), 5000); // Hide after 5 seconds
+        // Show success message with details
+        let message = `✓ Jira Sync Complete!\n\n`;
+        message += `Issues synced: ${result.issuesStored || 0}\n`;
+        message += `Theme links created: ${result.totalLinksCreated || 0}\n`;
 
-        // Wait longer for database to propagate changes
-        console.log('Waiting 2 seconds for database propagation...');
+        if (result.issuesStored === 0) {
+          message += `\n⚠️ No new issues found.\nThis could mean:\n- All issues are already synced\n- Check Jira integration settings\n- Verify Jira API access`;
+        }
+
+        setSuccess(message);
+
+        // Wait for database propagation
         await new Promise(resolve => setTimeout(resolve, 2000));
-        console.log('Fetching updated sync stats...');
-        const beforeLastSynced = syncStats.lastSynced;
-        await fetchSyncStats(); // Refresh stats after sync
-        console.log('Stats refresh complete. Before:', beforeLastSynced, 'After: will update on next render');
+        await fetchSyncStats();
       } else {
         console.error('❌ Jira sync failed:', result);
-        alert(`Sync failed: ${result.error || 'Unknown error'}\n${result.details || ''}`);
+        setError({
+          title: 'Sync Failed',
+          message: result.error || 'Unknown error',
+          details: result.details
+        });
       }
     } catch (error) {
       console.error('Sync error:', error);
-      alert(`Sync error: ${error instanceof Error ? error.message : 'Unknown'}`);
+      setError({
+        title: 'Sync Error',
+        message: 'Failed to sync Jira data',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
     } finally {
       setSyncing(false);
     }
@@ -147,11 +167,6 @@ export default function JiraSyncButton() {
           )}
         </button>
 
-        {syncResult && (
-          <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-            <p className="text-xs text-green-800">{syncResult}</p>
-          </div>
-        )}
       </div>
 
       {/* Hover Tooltip */}
@@ -185,6 +200,25 @@ export default function JiraSyncButton() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Success Toast */}
+      {success && (
+        <SuccessToast
+          message={success}
+          onClose={() => setSuccess(null)}
+          autoClose={false}
+        />
+      )}
+
+      {/* Error Toast */}
+      {error && (
+        <ErrorToast
+          title={error.title}
+          message={error.message}
+          details={error.details}
+          onClose={() => setError(null)}
+        />
       )}
     </div>
   );
