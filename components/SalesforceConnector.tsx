@@ -66,13 +66,20 @@ export default function SalesforceConnector() {
       const result = await response.json();
 
       if (response.ok) {
-        const message =
-          `✓ Salesforce Sync Complete!\n\n` +
-          `Accounts synced: ${result.synced}\n` +
-          `Top 25 ARR accounts: ${result.portfolios.top25}\n` +
-          `Random sample accounts: ${result.portfolios.randomSample}\n\n` +
-          `Address/location data has been updated.\n` +
-          `Refresh the dashboard to see latest data.`;
+        let message = `✓ Salesforce Sync Complete!\n\n`;
+        message += `Accounts synced: ${result.synced}\n`;
+
+        if (result.portfolios) {
+          message += `Storage accounts: ${result.portfolios.storage || 0}\n`;
+          message += `Marine accounts: ${result.portfolios.marine || 0}\n`;
+        }
+
+        // Include analysis status if provided
+        if (result.message) {
+          message += `\n${result.message}`;
+        }
+
+        message += `\n\nAddress/location data has been updated.\nRefresh the dashboard to see latest data.`;
 
         setSuccess(message);
         await checkIntegration();
