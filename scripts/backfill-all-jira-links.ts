@@ -152,7 +152,7 @@ async function backfillAllJiraLinks() {
 
         // Try both full name and name parts (e.g., "Spartan Investment Group" -> "spartan", "investment", "group")
         const nameParts = account.name.toLowerCase().split(/[\s-,]+/);
-        const matchesName = nameParts.some(part =>
+        const matchesName = nameParts.some((part: string) =>
           part.length > 3 && searchText.includes(part)
         );
 
