@@ -147,8 +147,8 @@ export async function POST(request: NextRequest) {
     // Build query based on whether this is first sync or incremental
     let dateFilter: string;
     if (isFirstSync) {
-      dateFilter = 'CreatedDate=LAST_N_DAYS:90';
-      console.log('First sync - fetching last 90 days');
+      dateFilter = 'CreatedDate=LAST_N_DAYS:365';
+      console.log('First sync - fetching last 365 days');
     } else {
       // Incremental sync - only get cases created after our last sync
       dateFilter = `CreatedDate>${lastSyncDate}`;
