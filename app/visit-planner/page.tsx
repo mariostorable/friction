@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
-import { MapPin, List as ListIcon, Search, Filter, AlertCircle, Loader2 } from 'lucide-react';
+import { MapPin, List as ListIcon, Search, Filter, AlertCircle, Loader2, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import { useLoadScript, Autocomplete } from '@react-google-maps/api';
 
 // Dynamically import map to avoid SSR issues with Google Maps
 const AccountMap = dynamic(() => import('@/components/AccountMap'), {
@@ -15,6 +16,8 @@ const AccountMap = dynamic(() => import('@/components/AccountMap'), {
     </div>
   ),
 });
+
+const libraries: ('places')[] = ['places'];
 
 interface NearbyAccount {
   id: string;
@@ -33,6 +36,15 @@ interface NearbyAccount {
   salesforce_id: string;
 }
 
+interface AccountSuggestion {
+  id: string;
+  name: string;
+  property_address_city: string | null;
+  property_address_state: string | null;
+  latitude: number;
+  longitude: number;
+}
+
 export default function VisitPlannerPage() {
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
@@ -43,7 +55,13 @@ export default function VisitPlannerPage() {
   const [cityInput, setCityInput] = useState('');
   const [stateInput, setStateInput] = useState('');
   const [accountQuery, setAccountQuery] = useState('');
-  const [selectedAccount, setSelectedAccount] = useState<any>(null);
+  const [selectedAccount, setSelectedAccount] = useState<AccountSuggestion | null>(null);
+  const [accountSuggestions, setAccountSuggestions] = useState<AccountSuggestion[]>([]);
+  const [showAccountDropdown, setShowAccountDropdown] = useState(false);
+
+  // Refs
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const accountInputRef = useRef<HTMLDivElement>(null);
 
   // Filter state
   const [radiusMiles, setRadiusMiles] = useState(50);
@@ -63,8 +81,39 @@ export default function VisitPlannerPage() {
   const supabase = createClientComponentClient();
   const router = useRouter();
 
+  // Load Google Maps script
+  const { isLoaded: mapsLoaded } = useLoadScript({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+    libraries,
+  });
+
   useEffect(() => {
     checkAuth();
+  }, []);
+
+  // Debounced account search
+  useEffect(() => {
+    if (searchMode === 'account' && accountQuery.length >= 2) {
+      const timer = setTimeout(() => {
+        searchAccounts(accountQuery);
+      }, 300);
+      return () => clearTimeout(timer);
+    } else {
+      setAccountSuggestions([]);
+      setShowAccountDropdown(false);
+    }
+  }, [accountQuery, searchMode]);
+
+  // Close account dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (accountInputRef.current && !accountInputRef.current.contains(event.target as Node)) {
+        setShowAccountDropdown(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   async function checkAuth() {
@@ -76,6 +125,69 @@ export default function VisitPlannerPage() {
     } else {
       setLoading(false);
     }
+  }
+
+  async function searchAccounts(query: string) {
+    try {
+      const { data } = await supabase
+        .from('accounts')
+        .select('id, name, property_address_city, property_address_state, latitude, longitude')
+        .eq('status', 'active')
+        .ilike('name', `%${query}%`)
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null)
+        .limit(10);
+
+      setAccountSuggestions(data || []);
+      setShowAccountDropdown(true);
+    } catch (err) {
+      console.error('Error searching accounts:', err);
+    }
+  }
+
+  function onPlaceSelected() {
+    if (autocompleteRef.current) {
+      const place = autocompleteRef.current.getPlace();
+
+      if (place.geometry?.location) {
+        const lat = place.geometry.location.lat();
+        const lng = place.geometry.location.lng();
+
+        // Extract city and state from address components
+        let city = '';
+        let state = '';
+
+        place.address_components?.forEach(component => {
+          if (component.types.includes('locality')) {
+            city = component.long_name;
+          }
+          if (component.types.includes('administrative_area_level_1')) {
+            state = component.short_name;
+          }
+        });
+
+        setCityInput(city);
+        setStateInput(state);
+        setMapCenter({ lat, lng });
+
+        // Automatically search nearby accounts
+        setSearching(true);
+        setError(null);
+        searchNearbyAccounts(lat, lng).finally(() => setSearching(false));
+      }
+    }
+  }
+
+  function handleAccountSelect(account: AccountSuggestion) {
+    setSelectedAccount(account);
+    setAccountQuery(account.name);
+    setShowAccountDropdown(false);
+
+    // Search nearby accounts
+    setSearching(true);
+    setError(null);
+    setMapCenter({ lat: account.latitude, lng: account.longitude });
+    searchNearbyAccounts(account.latitude, account.longitude).finally(() => setSearching(false));
   }
 
   async function handleCitySearch() {
@@ -240,61 +352,101 @@ export default function VisitPlannerPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Search by City
               </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="City (e.g., Austin)"
-                  value={cityInput}
-                  onChange={e => setCityInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleCitySearch()}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                />
-                <input
-                  type="text"
-                  placeholder="State (e.g., TX)"
-                  value={stateInput}
-                  onChange={e => setStateInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleCitySearch()}
-                  className="w-32 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                />
-                <button
-                  onClick={handleCitySearch}
-                  disabled={searching}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+              {mapsLoaded ? (
+                <Autocomplete
+                  onLoad={autocomplete => {
+                    autocompleteRef.current = autocomplete;
+                  }}
+                  onPlaceChanged={onPlaceSelected}
+                  options={{
+                    types: ['(cities)'],
+                    componentRestrictions: { country: 'us' },
+                  }}
                 >
-                  {searching ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Searching...
-                    </>
-                  ) : (
-                    <>
-                      <Search className="w-4 h-4" />
-                      Search
-                    </>
-                  )}
-                </button>
-              </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Start typing a city (e.g., Austin, TX)"
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    />
+                    {searching && (
+                      <div className="flex items-center px-4">
+                        <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                      </div>
+                    )}
+                  </div>
+                </Autocomplete>
+              ) : (
+                <div className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-gray-50">
+                  <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                  <span className="text-sm text-gray-600">Loading Google Maps...</span>
+                </div>
+              )}
+              <p className="text-sm text-gray-500 mt-2">
+                Select a city from the dropdown to find nearby accounts
+              </p>
             </div>
           ) : (
-            <div>
+            <div className="relative" ref={accountInputRef}>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Search by Account
               </label>
               <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Account name..."
-                  value={accountQuery}
-                  onChange={e => setAccountQuery(e.target.value)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                />
-                <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
-                  <Search className="w-4 h-4" />
-                  Search
-                </button>
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    placeholder="Start typing account name..."
+                    value={accountQuery}
+                    onChange={e => setAccountQuery(e.target.value)}
+                    onFocus={() => {
+                      if (accountSuggestions.length > 0) {
+                        setShowAccountDropdown(true);
+                      }
+                    }}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  />
+                  {selectedAccount && (
+                    <button
+                      onClick={() => {
+                        setSelectedAccount(null);
+                        setAccountQuery('');
+                        setAccounts([]);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                  {/* Dropdown */}
+                  {showAccountDropdown && accountSuggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                      {accountSuggestions.map(account => (
+                        <button
+                          key={account.id}
+                          onClick={() => handleAccountSelect(account)}
+                          className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                        >
+                          <div className="font-medium text-gray-900">{account.name}</div>
+                          {account.property_address_city && (
+                            <div className="text-sm text-gray-600">
+                              {account.property_address_city}
+                              {account.property_address_state && `, ${account.property_address_state}`}
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {searching && (
+                  <div className="flex items-center px-4">
+                    <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                  </div>
+                )}
               </div>
-              <p className="text-sm text-gray-500 mt-2">Coming soon: Search for accounts near a specific customer</p>
+              <p className="text-sm text-gray-500 mt-2">
+                Search for an account and find other accounts nearby
+              </p>
             </div>
           )}
         </div>
