@@ -150,20 +150,44 @@ async function backfillAllJiraLinks() {
       for (const account of accounts || []) {
         if (matchedAccountIds.has(account.id)) continue; // Skip if already matched via case ID
 
-        // Try both full name and name parts (e.g., "Spartan Investment Group" -> "spartan", "investment", "group")
-        const nameParts = account.name.toLowerCase().split(/[\s-,]+/);
-        const matchesName = nameParts.some((part: string) =>
-          part.length > 3 && searchText.includes(part)
-        );
+        const accountNameLower = account.name.toLowerCase();
 
-        if (matchesName) {
+        // Common words to exclude from matching
+        const excludeWords = new Set(['corp', 'llc', 'inc', 'ltd', 'storage', 'properties', 'property', 'group', 'holdings', 'the', 'and', 'of']);
+
+        // First try: exact full name match (highest confidence)
+        if (searchText.includes(accountNameLower)) {
           matchedAccountIds.add(account.id);
           accountLinksToCreate.push({
             user_id: userId,
             account_id: account.id,
             jira_issue_id: issue.id,
             match_type: 'account_name',
-            match_confidence: 0.9
+            match_confidence: 1.0
+          });
+          accountNameMatches++;
+          continue;
+        }
+
+        // Second try: match distinctive name parts (must have 2+ significant words matching)
+        const nameParts = accountNameLower.split(/[\s-,]+/).filter((part: string) =>
+          part.length >= 6 && !excludeWords.has(part)
+        );
+
+        if (nameParts.length === 0) continue;
+
+        const matchingParts = nameParts.filter((part: string) => searchText.includes(part));
+
+        // Require at least 2 distinctive words for multi-word names, or 1 for single distinctive word
+        if ((nameParts.length >= 2 && matchingParts.length >= 2) ||
+            (nameParts.length === 1 && matchingParts.length === 1)) {
+          matchedAccountIds.add(account.id);
+          accountLinksToCreate.push({
+            user_id: userId,
+            account_id: account.id,
+            jira_issue_id: issue.id,
+            match_type: 'account_name',
+            match_confidence: 0.8
           });
           accountNameMatches++;
         }
@@ -179,19 +203,55 @@ async function backfillAllJiraLinks() {
     console.log(`  - ${accountNameMatches} account_name links`);
     console.log(`✓ Creating ${accountLinksToCreate.length} total account links`);
 
-    // Step 6: Insert new links
+    // Step 6: Filter out duplicates and insert new links
     if (accountLinksToCreate.length > 0) {
-      console.log(`\n✓ Inserting ${accountLinksToCreate.length} new links...`);
-      const { error: insertError } = await supabaseAdmin
-        .from('account_jira_links')
-        .insert(accountLinksToCreate);
+      console.log(`\n✓ Filtering out existing links...`);
 
-      if (insertError) {
-        console.error('Error inserting links:', insertError);
-        process.exit(1);
+      // Get ALL existing links for this user to avoid duplicates (handle pagination)
+      let allExistingLinks: any[] = [];
+      let offset = 0;
+      const batchSize = 1000;
+
+      while (true) {
+        const { data: batch } = await supabaseAdmin
+          .from('account_jira_links')
+          .select('account_id, jira_issue_id')
+          .eq('user_id', userId)
+          .range(offset, offset + batchSize - 1);
+
+        if (!batch || batch.length === 0) break;
+
+        allExistingLinks = allExistingLinks.concat(batch);
+        if (batch.length < batchSize) break;
+        offset += batchSize;
       }
 
-      console.log('✓ Successfully created account links');
+      console.log(`  Found ${allExistingLinks.length} existing links`);
+
+      const existingSet = new Set(
+        allExistingLinks.map(link => `${link.account_id}:${link.jira_issue_id}`)
+      );
+
+      const newLinks = accountLinksToCreate.filter(
+        link => !existingSet.has(`${link.account_id}:${link.jira_issue_id}`)
+      );
+
+      console.log(`✓ Inserting ${newLinks.length} new links (${accountLinksToCreate.length - newLinks.length} duplicates skipped)...`);
+
+      if (newLinks.length > 0) {
+        const { error: insertError } = await supabaseAdmin
+          .from('account_jira_links')
+          .insert(newLinks);
+
+        if (insertError) {
+          console.error('Error inserting links:', insertError);
+          process.exit(1);
+        }
+
+        console.log('✓ Successfully created account links');
+      } else {
+        console.log('✓ All links already exist, no new links to create');
+      }
     }
 
     console.log('\n=== BACKFILL COMPLETE ===');
