@@ -14,6 +14,8 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [fetchingMissingCases, setFetchingMissingCases] = useState(false);
   const [fetchResult, setFetchResult] = useState<string | null>(null);
+  const [geocoding, setGeocoding] = useState(false);
+  const [geocodeResult, setGeocodeResult] = useState<string | null>(null);
   const supabase = createClientComponentClient();
   const router = useRouter();
 
@@ -61,6 +63,40 @@ export default function SettingsPage() {
       setFetchResult(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setFetchingMissingCases(false);
+    }
+  }
+
+  async function geocodeAccounts() {
+    setGeocoding(true);
+    setGeocodeResult(null);
+
+    try {
+      const response = await fetch('/api/visit-planner/geocode-accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: 50 })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setGeocodeResult(`❌ Error: ${data.error || 'Failed to geocode accounts'}\n${data.details || ''}`);
+        return;
+      }
+
+      setGeocodeResult(
+        `✓ Geocoding Complete!\n\n` +
+        `Accounts geocoded: ${data.geocoded}\n` +
+        `Failed: ${data.failed}\n` +
+        `Total processed: ${data.total_processed}\n\n` +
+        `${data.message}\n\n` +
+        `Visit Planner is now ready to use!`
+      );
+    } catch (error) {
+      console.error('Geocode error:', error);
+      setGeocodeResult(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setGeocoding(false);
     }
   }
 
@@ -342,6 +378,41 @@ export default function SettingsPage() {
                   : 'bg-red-50 border border-red-200 text-red-900'
               }`}>
                 <pre className="text-sm whitespace-pre-wrap font-mono">{fetchResult}</pre>
+              </div>
+            )}
+          </div>
+
+          {/* Geocode Accounts for Visit Planner */}
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-gray-900 mb-1">Geocode Accounts for Visit Planner</h3>
+                <p className="text-sm text-gray-600 mb-3">
+                  Convert account addresses to map coordinates using Google Maps. Required for the Visit Planner feature.
+                  Processes up to 50 accounts per run.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={geocodeAccounts}
+              disabled={geocoding}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                geocoding
+                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  : 'bg-green-600 text-white hover:bg-green-700'
+              }`}
+            >
+              {geocoding ? 'Geocoding...' : 'Geocode Accounts'}
+            </button>
+
+            {geocodeResult && (
+              <div className={`mt-4 p-4 rounded-lg ${
+                geocodeResult.startsWith('✓')
+                  ? 'bg-green-50 border border-green-200 text-green-900'
+                  : 'bg-red-50 border border-red-200 text-red-900'
+              }`}>
+                <pre className="text-sm whitespace-pre-wrap font-mono">{geocodeResult}</pre>
               </div>
             )}
           </div>
