@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     // Helper function to fetch accounts from Salesforce
     const fetchSalesforceAccounts = async (accessToken: string) => {
       // Try full query with custom fields first (for Storable orgs)
-      const fullQuery = `SELECT Id,Name,dL_Product_s_Corporate_Name__c,MRR_MVR__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,ShippingStreet,ShippingCity,ShippingState,ShippingPostalCode,ShippingCountry,BillingStreet,BillingCity,BillingState,BillingPostalCode,BillingCountry,smartystreets__Shipping_Latitude__c,smartystreets__Shipping_Longitude__c,smartystreets__Billing_Latitude__c,smartystreets__Billing_Longitude__c,smartystreets__Shipping_Address_Status__c,smartystreets__Shipping_Verified__c,UltimateParentId,(SELECT Id FROM Assets) FROM Account WHERE ParentId=null AND MRR_MVR__c>0 AND (UltimateParentId=null OR UltimateParentId=Id) ORDER BY MRR_MVR__c DESC LIMIT 500`;
+      const fullQuery = `SELECT Id,Name,dL_Product_s_Corporate_Name__c,MRR_MVR__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,ShippingStreet,ShippingCity,ShippingState,ShippingPostalCode,ShippingCountry,BillingStreet,BillingCity,BillingState,BillingPostalCode,BillingCountry,smartystreets__Shipping_Latitude__c,smartystreets__Shipping_Longitude__c,smartystreets__Billing_Latitude__c,smartystreets__Billing_Longitude__c,smartystreets__Shipping_Address_Status__c,smartystreets__Shipping_Verified__c,UltimateParentId,(SELECT Id FROM Assets) FROM Account WHERE ParentId=null AND MRR_MVR__c>0 ORDER BY MRR_MVR__c DESC LIMIT 500`;
 
       const fullResponse = await fetch(
         `${integration.instance_url}/services/data/v59.0/query?q=${encodeURIComponent(fullQuery)}`,
@@ -159,6 +159,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'No accounts found', synced: 0 });
     }
 
+    // Deduplicate accounts by corporate name to avoid syncing child accounts multiple times
+    // Keep only the first occurrence of each corporate name (highest ARR due to sort order)
+    const seenCorporateNames = new Set<string>();
+    const uniqueAccounts = accountsData.records.filter((sfAccount: any) => {
+      const corporateName = (sfAccount.dL_Product_s_Corporate_Name__c || sfAccount.Name || '').trim();
+      if (!corporateName) return true; // Keep accounts with no name (edge case)
+
+      if (seenCorporateNames.has(corporateName)) {
+        console.log(`Skipping duplicate account: ${corporateName} (ARR: ${sfAccount.MRR_MVR__c})`);
+        return false; // Skip duplicate
+      }
+
+      seenCorporateNames.add(corporateName);
+      return true; // Keep first occurrence
+    });
+
+    console.log(`Deduped ${accountsData.records.length} accounts to ${uniqueAccounts.length} unique corporate names`);
+
     // Helper function to map Salesforce Type to business unit
     const mapTypeToVertical = (type: string | null): 'storage' | 'marine' | 'rv' => {
       // Always return a vertical - never null
@@ -181,7 +199,7 @@ export async function POST(request: NextRequest) {
     };
 
     // Don't delete accounts - upsert to preserve friction data
-    const accountsToUpsert = accountsData.records.map((sfAccount: any) => {
+    const accountsToUpsert = uniqueAccounts.map((sfAccount: any) => {
       const businessUnit = mapTypeToVertical(sfAccount.Type);
       const products = [];
 
