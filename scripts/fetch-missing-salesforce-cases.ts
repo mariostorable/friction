@@ -30,7 +30,7 @@ async function fetchMissingSalesforceCases() {
 
     const matches = fieldValue.toString().match(/\b\d{8}\b/g);
     if (matches) {
-      matches.forEach(caseId => jiraCaseIds.add(caseId));
+      matches.forEach((caseId: string) => jiraCaseIds.add(caseId));
     }
   }
 
