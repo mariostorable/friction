@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json().catch(() => ({}));
-    const { limit = 50 } = body;
+    const { limit = 500 } = body;
 
     // Check for API key
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;

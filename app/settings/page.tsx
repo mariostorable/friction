@@ -74,7 +74,7 @@ export default function SettingsPage() {
       const response = await fetch('/api/visit-planner/geocode-accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limit: 50 })
+        body: JSON.stringify({ limit: 500 })
       });
 
       const data = await response.json();
@@ -389,7 +389,7 @@ export default function SettingsPage() {
                 <h3 className="text-sm font-semibold text-gray-900 mb-1">Geocode Accounts for Visit Planner</h3>
                 <p className="text-sm text-gray-600 mb-3">
                   Convert account addresses to map coordinates using Google Maps. Required for the Visit Planner feature.
-                  Processes up to 50 accounts per run.
+                  Processes up to 500 accounts per run.
                 </p>
               </div>
             </div>
