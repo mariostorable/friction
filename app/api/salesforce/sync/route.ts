@@ -325,18 +325,54 @@ export async function POST(request: NextRequest) {
       .not('arr', 'is', null)
       .order('arr', { ascending: false });
 
-    // Top 50 accounts by ARR (all verticals - don't filter by storage/marine/rv)
-    const topAccounts = allAccounts?.slice(0, 50);
+    // Create portfolios matching what dashboard expects
+    // Dashboard looks for 'top_25_edge' and 'top_25_marine' portfolio types
+    const storageAccounts = allAccounts?.filter(a => a.vertical === 'storage').slice(0, 25);
+    const marineAccounts = allAccounts?.filter(a => a.vertical === 'marine').slice(0, 25);
 
-    if (topAccounts && topAccounts.length > 0) {
-      await supabase.from('portfolios').insert({
+    console.log(`Found ${storageAccounts?.length || 0} storage accounts, ${marineAccounts?.length || 0} marine accounts`);
+
+    if (storageAccounts && storageAccounts.length > 0) {
+      console.log('Creating storage portfolio with account IDs:', storageAccounts.map(a => a.id));
+      const { error: storagePortfolioError } = await supabase.from('portfolios').insert({
         user_id: user.id,
-        name: 'Top 50 Accounts',
-        portfolio_type: 'top_50_arr',
-        criteria: { type: 'top_arr', limit: 50 },
-        account_ids: topAccounts.map(a => a.id),
+        name: 'Top 25 Storage',
+        portfolio_type: 'top_25_edge',
+        criteria: { type: 'top_arr', vertical: 'storage', limit: 25 },
+        account_ids: storageAccounts.map(a => a.id),
       });
+
+      if (storagePortfolioError) {
+        console.error('Failed to create storage portfolio:', storagePortfolioError);
+        return NextResponse.json({
+          error: 'Failed to create storage portfolio',
+          details: storagePortfolioError.message
+        }, { status: 500 });
+      }
+      console.log('✓ Storage portfolio created successfully');
     }
+
+    if (marineAccounts && marineAccounts.length > 0) {
+      console.log('Creating marine portfolio with account IDs:', marineAccounts.map(a => a.id));
+      const { error: marinePortfolioError } = await supabase.from('portfolios').insert({
+        user_id: user.id,
+        name: 'Top 25 Marine',
+        portfolio_type: 'top_25_marine',
+        criteria: { type: 'top_arr', vertical: 'marine', limit: 25 },
+        account_ids: marineAccounts.map(a => a.id),
+      });
+
+      if (marinePortfolioError) {
+        console.error('Failed to create marine portfolio:', marinePortfolioError);
+        return NextResponse.json({
+          error: 'Failed to create marine portfolio',
+          details: marinePortfolioError.message
+        }, { status: 500 });
+      }
+      console.log('✓ Marine portfolio created successfully');
+    }
+
+    const topAccounts = [...(storageAccounts || []), ...(marineAccounts || [])];
 
     await supabase.from('integrations').update({ last_synced_at: new Date().toISOString() }).eq('id', integration.id);
 
@@ -416,7 +452,8 @@ export async function POST(request: NextRequest) {
       success: true,
       synced: upsertedAccounts?.length || 0,
       portfolios: {
-        top_50: topAccounts?.length || 0,
+        storage: storageAccounts?.length || 0,
+        marine: marineAccounts?.length || 0,
       },
       geocoded: geocodedCount || 0,
       analysisResult,
