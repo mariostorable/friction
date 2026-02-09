@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
-import { TrendingUp, TrendingDown, Minus, Settings, ArrowUpDown, ArrowUp, ArrowDown, ExternalLink } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Settings, ArrowUpDown, ArrowUp, ArrowDown, ExternalLink, MapPin } from 'lucide-react';
 import { AccountWithMetrics } from '@/types';
 import PortfolioSummary from '@/components/PortfolioSummary';
 import FavoritesTab from '@/components/FavoritesTab';
@@ -505,6 +505,13 @@ export default function Dashboard() {
               <p className="mt-1 text-sm text-gray-500">Early warning system for customer friction</p>
             </div>
             <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push('/visit-planner')}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+              >
+                <MapPin className="w-4 h-4" />
+                Visit Planner
+              </button>
               <button
                 onClick={() => router.push('/roadmap')}
                 className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
