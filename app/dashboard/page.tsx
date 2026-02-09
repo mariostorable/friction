@@ -12,6 +12,8 @@ import ThemesTab from '@/components/ThemesTab';
 import JiraSyncButton from '@/components/JiraSyncButton';
 import JiraPortfolioOverview from '@/components/JiraPortfolioOverview';
 import JiraAccountBreakdown from '@/components/JiraAccountBreakdown';
+import SuccessToast from '@/components/SuccessToast';
+import ErrorToast from '@/components/ErrorToast';
 
 export default function Dashboard() {
   const [top25, setTop25] = useState<AccountWithMetrics[]>([]);
@@ -38,6 +40,8 @@ export default function Dashboard() {
   const [hoveredCaseIcon, setHoveredCaseIcon] = useState<string | null>(null);
   const [jiraTicketCounts, setJiraTicketCounts] = useState<Record<string, { resolved_30d: number; in_progress: number; open: number }>>({});
   const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [error, setError] = useState<{ title: string; message: string; details?: string } | null>(null);
   const supabase = createClientComponentClient();
   const router = useRouter();
 
@@ -262,13 +266,18 @@ export default function Dashboard() {
       .single();
 
     if (!integration) {
-      alert('⚠️ Salesforce Not Connected\n\nYou need to connect your Salesforce account first.\n\n1. Click on Settings (top right)\n2. Connect to Salesforce\n3. Come back here and click "Sync from Salesforce"');
-      router.push('/settings');
+      setError({
+        title: 'Salesforce Not Connected',
+        message: 'You need to connect your Salesforce account first.',
+        details: '1. Click on Settings (top right)\n2. Connect to Salesforce\n3. Come back here and click "Sync from Salesforce"'
+      });
       return;
     }
 
     setSyncing(true);
     setSyncProgress('Syncing account data from Salesforce...');
+    setError(null);
+    setSuccess(null);
 
     try {
       const response = await fetch('/api/salesforce/sync', {
@@ -291,8 +300,11 @@ export default function Dashboard() {
 
         // Check if Salesforce is not connected
         if (errorData.error === 'Salesforce not connected' || errorData.error === 'No tokens found') {
-          alert('⚠️ Salesforce Connection Issue\n\nYour Salesforce connection may have expired or is not properly configured.\n\n1. Go to Settings (top right)\n2. Reconnect to Salesforce\n3. Come back here and try syncing again');
-          router.push('/settings');
+          setError({
+            title: 'Salesforce Connection Issue',
+            message: 'Your Salesforce connection may have expired or is not properly configured.',
+            details: '1. Go to Settings (top right)\n2. Reconnect to Salesforce\n3. Come back here and try syncing again'
+          });
           setSyncing(false);
           return;
         }
@@ -306,21 +318,41 @@ export default function Dashboard() {
       const result = await response.json();
       console.log('Sync result:', result);
 
-      // Show the message from the backend
-      if (result.message) {
-        setSyncProgress(result.message);
+      // Build success message
+      let message = `✓ Salesforce Sync Complete!\n\n`;
+      message += `Accounts synced: ${result.synced}\n`;
+
+      if (result.portfolios) {
+        const storage = result.portfolios.storage || 0;
+        const marine = result.portfolios.marine || 0;
+        const top50 = result.portfolios.top_50 || 0;
+
+        if (storage > 0) message += `Storage accounts: ${storage}\n`;
+        if (marine > 0) message += `Marine accounts: ${marine}\n`;
+        if (top50 > 0 && storage === 0 && marine === 0) message += `Top portfolio accounts: ${top50}\n`;
       }
 
-      // If there was an analysis error, show it
-      if (result.analysisError) {
-        console.error('Analysis error:', result.analysisError);
-        alert(`⚠️ Analysis Failed\n\n${result.analysisError}\n\nCheck the console or Vercel logs for details.`);
+      if (result.geocoded !== undefined) {
+        message += `Geocoded (for Visit Planner): ${result.geocoded}\n`;
       }
+
+      if (result.message) {
+        message += `\n${result.message}`;
+      }
+
+      // If there was an analysis error, include it
+      if (result.analysisError) {
+        message += `\n\n⚠️ Analysis Warning:\n${result.analysisError}`;
+      }
+
+      message += `\n\nAddress/location data has been updated.\nRefresh the dashboard to see latest data.`;
+
+      setSuccess(message);
 
       // Refresh the dashboard to show updated data
       await loadDashboard();
       setSyncing(false);
-      setTimeout(() => setSyncProgress(''), 10000);
+      setSyncProgress('');
       return;
 
     } catch (error) {
@@ -334,23 +366,37 @@ export default function Dashboard() {
       const errorMessage = error instanceof Error ? error.message : String(error);
 
       // Provide helpful error messages based on common issues
-      let userMessage = '❌ Failed to sync with Salesforce\n\n';
+      let title = 'Sync Failed';
+      let message = '';
+      let details = '';
 
       if (errorMessage.toLowerCase().includes('401') || errorMessage.toLowerCase().includes('unauthorized') || errorMessage.toLowerCase().includes('not connected')) {
-        userMessage += '🔐 Authentication Issue\n\nYour Salesforce connection may have expired or is not set up.\n\n📝 Steps to fix:\n1. Click Settings (top right)\n2. Connect or reconnect to Salesforce\n3. Come back and try syncing again';
+        title = 'Authentication Issue';
+        message = 'Your Salesforce connection may have expired or is not set up.';
+        details = 'Steps to fix:\n1. Click Settings (top right)\n2. Connect or reconnect to Salesforce\n3. Come back and try syncing again';
       } else if (errorMessage.toLowerCase().includes('timeout') || errorMessage.toLowerCase().includes('etimedout')) {
-        userMessage += '⏱️ Connection Timeout\n\nThe request took too long - this can happen with large datasets.\n\n📝 What to do:\nJust click the sync button again to retry. Your progress is saved.';
+        title = 'Connection Timeout';
+        message = 'The request took too long - this can happen with large datasets.';
+        details = 'Just click the sync button again to retry. Your progress is saved.';
       } else if (errorMessage.toLowerCase().includes('network') || errorMessage.toLowerCase().includes('econnrefused') || errorMessage.toLowerCase().includes('fetch')) {
-        userMessage += '🌐 Network Error\n\nUnable to reach the server or Salesforce.\n\n📝 What to do:\n• Check your internet connection\n• Click the sync button to try again\n• Check browser console for details';
+        title = 'Network Error';
+        message = 'Unable to reach the server or Salesforce.';
+        details = '• Check your internet connection\n• Click the sync button to try again\n• Check browser console for details';
       } else if (errorMessage.toLowerCase().includes('rate limit')) {
-        userMessage += '⚠️ Rate Limit\n\nToo many requests to Salesforce API.\n\n📝 What to do:\nWait 2-3 minutes, then click sync again.';
+        title = 'Rate Limit';
+        message = 'Too many requests to Salesforce API.';
+        details = 'Wait 2-3 minutes, then click sync again.';
       } else if (errorMessage.toLowerCase().includes('invalid') || errorMessage.toLowerCase().includes('parse')) {
-        userMessage += '⚠️ Server Response Error\n\nThe server returned an unexpected response.\n\n📝 What to do:\n• Try clicking sync again\n• Check your Salesforce connection in Settings\n• Contact support if this persists';
+        title = 'Server Response Error';
+        message = 'The server returned an unexpected response.';
+        details = '• Try clicking sync again\n• Check your Salesforce connection in Settings\n• Contact support if this persists';
       } else {
-        userMessage += `Error Details:\n${errorMessage}\n\n📝 What to do:\n• Copy this error message\n• Try clicking sync again\n• If it fails again, go to Settings → Disconnect → Reconnect Salesforce\n• Open browser console (F12) for technical details`;
+        title = 'Sync Failed';
+        message = errorMessage;
+        details = '• Copy this error message\n• Try clicking sync again\n• If it fails again, go to Settings → Disconnect → Reconnect Salesforce\n• Open browser console (F12) for technical details';
       }
 
-      alert(userMessage);
+      setError({ title, message, details });
       setSyncing(false);
       setSyncProgress('');
 
@@ -1152,6 +1198,25 @@ export default function Dashboard() {
           />
         )}
       </main>
+
+      {/* Success Toast */}
+      {success && (
+        <SuccessToast
+          message={success}
+          onClose={() => setSuccess(null)}
+          autoClose={false}
+        />
+      )}
+
+      {/* Error Toast */}
+      {error && (
+        <ErrorToast
+          title={error.title}
+          message={error.message}
+          details={error.details}
+          onClose={() => setError(null)}
+        />
+      )}
     </div>
   );
 }
