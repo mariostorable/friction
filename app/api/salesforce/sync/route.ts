@@ -325,18 +325,40 @@ export async function POST(request: NextRequest) {
       .not('arr', 'is', null)
       .order('arr', { ascending: false });
 
-    // Top 50 accounts by ARR (all verticals - don't filter by storage/marine/rv)
-    const topAccounts = allAccounts?.slice(0, 50);
+    // Top 25 Storage Accounts (ONLY EDGE + SiteLink - exclude accounts without software)
+    const storageAccounts = allAccounts?.filter(a => {
+      if (a.vertical !== 'storage') return false;
+      // ONLY include accounts with EDGE or SiteLink software
+      if (!a.products || !a.products.trim()) return false;
+      return a.products.includes('EDGE') || a.products.includes('SiteLink');
+    }).slice(0, 25);
 
-    if (topAccounts && topAccounts.length > 0) {
+    if (storageAccounts && storageAccounts.length > 0) {
       await supabase.from('portfolios').insert({
         user_id: user.id,
-        name: 'Top 50 Accounts',
-        portfolio_type: 'top_50_arr',
-        criteria: { type: 'top_arr', limit: 50 },
-        account_ids: topAccounts.map(a => a.id),
+        name: 'Top 25 Storage Accounts',
+        portfolio_type: 'top_25_edge',
+        criteria: { type: 'top_mrr_storage', limit: 25, vertical: 'storage', requires_software: true },
+        account_ids: storageAccounts.map(a => a.id),
       });
     }
+
+    // Top 25 Marine Accounts
+    const marineAccounts = allAccounts?.filter(a =>
+      a.vertical === 'marine'
+    ).slice(0, 25);
+
+    if (marineAccounts && marineAccounts.length > 0) {
+      await supabase.from('portfolios').insert({
+        user_id: user.id,
+        name: 'Top 25 Marine Accounts',
+        portfolio_type: 'top_25_marine',
+        criteria: { type: 'top_mrr_marine', limit: 25, vertical: 'marine' },
+        account_ids: marineAccounts.map(a => a.id),
+      });
+    }
+
+    const topAccounts = [...(storageAccounts || []), ...(marineAccounts || [])];
 
     await supabase.from('integrations').update({ last_synced_at: new Date().toISOString() }).eq('id', integration.id);
 
@@ -416,7 +438,8 @@ export async function POST(request: NextRequest) {
       success: true,
       synced: upsertedAccounts?.length || 0,
       portfolios: {
-        top_50: topAccounts?.length || 0,
+        storage: storageAccounts?.length || 0,
+        marine: marineAccounts?.length || 0,
       },
       geocoded: geocodedCount || 0,
       analysisResult,
