@@ -74,6 +74,10 @@ export default function SalesforceConnector() {
           message += `Marine accounts: ${result.portfolios.marine || 0}\n`;
         }
 
+        if (result.geocoded !== undefined) {
+          message += `Geocoded (for Visit Planner): ${result.geocoded}\n`;
+        }
+
         // Include analysis status if provided
         if (result.message) {
           message += `\n${result.message}`;

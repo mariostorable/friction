@@ -136,11 +136,19 @@ export default function VisitPlannerPage() {
       });
 
       if (!nearbyResponse.ok) {
-        throw new Error('Failed to search accounts');
+        const errorData = await nearbyResponse.json().catch(() => ({}));
+        const errorMsg = errorData.error || 'Failed to search accounts';
+        const errorDetails = errorData.details ? ` - ${errorData.details}` : '';
+        throw new Error(`${errorMsg}${errorDetails}`);
       }
 
       const nearbyData = await nearbyResponse.json();
       setAccounts(nearbyData.accounts || []);
+
+      // Show message if no accounts found
+      if (!nearbyData.accounts || nearbyData.accounts.length === 0) {
+        setError(`No accounts found within ${radiusMiles} miles. Try increasing the search radius or checking that your accounts have address data synced from Salesforce.`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load accounts');
     }
