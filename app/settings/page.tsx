@@ -12,6 +12,8 @@ import JiraLinksDiagnostic from '@/components/JiraLinksDiagnostic';
 export default function SettingsPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchingMissingCases, setFetchingMissingCases] = useState(false);
+  const [fetchResult, setFetchResult] = useState<string | null>(null);
   const supabase = createClientComponentClient();
   const router = useRouter();
 
@@ -28,6 +30,38 @@ export default function SettingsPage() {
   async function handleSignOut() {
     await supabase.auth.signOut();
     router.push('/');
+  }
+
+  async function fetchMissingCases() {
+    setFetchingMissingCases(true);
+    setFetchResult(null);
+
+    try {
+      const response = await fetch('/api/salesforce/fetch-missing-cases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setFetchResult(`❌ Error: ${data.error || 'Failed to fetch missing cases'}`);
+        return;
+      }
+
+      setFetchResult(
+        `✓ Successfully imported ${data.imported} cases!\n` +
+        `  Searched for: ${data.searched} missing case IDs\n` +
+        `  Found in Salesforce: ${data.fetched}\n` +
+        `  Imported: ${data.imported}\n\n` +
+        `${data.message}`
+      );
+    } catch (error) {
+      console.error('Fetch missing cases error:', error);
+      setFetchResult(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setFetchingMissingCases(false);
+    }
   }
 
   if (loading) {
@@ -276,6 +310,41 @@ export default function SettingsPage() {
             <h2 className="text-xl font-semibold text-gray-900">Salesforce Integration</h2>
           </div>
           <SalesforceConnector />
+
+          {/* Fetch Missing Cases Button */}
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-gray-900 mb-1">Historical Case Backfill</h3>
+                <p className="text-sm text-gray-600 mb-3">
+                  Fetch older Salesforce cases that are referenced in Jira tickets but missing from the database.
+                  This will search for and import specific cases without re-syncing entire accounts.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={fetchMissingCases}
+              disabled={fetchingMissingCases}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                fetchingMissingCases
+                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+            >
+              {fetchingMissingCases ? 'Fetching Cases...' : 'Fetch Missing Cases'}
+            </button>
+
+            {fetchResult && (
+              <div className={`mt-4 p-4 rounded-lg ${
+                fetchResult.startsWith('✓')
+                  ? 'bg-green-50 border border-green-200 text-green-900'
+                  : 'bg-red-50 border border-red-200 text-red-900'
+              }`}>
+                <pre className="text-sm whitespace-pre-wrap font-mono">{fetchResult}</pre>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Jira Integration Section */}
