@@ -387,7 +387,7 @@ export async function POST(request: NextRequest) {
       `)
       .eq('user_id', userId)
       .eq('is_friction', true)
-      .not('raw_inputs.source_id', 'is', null');
+      .not('raw_inputs.source_id', 'is', null);
 
     // Build map: Salesforce Case ID → Friction Themes (only for friction cases)
     const caseIdToThemes = new Map<string, Set<string>>();
