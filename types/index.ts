@@ -46,6 +46,23 @@ export interface Account {
   vitally_nps_score: number | null;
   vitally_status: string | null;
   vitally_last_activity_at: string | null;
+  // Visit Planner fields (added 2026-02-09)
+  property_address_street: string | null;
+  property_address_city: string | null;
+  property_address_state: string | null;
+  property_address_postal_code: string | null;
+  property_address_country: string | null;
+  billing_address_street: string | null;
+  billing_address_city: string | null;
+  billing_address_state: string | null;
+  billing_address_postal_code: string | null;
+  billing_address_country: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  geocode_source: 'salesforce' | 'google' | null;
+  geocode_quality: 'high' | 'medium' | 'low' | null;
+  geocoded_at: string | null;
+  ultimate_parent_id: string | null;
 }
 
 export interface Portfolio {

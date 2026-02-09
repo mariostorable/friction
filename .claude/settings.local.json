@@ -19,7 +19,8 @@
       "Bash(vercel ls:*)",
       "Bash(git push:*)",
       "Bash(vercel logs:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }
