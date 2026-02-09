@@ -70,8 +70,7 @@ export default function SalesforceConnector() {
         message += `Accounts synced: ${result.synced}\n`;
 
         if (result.portfolios) {
-          message += `Storage accounts: ${result.portfolios.storage || 0}\n`;
-          message += `Marine accounts: ${result.portfolios.marine || 0}\n`;
+          message += `Top portfolio accounts: ${result.portfolios.top_50 || 0}\n`;
         }
 
         if (result.geocoded !== undefined) {

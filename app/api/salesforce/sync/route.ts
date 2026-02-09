@@ -298,7 +298,7 @@ export async function POST(request: NextRequest) {
 
     await supabase.from('portfolios').delete().eq('user_id', user.id);
 
-    // Get all accounts with products and vertical fields (active only)
+    // Get all accounts (active only, has ARR)
     const { data: allAccounts } = await supabase
       .from('accounts')
       .select('id, vertical, products, arr')
@@ -307,39 +307,16 @@ export async function POST(request: NextRequest) {
       .not('arr', 'is', null)
       .order('arr', { ascending: false });
 
-    // Top 25 Storage Accounts (EDGE + SiteLink if products available, otherwise all storage)
-    const storageAccounts = allAccounts?.filter(a => {
-      if (a.vertical !== 'storage') return false;
-      // If products field has data, filter by EDGE/SiteLink
-      if (a.products && a.products.trim()) {
-        return a.products.includes('EDGE') || a.products.includes('SiteLink');
-      }
-      // Otherwise include all storage accounts
-      return true;
-    }).slice(0, 25);
+    // Top 50 accounts by ARR (all verticals - don't filter by storage/marine/rv)
+    const topAccounts = allAccounts?.slice(0, 50);
 
-    if (storageAccounts && storageAccounts.length > 0) {
+    if (topAccounts && topAccounts.length > 0) {
       await supabase.from('portfolios').insert({
         user_id: user.id,
-        name: 'Top 25 Storage Accounts',
-        portfolio_type: 'top_25_edge', // Keep same type for backwards compatibility
-        criteria: { type: 'top_mrr_storage', limit: 25, vertical: 'storage' },
-        account_ids: storageAccounts.map(a => a.id),
-      });
-    }
-
-    // Top 25 Marine Accounts
-    const marineAccounts = allAccounts?.filter(a =>
-      a.vertical === 'marine'
-    ).slice(0, 25);
-
-    if (marineAccounts && marineAccounts.length > 0) {
-      await supabase.from('portfolios').insert({
-        user_id: user.id,
-        name: 'Top 25 Marine Accounts',
-        portfolio_type: 'top_25_marine',
-        criteria: { type: 'top_mrr_marine', limit: 25, vertical: 'marine' },
-        account_ids: marineAccounts.map(a => a.id),
+        name: 'Top 50 Accounts',
+        portfolio_type: 'top_50_arr',
+        criteria: { type: 'top_arr', limit: 50 },
+        account_ids: topAccounts.map(a => a.id),
       });
     }
 
@@ -402,7 +379,7 @@ export async function POST(request: NextRequest) {
       const summary = analysisResult.summary || {};
       const analyzed = summary.analyzed || 0;
       const skipped = summary.skipped || 0;
-      const pending = (storageAccounts?.length || 0) + (marineAccounts?.length || 0) - analyzed - skipped;
+      const pending = (topAccounts?.length || 0) - analyzed - skipped;
 
       if (analyzed > 0) {
         message += `\n\n✓ Analyzed ${analyzed} account${analyzed > 1 ? 's' : ''}!`;
@@ -421,8 +398,7 @@ export async function POST(request: NextRequest) {
       success: true,
       synced: upsertedAccounts?.length || 0,
       portfolios: {
-        storage: storageAccounts?.length || 0,
-        marine: marineAccounts?.length || 0,
+        top_50: topAccounts?.length || 0,
       },
       geocoded: geocodedCount || 0,
       analysisResult,
