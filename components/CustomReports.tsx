@@ -141,7 +141,7 @@ export default function CustomReports({ allAccounts }: CustomReportsProps) {
             onMouseEnter={() => setHoveredColumn('case_volume')}
             onMouseLeave={() => setHoveredColumn(null)}
           >
-            Cases (90d)
+            Cases (365d)
             {hoveredColumn === 'case_volume' && (
               <div className="absolute left-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 z-50 whitespace-normal font-normal">
                 Total number of Salesforce cases for this account in the last 90 days
@@ -208,7 +208,7 @@ export default function CustomReports({ allAccounts }: CustomReportsProps) {
     const rows = table.getFilteredRowModel().rows.map(row => row.original);
 
     const csvContent = [
-      ['Account Name', 'ARR', 'Product', 'Segment', 'OFI Score', 'Cases (90d)', 'Trend', 'Last Analyzed'],
+      ['Account Name', 'ARR', 'Product', 'Segment', 'OFI Score', 'Cases (365d)', 'Trend', 'Last Analyzed'],
       ...rows.map(row => [
         row.name,
         row.arr || '',

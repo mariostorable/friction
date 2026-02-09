@@ -71,7 +71,7 @@ const defaultColumns: Column[] = [
   },
   {
     key: 'case_volume',
-    label: 'Cases (90d)',
+    label: 'Cases (365d)',
     sortable: true,
     render: (account) => (
       <span className="text-gray-900">{account.current_snapshot?.case_volume || 0}</span>

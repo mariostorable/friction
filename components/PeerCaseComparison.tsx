@@ -96,7 +96,7 @@ export default function PeerCaseComparison({ currentAccount, peers }: PeerCaseCo
           <p className="text-2xl font-bold text-blue-900 mt-1">
             {avgVolume.toFixed(0)}
           </p>
-          <p className="text-xs text-blue-600">cases/90d</p>
+          <p className="text-xs text-blue-600">cases/365d</p>
         </div>
 
         {/* Median */}

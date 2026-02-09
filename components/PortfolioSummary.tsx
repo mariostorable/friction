@@ -313,7 +313,7 @@ export default function PortfolioSummary({ top25, singleOperator }: PortfolioSum
                       <div className={`text-2xl font-bold ${account.reason === 'high' ? 'text-red-600' : 'text-yellow-600'}`}>
                         {account.current_snapshot?.case_volume || 0}
                       </div>
-                      <div className="text-sm text-gray-600">cases (90d)</div>
+                      <div className="text-sm text-gray-600">cases (365d)</div>
                     </div>
                   </div>
                   <div className="mt-3 flex items-center gap-2">

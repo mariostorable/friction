@@ -859,7 +859,7 @@ export default function Dashboard() {
                         className="w-[10%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-tight cursor-pointer hover:bg-gray-100 relative"
                       >
                         <div className="flex items-center gap-1">
-                          Cases (90d) {getSortIcon('case_volume')}
+                          Cases (365d) {getSortIcon('case_volume')}
                         </div>
                         {hoveredColumn === 'case_volume' && (
                           <div className="absolute left-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 z-50 whitespace-normal normal-case font-normal">
@@ -875,7 +875,7 @@ export default function Dashboard() {
                         className="w-[10%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-tight cursor-pointer hover:bg-gray-100 relative"
                       >
                         <div className="flex items-center gap-1">
-                          Per Loc (90d) {getSortIcon('cases_per_facility')}
+                          Per Loc (365d) {getSortIcon('cases_per_facility')}
                         </div>
                         {hoveredColumn === 'cases_per_facility' && (
                           <div className="absolute left-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 z-50 whitespace-normal normal-case font-normal">
