@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { MapPin, List as ListIcon, Search, Filter, AlertCircle, Loader2, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useLoadScript, Autocomplete } from '@react-google-maps/api';
@@ -80,6 +80,7 @@ export default function VisitPlannerPage() {
 
   const supabase = createClientComponentClient();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Load Google Maps script
   const { isLoaded: mapsLoaded } = useLoadScript({
@@ -90,6 +91,14 @@ export default function VisitPlannerPage() {
   useEffect(() => {
     checkAuth();
   }, []);
+
+  // Handle account query parameter on mount
+  useEffect(() => {
+    const accountId = searchParams.get('account');
+    if (accountId && !loading) {
+      loadAccountAndSearch(accountId);
+    }
+  }, [searchParams, loading]);
 
   // Debounced account search
   useEffect(() => {
@@ -124,6 +133,26 @@ export default function VisitPlannerPage() {
       router.push('/');
     } else {
       setLoading(false);
+    }
+  }
+
+  async function loadAccountAndSearch(accountId: string) {
+    try {
+      // Fetch the account by ID
+      const { data: account } = await supabase
+        .from('accounts')
+        .select('id, name, property_address_city, property_address_state, latitude, longitude')
+        .eq('id', accountId)
+        .single();
+
+      if (account && account.latitude && account.longitude) {
+        // Switch to account search mode
+        setSearchMode('account');
+        // Trigger the account selection
+        handleAccountSelect(account);
+      }
+    } catch (err) {
+      console.error('Error loading account:', err);
     }
   }
 

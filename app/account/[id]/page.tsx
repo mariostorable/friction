@@ -14,7 +14,8 @@ import {
   Info,
   AlertCircle,
   ArrowLeft,
-  X
+  X,
+  MapPin
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import VisitBriefing from '@/components/VisitBriefing';
@@ -764,6 +765,15 @@ export default function AccountDetailPage() {
                 frictionCards={frictionCards}
                 snapshot={latestSnapshot}
               />
+              {account.latitude && account.longitude && (
+                <button
+                  onClick={() => router.push(`/visit-planner?account=${accountId}`)}
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors shadow-sm"
+                >
+                  <MapPin className="w-4 h-4" />
+                  Find Nearby Accounts
+                </button>
+              )}
               <button
                 onClick={createShareLink}
                 className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
