@@ -418,7 +418,7 @@ export async function POST(request: NextRequest) {
       await supabase.from('portfolios').insert({
         user_id: user.id,
         name: 'Top 25 Storage Accounts',
-        portfolio_type: 'top_25_storage',
+        portfolio_type: 'top_25_edge',  // Keep as top_25_edge for dashboard compatibility
         criteria: { type: 'top_mrr_storage', limit: 25, vertical: 'storage' },
         account_ids: storageAccounts.map(a => a.id),
       });
