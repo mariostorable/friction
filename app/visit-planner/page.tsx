@@ -1,8 +1,6 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { MapPin, List as ListIcon, Search, Filter, AlertCircle, Loader2, X } from 'lucide-react';
@@ -47,7 +45,7 @@ interface AccountSuggestion {
   longitude: number;
 }
 
-export default function VisitPlannerPage() {
+function VisitPlannerContent() {
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [searchMode, setSearchMode] = useState<'city' | 'account'>('city');
@@ -693,5 +691,17 @@ export default function VisitPlannerPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function VisitPlannerPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    }>
+      <VisitPlannerContent />
+    </Suspense>
   );
 }
