@@ -10,6 +10,7 @@ export default function SalesforceConnector() {
   const [integration, setIntegration] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [hasCredentials, setHasCredentials] = useState(true);
 
   // Toast state
   const [error, setError] = useState<{ title: string; message: string; details?: string } | null>(null);
@@ -28,8 +29,10 @@ export default function SalesforceConnector() {
       .eq('integration_type', 'salesforce')
       .eq('status', 'active')
       .single();
-    
+
     setIntegration(data);
+    // Check if credentials exist (they might be null/undefined)
+    setHasCredentials(!!(data?.credentials));
     setLoading(false);
   }
 
@@ -112,6 +115,10 @@ export default function SalesforceConnector() {
         setSuccess(message);
         await checkIntegration();
       } else {
+        // Check if it's a credentials error
+        if (result.error && result.error.includes('credentials')) {
+          setHasCredentials(false);
+        }
         setError({
           title: 'Sync Failed',
           message: result.error || 'Failed to sync Salesforce data',
@@ -148,6 +155,54 @@ export default function SalesforceConnector() {
   }
 
   if (integration) {
+    // If credentials are missing, show warning and reconnect option
+    if (!hasCredentials) {
+      return (
+        <>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <svg className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+              <div className="flex-1">
+                <h3 className="font-semibold text-red-900">Salesforce Connection Lost</h3>
+                <p className="text-sm text-red-700 mt-1">Your Salesforce credentials are missing. Data sync is disabled.</p>
+                <p className="text-xs text-red-600 mt-1">{integration.instance_url}</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={connectSalesforce}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
+                >
+                  Reconnect
+                </button>
+                <button
+                  onClick={disconnect}
+                  className="px-3 py-2 text-sm font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+          {error && (
+            <ErrorToast
+              title={error.title}
+              message={error.message}
+              details={error.details}
+              onClose={() => setError(null)}
+            />
+          )}
+          {success && (
+            <SuccessToast
+              message={success}
+              onClose={() => setSuccess(null)}
+            />
+          )}
+        </>
+      );
+    }
+
     return (
       <>
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
