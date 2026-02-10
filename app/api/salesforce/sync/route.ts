@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const { data: integration } = await supabase
+    const { data: integration, error: integrationError } = await supabase
       .from('integrations')
       .select('*')
       .eq('user_id', user.id)
@@ -24,7 +24,24 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (!integration) {
-      return NextResponse.json({ error: 'Salesforce not connected' }, { status: 400 });
+      return NextResponse.json({
+        error: 'Salesforce not connected',
+        message: 'Please connect Salesforce in Settings',
+        integrationError: integrationError?.message
+      }, { status: 400 });
+    }
+
+    // CRITICAL CHECK: Verify credentials exist
+    if (!integration.credentials) {
+      console.error('⚠️ CRITICAL: Salesforce integration exists but has no credentials!');
+      console.error('Integration ID:', integration.id);
+      console.error('User ID:', user.id);
+      return NextResponse.json({
+        error: 'Salesforce credentials missing',
+        message: 'Your Salesforce connection has lost its credentials. Please reconnect Salesforce in Settings.',
+        integrationId: integration.id,
+        action: 'reconnect_required'
+      }, { status: 400 });
     }
 
     const supabaseAdmin = createClient(

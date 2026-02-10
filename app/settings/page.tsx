@@ -8,6 +8,7 @@ import SalesforceConnector from '@/components/SalesforceConnector';
 import JiraConnector from '@/components/JiraConnector';
 import VitallyConnector from '@/components/VitallyConnector';
 import JiraLinksDiagnostic from '@/components/JiraLinksDiagnostic';
+import IntegrationHealthBanner from '@/components/IntegrationHealthBanner';
 
 export default function SettingsPage() {
   const [user, setUser] = useState<any>(null);
@@ -139,6 +140,9 @@ export default function SettingsPage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        {/* Integration Health Warning Banner */}
+        <IntegrationHealthBanner />
+
         {/* What is this? Section */}
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center gap-3 mb-6">

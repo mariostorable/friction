@@ -14,6 +14,7 @@ import JiraPortfolioOverview from '@/components/JiraPortfolioOverview';
 import JiraAccountBreakdown from '@/components/JiraAccountBreakdown';
 import SuccessToast from '@/components/SuccessToast';
 import ErrorToast from '@/components/ErrorToast';
+import IntegrationHealthBanner from '@/components/IntegrationHealthBanner';
 
 export default function Dashboard() {
   const [top25, setTop25] = useState<AccountWithMetrics[]>([]);
@@ -599,6 +600,9 @@ export default function Dashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Integration Health Warning Banner */}
+        <IntegrationHealthBanner />
+
         {/* Business Unit Filter */}
         <div className="mb-4">
           <div className="flex items-center gap-2">
