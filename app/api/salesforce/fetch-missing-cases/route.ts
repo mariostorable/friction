@@ -5,6 +5,7 @@ import { cookies } from 'next/headers';
 import { getDecryptedToken } from '@/lib/encryption';
 
 export const maxDuration = 300; // 5 minutes for fetching many cases
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {

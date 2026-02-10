@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const maxDuration = 300; // 5 minutes for batch geocoding
+export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/visit-planner/geocode-accounts

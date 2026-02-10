@@ -3,6 +3,8 @@ import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { calculatePriorityScores, getMaxArr } from '@/lib/priorityScore';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/visit-planner/nearby
  *

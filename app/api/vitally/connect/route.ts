@@ -4,6 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { upsertEncryptedToken } from '@/lib/encryption';
 
+export const dynamic = 'force-dynamic';
+
 const VITALLY_API_BASE_URL = 'https://storable.rest.vitally.io';
 
 export async function POST(request: NextRequest) {

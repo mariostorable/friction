@@ -5,6 +5,7 @@ import { cookies } from 'next/headers';
 import { getDecryptedToken } from '@/lib/encryption';
 
 export const maxDuration = 120; // Increased for large Jira instances
+export const dynamic = 'force-dynamic';
 
 // Theme keyword mapping for intelligent matching
 const THEME_KEYWORDS: Record<string, string[]> = {

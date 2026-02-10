@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Check what's actually stored in the database for Jira issues
  * This helps debug why custom_fields is empty

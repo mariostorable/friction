@@ -3,6 +3,8 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Test endpoint to verify vitally_note source_type is allowed
  * This will attempt to insert a test record with source_type='vitally_note'

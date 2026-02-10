@@ -5,6 +5,7 @@ import { cookies } from 'next/headers';
 import { getDecryptedToken, updateEncryptedAccessToken } from '@/lib/encryption';
 
 export const maxDuration = 60; // 60 seconds to handle Salesforce API calls and database operations
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {

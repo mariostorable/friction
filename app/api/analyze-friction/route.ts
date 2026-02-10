@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
 export const maxDuration = 300; // 5 minutes to handle up to 50 cases
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {

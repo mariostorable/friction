@@ -3,6 +3,8 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { getDecryptedToken } from '@/lib/encryption';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Diagnostic endpoint to fetch a single Jira issue and show raw API response
  * This helps debug why custom fields aren't being captured

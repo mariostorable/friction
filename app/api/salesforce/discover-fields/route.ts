@@ -3,6 +3,8 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { getDecryptedToken } from '@/lib/encryption';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/salesforce/discover-fields
  *

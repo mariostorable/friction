@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
+export const dynamic = 'force-dynamic';
+
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY!;
 
 export async function POST(request: NextRequest) {

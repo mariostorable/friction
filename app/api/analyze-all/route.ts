@@ -3,6 +3,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
 export const maxDuration = 300;
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {

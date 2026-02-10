@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
+export const dynamic = 'force-dynamic';
+
 // This endpoint helps explore what fields are available in Vitally accounts
 export async function GET() {
   try {
