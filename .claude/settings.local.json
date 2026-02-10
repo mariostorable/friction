@@ -22,7 +22,8 @@
       "Bash(find:*)",
       "Bash(npx tsc:*)",
       "Bash(curl \"https://friction-intelligence.vercel.app/api/salesforce/inspect-addresses?user_id=ab953672-7bad-4601-9289-5d766e73fec9\")",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(curl:*)"
     ]
   }
 }

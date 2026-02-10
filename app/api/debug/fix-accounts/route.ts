@@ -105,6 +105,7 @@ export async function POST(request: Request) {
       const { data: insertedAccount, error: insertError } = await supabase
         .from('accounts')
         .insert({
+          user_id: userId,
           salesforce_id: account.id,
           name: sfData.Name,
           arr: sfData.AnnualRevenue || 0,
