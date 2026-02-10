@@ -347,27 +347,49 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // Top 25 Storage Accounts by ARR (any products for now - filter broken)
-    const allStorageAccounts = allAccounts?.filter(a => a.vertical === 'storage') || [];
-    const storageWithProducts = allStorageAccounts.filter(a => a.products && a.products.trim());
+    // Filter storage accounts: exclude test accounts and require software
+    const allStorageAccounts = allAccounts?.filter(a =>
+      a.vertical === 'storage' &&
+      !a.name?.toLowerCase().includes('test') && // Exclude test accounts
+      a.products && a.products.trim() && // Must have products
+      (a.products.includes('Software') || a.products.includes('EDGE') || a.products.includes('SiteLink')) // Must have software
+    ) || [];
 
     console.log('🔍 Storage Account Filtering:');
-    console.log(`  Total storage accounts: ${allStorageAccounts.length}`);
-    console.log(`  With any products: ${storageWithProducts.length}`);
-    if (storageWithProducts.length > 0) {
-      console.log(`  Sample products:`, storageWithProducts.slice(0, 3).map(a => ({ name: a.name, products: a.products })));
-    }
+    console.log(`  Total storage accounts with software: ${allStorageAccounts.length}`);
+    console.log(`  Excluded test accounts and accounts without software`);
 
-    // TEMPORARY: Remove software filter to get dashboard working
-    const storageAccounts = allStorageAccounts.slice(0, 25);
+    // Top 25 EDGE Accounts (have SE_Company_UUID__c or "EDGE" in products)
+    const edgeAccounts = allStorageAccounts
+      .filter(a => a.products?.includes('EDGE'))
+      .slice(0, 25);
 
-    if (storageAccounts && storageAccounts.length > 0) {
+    console.log(`  EDGE accounts: ${edgeAccounts.length}`);
+
+    if (edgeAccounts && edgeAccounts.length > 0) {
       await supabase.from('portfolios').insert({
         user_id: user.id,
-        name: 'Top 25 Storage Accounts',
-        portfolio_type: 'top_25_edge',  // Keep as top_25_edge for dashboard compatibility
-        criteria: { type: 'top_mrr_storage', limit: 25, vertical: 'storage' },
-        account_ids: storageAccounts.map(a => a.id),
+        name: 'Top 25 EDGE Accounts',
+        portfolio_type: 'top_25_edge',
+        criteria: { type: 'top_mrr_edge', limit: 25, vertical: 'storage', software: 'EDGE' },
+        account_ids: edgeAccounts.map(a => a.id),
+      });
+    }
+
+    // Top 25 SiteLink Accounts (have Corp_Code__c or "SiteLink" in products)
+    const sitelinkAccounts = allStorageAccounts
+      .filter(a => a.products?.includes('SiteLink'))
+      .slice(0, 25);
+
+    console.log(`  SiteLink accounts: ${sitelinkAccounts.length}`);
+
+    if (sitelinkAccounts && sitelinkAccounts.length > 0) {
+      await supabase.from('portfolios').insert({
+        user_id: user.id,
+        name: 'Top 25 SiteLink Accounts',
+        portfolio_type: 'top_25_sitelink',
+        criteria: { type: 'top_mrr_sitelink', limit: 25, vertical: 'storage', software: 'SiteLink' },
+        account_ids: sitelinkAccounts.map(a => a.id),
       });
     }
 
@@ -386,7 +408,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const topAccounts = [...(storageAccounts || []), ...(marineAccounts || [])];
+    const topAccounts = [...(edgeAccounts || []), ...(sitelinkAccounts || []), ...(marineAccounts || [])];
 
     await supabase.from('integrations').update({ last_synced_at: new Date().toISOString() }).eq('id', integration.id);
 
@@ -467,7 +489,8 @@ export async function POST(request: NextRequest) {
       synced: upsertedAccounts?.length || 0,
       verticals: verticalCounts,
       portfolios: {
-        storage: storageAccounts?.length || 0,
+        edge: edgeAccounts?.length || 0,
+        sitelink: sitelinkAccounts?.length || 0,
         marine: marineAccounts?.length || 0,
       },
       geocoded: geocodedCount || 0,
@@ -476,8 +499,8 @@ export async function POST(request: NextRequest) {
       message,
       debug: {
         totalStorage: allStorageAccounts.length,
-        withProducts: storageWithProducts.length,
-        sampleProducts: storageWithProducts.slice(0, 5).map(a => ({
+        withSoftware: allStorageAccounts.length,
+        sampleProducts: allStorageAccounts.slice(0, 5).map(a => ({
           name: a.name,
           products: a.products
         }))
