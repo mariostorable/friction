@@ -323,13 +323,12 @@ export async function POST(request: NextRequest) {
 
     await supabase.from('portfolios').delete().eq('user_id', user.id);
 
-    // Get all accounts (active only, has ARR or is corporate parent)
-    const { data: allAccounts } = await supabase
-      .from('accounts')
-      .select('id, vertical, products, arr, name')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .order('arr', { ascending: false });
+    // DEBUG: Instead of querying all accounts, use the freshly upserted accounts
+    // The upserted accounts have the correct, fresh data
+    console.log('\n📊 Using upserted accounts for portfolio (fresh data)');
+    console.log(`  Total upserted: ${upsertedAccounts?.length || 0}`);
+
+    const allAccounts = upsertedAccounts || [];
 
     // Calculate actual vertical distribution
     const verticalCounts = {
