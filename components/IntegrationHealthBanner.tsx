@@ -19,10 +19,12 @@ export default function IntegrationHealthBanner() {
 
   useEffect(() => {
     // Check if user has dismissed the banner in this session
-    const isDismissed = sessionStorage.getItem('health_banner_dismissed');
-    if (isDismissed) {
-      setDismissed(true);
-      return;
+    if (typeof window !== 'undefined') {
+      const isDismissed = sessionStorage.getItem('health_banner_dismissed');
+      if (isDismissed) {
+        setDismissed(true);
+        return;
+      }
     }
 
     // Check integration health
@@ -38,7 +40,9 @@ export default function IntegrationHealthBanner() {
 
   const handleDismiss = () => {
     setDismissed(true);
-    sessionStorage.setItem('health_banner_dismissed', 'true');
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('health_banner_dismissed', 'true');
+    }
   };
 
   const handleReconnect = () => {
