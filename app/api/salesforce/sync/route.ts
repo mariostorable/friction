@@ -298,35 +298,36 @@ export async function POST(request: NextRequest) {
         service_level: sfAccount.LevelOfService__c || null,
         managed_account: sfAccount.Managed_Account__c || null,
         cs_segment: sfAccount.VitallyClient_Success_Tier__c || null,
-        // Determine which address to use for property (Corporate HQ) and match coordinates
-        // PRIORITY: Billing (corporate) > Shipping (facility) > Parent fields (legacy/backup)
-        // Always match coordinates to the address source we use
-        property_address_street: sfAccount.BillingStreet ||
+        // Property address - PRIORITY: Parent (Corporate HQ) > Billing > Shipping
+        // Parent_Street__c, Parent_City__c, etc. contain corporate HQ address (e.g., 10 Federal Storage = Raleigh)
+        property_address_street: sfAccount.Parent_Street__c ||
+                                sfAccount.BillingStreet ||
                                 sfAccount.ShippingStreet ||
-                                sfAccount.Parent_Street__c ||
                                 null,
-        property_address_city: sfAccount.BillingCity ||
+        property_address_city: sfAccount.Parent_City__c ||
+                              sfAccount.BillingCity ||
                               sfAccount.ShippingCity ||
-                              sfAccount.Parent_City__c ||
                               null,
-        property_address_state: sfAccount.BillingState ||
+        property_address_state: sfAccount.Parent_State__c ||
+                               sfAccount.BillingState ||
                                sfAccount.ShippingState ||
-                               sfAccount.Parent_State__c ||
                                null,
-        property_address_postal_code: sfAccount.BillingPostalCode ||
+        property_address_postal_code: sfAccount.Parent_Zip__c ||
+                                     sfAccount.BillingPostalCode ||
                                      sfAccount.ShippingPostalCode ||
-                                     sfAccount.Parent_Zip__c ||
                                      null,
         property_address_country: sfAccount.BillingCountry ||
                                  sfAccount.ShippingCountry ||
                                  null,
-        // Billing address (store separately)
+        // Billing address (store separately for reference)
         billing_address_street: sfAccount.BillingStreet || null,
         billing_address_city: sfAccount.BillingCity || null,
         billing_address_state: sfAccount.BillingState || null,
         billing_address_postal_code: sfAccount.BillingPostalCode || null,
         billing_address_country: sfAccount.BillingCountry || null,
-        // Coordinates - match to same source as property address (Billing > Shipping)
+        // Geocoding - SmartyStreets coordinates from Billing or Shipping addresses
+        // NOTE: Parent fields don't have SmartyStreets coords, so accounts using Parent address
+        // will have address but no coordinates and need manual geocoding via Google Maps API
         latitude: sfAccount.smartystreets__Billing_Latitude__c ||
                   sfAccount.smartystreets__Shipping_Latitude__c ||
                   null,
