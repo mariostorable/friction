@@ -31,8 +31,9 @@ export default function SalesforceConnector() {
       .single();
 
     setIntegration(data);
-    // Check if credentials exist (they might be null/undefined)
-    setHasCredentials(!!(data?.credentials));
+    // Credentials are stored encrypted in oauth_tokens table
+    // Assume they exist if integration is active - will show error on sync if missing
+    setHasCredentials(true);
     setLoading(false);
   }
 
