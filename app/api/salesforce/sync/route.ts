@@ -432,19 +432,42 @@ export async function POST(request: NextRequest) {
     await supabase.from('integrations').update({ last_synced_at: new Date().toISOString() }).eq('id', integration.id);
 
     // AUTO-GEOCODE: Geocode accounts that have addresses but no coordinates
-    // This handles accounts using Parent address fields which don't have SmartyStreets coords
+    // PRIORITY: Top 25 portfolio accounts first, then other accounts
     const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     let geocodedInSync = 0;
 
     if (GOOGLE_MAPS_API_KEY) {
-      const { data: needsGeocoding } = await supabase
-        .from('accounts')
-        .select('id, property_address_street, property_address_city, property_address_state, property_address_postal_code')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .not('property_address_street', 'is', null)
-        .is('latitude', null)
-        .limit(50); // Geocode up to 50 accounts per sync
+      // Get all portfolio account IDs
+      const portfolioAccountIds = topAccounts?.map(a => a.id) || [];
+
+      // Priority 1: Geocode Top 25 accounts that need it
+      let needsGeocoding: any[] = [];
+      if (portfolioAccountIds.length > 0) {
+        const { data: portfolioNeedsGeo } = await supabase
+          .from('accounts')
+          .select('id, property_address_street, property_address_city, property_address_state, property_address_postal_code')
+          .in('id', portfolioAccountIds)
+          .not('property_address_street', 'is', null)
+          .is('latitude', null);
+
+        needsGeocoding = portfolioNeedsGeo || [];
+      }
+
+      // Priority 2: Add other accounts up to limit of 50 total
+      if (needsGeocoding.length < 50) {
+        const { data: otherNeedsGeo } = await supabase
+          .from('accounts')
+          .select('id, property_address_street, property_address_city, property_address_state, property_address_postal_code')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .not('property_address_street', 'is', null)
+          .is('latitude', null)
+          .limit(50 - needsGeocoding.length);
+
+        if (otherNeedsGeo) {
+          needsGeocoding = [...needsGeocoding, ...otherNeedsGeo];
+        }
+      }
 
       if (needsGeocoding && needsGeocoding.length > 0) {
         console.log(`Auto-geocoding ${needsGeocoding.length} accounts...`);
