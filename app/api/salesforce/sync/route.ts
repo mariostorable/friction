@@ -205,21 +205,28 @@ export async function POST(request: NextRequest) {
 
     console.log(`Deduped ${accountsData.records.length} accounts to ${uniqueAccounts.length} unique corporate names`);
 
-    // Helper function to map Salesforce Type to business unit
-    const mapTypeToVertical = (type: string | null): 'storage' | 'marine' | 'rv' => {
-      // Always return a vertical - never null
-      if (!type) return 'storage'; // Safe default for Storable customers
+    // Helper function to map Salesforce Type/Industry to business unit
+    const mapTypeToVertical = (type: string | null, industry: string | null): 'storage' | 'marine' | 'rv' => {
+      // Check both Type and Industry fields to determine vertical
+      const typeLower = (type || '').toLowerCase().trim();
+      const industryLower = (industry || '').toLowerCase().trim();
+      const combined = typeLower + ' ' + industryLower;
 
-      const typeLower = type.toLowerCase().trim();
-
-      if (typeLower.includes('marine') || typeLower.includes('marina')) {
+      // Check for marine indicators
+      if (combined.includes('marine') || combined.includes('marina') || combined.includes('boat')) {
         return 'marine';
       }
-      if (typeLower.includes('storage') || typeLower.includes('self storage')) {
-        return 'storage';
-      }
-      if (typeLower.includes('rv') || typeLower.includes('recreational vehicle')) {
+
+      // Check for RV indicators
+      if (combined.includes('rv') || combined.includes('recreational vehicle') ||
+          combined.includes('recreation vehicle')) {
         return 'rv';
+      }
+
+      // Check for storage indicators (or default)
+      if (combined.includes('storage') || combined.includes('self storage') ||
+          combined.includes('self-storage') || !combined.trim()) {
+        return 'storage';
       }
 
       // Default to storage if unclear (most Storable accounts are storage)
@@ -228,7 +235,7 @@ export async function POST(request: NextRequest) {
 
     // Don't delete accounts - upsert to preserve friction data
     const accountsToUpsert = uniqueAccounts.map((sfAccount: any) => {
-      const businessUnit = mapTypeToVertical(sfAccount.Type);
+      const businessUnit = mapTypeToVertical(sfAccount.Type, sfAccount.Industry);
       const products = [];
 
       // Product detection based on business unit and specific ID fields (if custom fields exist)
