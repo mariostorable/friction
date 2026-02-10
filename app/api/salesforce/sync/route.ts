@@ -374,6 +374,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to store accounts', details: upsertError.message }, { status: 500 });
     }
 
+    // Clean up: Convert any remaining 'rv' vertical accounts to 'storage'
+    // At Storable, RV facilities are storage facilities, not a separate vertical
+    await supabase
+      .from('accounts')
+      .update({ vertical: 'storage' })
+      .eq('user_id', user.id)
+      .eq('vertical', 'rv');
+
     await supabase.from('portfolios').delete().eq('user_id', user.id);
 
     // Get all accounts (active only, has ARR or is corporate parent)
