@@ -225,31 +225,21 @@ export async function POST(request: NextRequest) {
 
     // Helper function to map Salesforce Type/Industry to business unit
     const mapTypeToVertical = (type: string | null, industry: string | null): 'storage' | 'marine' | 'rv' => {
-      // Check both Type and Industry fields to determine vertical
+      // For Storable: Almost everything is a storage facility
+      // RV Storage, Boat Storage, Self Storage → all 'storage' vertical
+      // Only pure Marine/Marina operations (not storage) are 'marine'
       const typeLower = (type || '').toLowerCase().trim();
       const industryLower = (industry || '').toLowerCase().trim();
       const combined = typeLower + ' ' + industryLower;
 
-      // PRIORITY: Check for storage first (most common at Storable)
-      // This catches "Self Storage", "RV Storage", "Boat Storage", etc.
-      if (combined.includes('self storage') || combined.includes('self-storage') ||
-          combined.includes('storage') || combined.includes('mini storage')) {
-        return 'storage';
-      }
-
-      // Then check for marine-specific (not just "boat" which appears in "Boat Storage")
-      if (combined.includes('marine') || combined.includes('marina') ||
-          industryLower.includes('boat') && !industryLower.includes('storage')) {
+      // Marine: Only if explicitly marine/marina AND not a storage facility
+      if ((combined.includes('marine') || combined.includes('marina')) &&
+          !combined.includes('storage')) {
         return 'marine';
       }
 
-      // RV-only facilities (not "RV Storage" which is storage)
-      if ((combined.includes('rv') || combined.includes('recreational vehicle')) &&
-          !combined.includes('storage')) {
-        return 'rv';
-      }
-
-      // Default to storage (most Storable customers are storage)
+      // Everything else is storage
+      // Includes: Self Storage, RV Storage, Boat Storage, RV, Mini Storage, etc.
       return 'storage';
     };
 
