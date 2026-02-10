@@ -33,18 +33,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // CRITICAL CHECK: Verify credentials exist
-    if (!integration.credentials) {
-      console.error('⚠️ CRITICAL: Salesforce integration exists but has no credentials!');
-      console.error('Integration ID:', integration.id);
-      console.error('User ID:', user.id);
-      return NextResponse.json({
-        error: 'Salesforce credentials missing',
-        message: 'Your Salesforce connection has lost its credentials. Please reconnect Salesforce in Settings.',
-        integrationId: integration.id,
-        action: 'reconnect_required'
-      }, { status: 400 });
-    }
+    console.log('Found Salesforce integration:', integration.id);
 
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
