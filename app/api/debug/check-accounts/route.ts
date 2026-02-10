@@ -1,0 +1,45 @@
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+export async function GET() {
+  try {
+    // Query database for 10 Federal and Elite accounts
+    const { data: accounts, error } = await supabase
+      .from('accounts')
+      .select('id, salesforce_id, name, property_address_street, property_address_city, property_address_state, billing_address_street, billing_address_city, billing_address_state, updated_at')
+      .or('name.ilike.%10 Federal%,name.ilike.%Elite%')
+      .order('name');
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      count: accounts.length,
+      accounts: accounts.map(acc => ({
+        name: acc.name,
+        salesforce_id: acc.salesforce_id,
+        property_address: acc.property_address_street
+          ? `${acc.property_address_street}, ${acc.property_address_city}, ${acc.property_address_state}`
+          : null,
+        billing_address: acc.billing_address_street
+          ? `${acc.billing_address_street}, ${acc.billing_address_city}, ${acc.billing_address_state}`
+          : null,
+        has_address: !!(acc.property_address_street || acc.billing_address_street),
+        updated_at: acc.updated_at
+      }))
+    });
+
+  } catch (error: any) {
+    console.error('Error checking accounts:', error);
+    return NextResponse.json(
+      { error: 'Failed to check accounts', details: error.message },
+      { status: 500 }
+    );
+  }
+}
