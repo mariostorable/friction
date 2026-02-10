@@ -277,6 +277,15 @@ export async function POST(request: NextRequest) {
       };
     });
 
+    // DEBUG: Log first 3 accounts being upserted
+    console.log('\n🔧 UPSERT DEBUG - First 3 accounts:');
+    accountsToUpsert.slice(0, 3).forEach((acc: any, i: number) => {
+      console.log(`\nAccount ${i + 1}:`, acc.name);
+      console.log('  ARR:', acc.arr);
+      console.log('  Products:', acc.products);
+      console.log('  Vertical:', acc.vertical);
+    });
+
     // Upsert accounts to update existing and add new ones
     const { data: upsertedAccounts, error: upsertError } = await supabase
       .from('accounts')
@@ -287,7 +296,21 @@ export async function POST(request: NextRequest) {
       .select();
 
     if (upsertError) {
+      console.error('Upsert error:', upsertError);
       return NextResponse.json({ error: 'Failed to store accounts', details: upsertError.message }, { status: 500 });
+    }
+
+    // DEBUG: Log what came back from upsert
+    console.log('\n✅ UPSERT RESULT - First 3 accounts returned:');
+    if (upsertedAccounts && upsertedAccounts.length > 0) {
+      upsertedAccounts.slice(0, 3).forEach((acc: any, i: number) => {
+        console.log(`\nAccount ${i + 1}:`, acc.name);
+        console.log('  ARR:', acc.arr);
+        console.log('  Products:', acc.products);
+        console.log('  Vertical:', acc.vertical);
+      });
+    } else {
+      console.log('  No accounts returned from upsert!');
     }
 
     // Clean up: Convert any remaining 'rv' vertical accounts to 'storage'
