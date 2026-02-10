@@ -97,55 +97,50 @@ export async function GET(request: NextRequest) {
     const tokenData = await tokenResponse.json();
     console.log('Token exchange successful! Instance URL:', tokenData.instance_url);
 
-    // Use regular client for integration (user owns this)
-    // Check if integration exists first
-    const { data: existingIntegration } = await supabase
+    // CLEANUP: Delete ALL old Salesforce integrations for this user to avoid duplicates
+    // Get all existing Salesforce integrations
+    const { data: oldIntegrations } = await supabase
       .from('integrations')
       .select('id')
       .eq('user_id', user.id)
-      .eq('integration_type', 'salesforce')
+      .eq('integration_type', 'salesforce');
+
+    if (oldIntegrations && oldIntegrations.length > 0) {
+      const oldIntegrationIds = oldIntegrations.map(i => i.id);
+      console.log(`Cleaning up ${oldIntegrationIds.length} old Salesforce integration(s):`, oldIntegrationIds);
+
+      // Delete oauth_tokens for old integrations (using admin client)
+      await supabaseAdmin
+        .from('oauth_tokens')
+        .delete()
+        .in('integration_id', oldIntegrationIds);
+
+      // Delete old integrations
+      await supabase
+        .from('integrations')
+        .delete()
+        .in('id', oldIntegrationIds);
+
+      console.log('Old integrations cleaned up');
+    }
+
+    // Insert fresh new integration
+    const { data: integration, error: integrationError } = await supabase
+      .from('integrations')
+      .insert({
+        user_id: user.id,
+        integration_type: 'salesforce',
+        status: 'active',
+        instance_url: tokenData.instance_url || null,
+        metadata: {},
+        connected_at: new Date().toISOString(),
+      })
+      .select()
       .single();
 
-    let integration;
-    if (existingIntegration) {
-      // Update existing integration
-      const { data, error: integrationError } = await supabase
-        .from('integrations')
-        .update({
-          status: 'active',
-          instance_url: tokenData.instance_url || null,
-          metadata: {},
-          connected_at: new Date().toISOString(),
-        })
-        .eq('id', existingIntegration.id)
-        .select()
-        .single();
-
-      if (integrationError) {
-        console.error('Integration update error:', integrationError);
-        throw integrationError;
-      }
-      integration = data;
-    } else {
-      // Insert new integration
-      const { data, error: integrationError } = await supabase
-        .from('integrations')
-        .insert({
-          user_id: user.id,
-          integration_type: 'salesforce',
-          status: 'active',
-          instance_url: tokenData.instance_url || null,
-          metadata: {},
-          connected_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (integrationError) {
-        console.error('Integration insert error:', integrationError);
-        throw integrationError;
-      }
-      integration = data;
+    if (integrationError) {
+      console.error('Integration insert error:', integrationError);
+      throw integrationError;
     }
 
     console.log('Integration stored:', integration.id);
