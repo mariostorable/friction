@@ -28,12 +28,12 @@ export async function GET() {
     // Try to get ALL integrations without filtering
     const { data: allIntegrations, error: allError } = await supabase
       .from('integrations')
-      .select('id, integration_type, user_id, instance_url, created_at');
+      .select('id, integration_type, user_id, instance_url');
 
     // Try to get integrations for this user
     const { data: userIntegrations, error: userError2 } = await supabase
       .from('integrations')
-      .select('id, integration_type, user_id, instance_url, created_at')
+      .select('id, integration_type, user_id, instance_url')
       .eq('user_id', user.id);
 
     return NextResponse.json({
