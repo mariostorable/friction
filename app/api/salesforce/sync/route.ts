@@ -409,12 +409,12 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // Top 25 Storage Accounts (ONLY EDGE + SiteLink software)
+    // Top 25 Storage Accounts (ONLY EDGE + SiteLink - exclude accounts without software)
     const storageAccounts = allAccounts?.filter(a => {
       if (a.vertical !== 'storage') return false;
+      // ONLY include accounts with EDGE or SiteLink software
       if (!a.products || !a.products.trim()) return false;
-      // Products are stored as "Software (EDGE)" or "Software (SiteLink)"
-      return a.products.includes('Software (EDGE)') || a.products.includes('Software (SiteLink)');
+      return a.products.includes('EDGE') || a.products.includes('SiteLink');
     }).slice(0, 25);
 
     if (storageAccounts && storageAccounts.length > 0) {
