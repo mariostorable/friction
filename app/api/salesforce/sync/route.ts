@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
       // Query top accounts by MRR with software/product detection fields and addresses
       // Remove ParentId filter - get ALL accounts with revenue
       return await fetch(
-        `${integration.instance_url}/services/data/v59.0/query?q=SELECT+Id,Name,MRR_MVR__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,ShippingStreet,ShippingCity,ShippingState,ShippingPostalCode,ShippingCountry,BillingStreet,BillingCity,BillingState,BillingPostalCode,BillingCountry,smartystreets__Shipping_Latitude__c,smartystreets__Shipping_Longitude__c,smartystreets__Billing_Latitude__c,smartystreets__Billing_Longitude__c,smartystreets__Shipping_Address_Status__c,(SELECT+Id+FROM+Assets)+FROM+Account+WHERE+MRR_MVR__c>0+ORDER+BY+MRR_MVR__c+DESC+LIMIT+200`,
+        `${integration.instance_url}/services/data/v59.0/query?q=SELECT+Id,Name,MRR_MVR__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,ShippingStreet,ShippingCity,ShippingState,ShippingPostalCode,ShippingCountry,BillingStreet,BillingCity,BillingState,BillingPostalCode,BillingCountry,Property_Street__c,Property_City__c,Property_State__c,Property_Zip__c,smartystreets__Shipping_Latitude__c,smartystreets__Shipping_Longitude__c,smartystreets__Billing_Latitude__c,smartystreets__Billing_Longitude__c,smartystreets__Shipping_Address_Status__c,(SELECT+Id+FROM+Assets)+FROM+Account+WHERE+MRR_MVR__c>0+ORDER+BY+MRR_MVR__c+DESC+LIMIT+200`,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -280,11 +280,11 @@ export async function POST(request: NextRequest) {
         service_level: sfAccount.LevelOfService__c || null,
         managed_account: sfAccount.Managed_Account__c || null,
         cs_segment: sfAccount.VitallyClient_Success_Tier__c || null,
-        // Property address (from Shipping - physical location)
-        property_address_street: sfAccount.ShippingStreet || null,
-        property_address_city: sfAccount.ShippingCity || null,
-        property_address_state: sfAccount.ShippingState || null,
-        property_address_postal_code: sfAccount.ShippingPostalCode || null,
+        // Property address - prefer custom Property_* fields, fallback to Shipping
+        property_address_street: sfAccount.Property_Street__c || sfAccount.ShippingStreet || null,
+        property_address_city: sfAccount.Property_City__c || sfAccount.ShippingCity || null,
+        property_address_state: sfAccount.Property_State__c || sfAccount.ShippingState || null,
+        property_address_postal_code: sfAccount.Property_Zip__c || sfAccount.ShippingPostalCode || null,
         property_address_country: sfAccount.ShippingCountry || null,
         // Billing address (fallback)
         billing_address_street: sfAccount.BillingStreet || null,
