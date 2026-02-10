@@ -20,7 +20,7 @@ export async function GET(request: Request) {
       .from('integrations')
       .select('*')
       .eq('user_id', userId)
-      .eq('provider', 'salesforce')
+      .eq('integration_type', 'salesforce')
       .single();
 
     if (integrationError || !integration) {
