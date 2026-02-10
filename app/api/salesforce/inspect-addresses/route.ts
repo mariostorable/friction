@@ -50,42 +50,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Failed to decrypt tokens', details: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
     }
 
-    // Helper function to refresh Salesforce token if needed
-    const refreshSalesforceToken = async () => {
-      if (!tokens.refresh_token) {
-        throw new Error('No refresh token available. Please reconnect Salesforce.');
-      }
-
-      const refreshResponse = await fetch(`${integration.instance_url}/services/oauth2/token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          grant_type: 'refresh_token',
-          client_id: process.env.SALESFORCE_CLIENT_ID!,
-          client_secret: process.env.SALESFORCE_CLIENT_SECRET!,
-          refresh_token: tokens.refresh_token,
-        }),
-      });
-
-      if (!refreshResponse.ok) {
-        throw new Error('Failed to refresh Salesforce token');
-      }
-
-      const refreshData = await refreshResponse.json();
-
-      await supabase
-        .from('integrations')
-        .update({
-          credentials: {
-            ...tokens,
-            access_token: refreshData.access_token,
-          },
-          token_expires_at: new Date(Date.now() + 7200000).toISOString(),
-        })
-        .eq('id', integration.id);
-
-      return refreshData.access_token;
-    };
+    // Note: Removed refresh token logic for simplicity - we only need to inspect once
 
     // Fetch specific accounts by name
     const fetchAccount = async (accessToken: string, accountName: string) => {
@@ -153,15 +118,8 @@ export async function GET(request: Request) {
     // Try to fetch accounts
     const accessToken = tokens.access_token;
 
-    let eliteStorData = await fetchAccount(accessToken, 'Elite-Stor');
-
-    // If 401, refresh token and retry
-    if (eliteStorData.error && eliteStorData.error.includes('401')) {
-      accessToken = await refreshSalesforceToken();
-      eliteStorData = await fetchAccount(accessToken, 'Elite-Stor');
-    }
-
-    let federalStorageData = await fetchAccount(accessToken, '10 Federal Storage');
+    const eliteStorData = await fetchAccount(accessToken, 'Elite-Stor');
+    const federalStorageData = await fetchAccount(accessToken, '10 Federal Storage');
 
     // Search for address fields in the data
     const findAddressFields = (data: any, searchAddress: string) => {
