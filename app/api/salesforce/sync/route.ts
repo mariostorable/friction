@@ -298,45 +298,45 @@ export async function POST(request: NextRequest) {
         service_level: sfAccount.LevelOfService__c || null,
         managed_account: sfAccount.Managed_Account__c || null,
         cs_segment: sfAccount.VitallyClient_Success_Tier__c || null,
-        // Property address - PRIORITY: Parent (Corporate HQ) > Billing > Shipping (facility)
-        // For corporate accounts, Parent_Street__c has the HQ address (confirmed with 10 Federal Storage)
-        // Billing address is second priority, Shipping is usually individual facilities
-        property_address_street: sfAccount.Parent_Street__c ||
-                                sfAccount.BillingStreet ||
+        // Determine which address to use for property (Corporate HQ) and match coordinates
+        // PRIORITY: Billing (corporate) > Shipping (facility) > Parent fields (legacy/backup)
+        // Always match coordinates to the address source we use
+        property_address_street: sfAccount.BillingStreet ||
                                 sfAccount.ShippingStreet ||
+                                sfAccount.Parent_Street__c ||
                                 null,
-        property_address_city: sfAccount.Parent_City__c ||
-                              sfAccount.BillingCity ||
+        property_address_city: sfAccount.BillingCity ||
                               sfAccount.ShippingCity ||
+                              sfAccount.Parent_City__c ||
                               null,
-        property_address_state: sfAccount.Parent_State__c ||
-                               sfAccount.BillingState ||
+        property_address_state: sfAccount.BillingState ||
                                sfAccount.ShippingState ||
+                               sfAccount.Parent_State__c ||
                                null,
-        property_address_postal_code: sfAccount.Parent_Zip__c ||
-                                     sfAccount.BillingPostalCode ||
+        property_address_postal_code: sfAccount.BillingPostalCode ||
                                      sfAccount.ShippingPostalCode ||
+                                     sfAccount.Parent_Zip__c ||
                                      null,
         property_address_country: sfAccount.BillingCountry ||
                                  sfAccount.ShippingCountry ||
                                  null,
-        // Billing address (fallback)
+        // Billing address (store separately)
         billing_address_street: sfAccount.BillingStreet || null,
         billing_address_city: sfAccount.BillingCity || null,
         billing_address_state: sfAccount.BillingState || null,
         billing_address_postal_code: sfAccount.BillingPostalCode || null,
         billing_address_country: sfAccount.BillingCountry || null,
-        // Geocoding - PRIORITY: SmartyStreets Shipping > SmartyStreets Billing
-        latitude: sfAccount.smartystreets__Shipping_Latitude__c ||
-                  sfAccount.smartystreets__Billing_Latitude__c ||
+        // Coordinates - match to same source as property address (Billing > Shipping)
+        latitude: sfAccount.smartystreets__Billing_Latitude__c ||
+                  sfAccount.smartystreets__Shipping_Latitude__c ||
                   null,
-        longitude: sfAccount.smartystreets__Shipping_Longitude__c ||
-                   sfAccount.smartystreets__Billing_Longitude__c ||
+        longitude: sfAccount.smartystreets__Billing_Longitude__c ||
+                   sfAccount.smartystreets__Shipping_Longitude__c ||
                    null,
-        geocode_source: (sfAccount.smartystreets__Shipping_Latitude__c || sfAccount.smartystreets__Billing_Latitude__c) ? 'salesforce' : null,
-        geocode_quality: sfAccount.smartystreets__Shipping_Verified__c ? 'high' :
-                        (sfAccount.smartystreets__Shipping_Address_Status__c === 'Valid' ? 'medium' : 'low'),
-        geocoded_at: (sfAccount.smartystreets__Shipping_Latitude__c || sfAccount.smartystreets__Billing_Latitude__c) ?
+        geocode_source: (sfAccount.smartystreets__Billing_Latitude__c || sfAccount.smartystreets__Shipping_Latitude__c) ? 'salesforce' : null,
+        geocode_quality: sfAccount.smartystreets__Billing_Latitude__c ? 'high' :
+                        (sfAccount.smartystreets__Shipping_Verified__c ? 'high' : 'medium'),
+        geocoded_at: (sfAccount.smartystreets__Billing_Latitude__c || sfAccount.smartystreets__Shipping_Latitude__c) ?
                      new Date().toISOString() : null,
         // Account hierarchy
         ultimate_parent_id: sfAccount.UltimateParentId || null,
