@@ -287,27 +287,27 @@ export async function POST(request: NextRequest) {
         service_level: sfAccount.LevelOfService__c || null,
         managed_account: sfAccount.Managed_Account__c || null,
         cs_segment: sfAccount.VitallyClient_Success_Tier__c || null,
-        // Property address - PRIORITY: ShippingStreet (Property Address) > Parent_Street__c > BillingStreet (fallback)
-        // "Property Address" in Salesforce UI = STANDARD ShippingAddress compound field (ShippingStreet, ShippingCity, etc.)
-        // Fallback to Billing Address if Property Address is NULL
-        property_address_street: sfAccount.ShippingStreet ||
-                                sfAccount.Parent_Street__c ||
+        // Property address - PRIORITY: Parent (Corporate HQ) > Billing > Shipping (facility)
+        // For corporate accounts, Parent_Street__c has the HQ address (confirmed with 10 Federal Storage)
+        // Billing address is second priority, Shipping is usually individual facilities
+        property_address_street: sfAccount.Parent_Street__c ||
                                 sfAccount.BillingStreet ||
+                                sfAccount.ShippingStreet ||
                                 null,
-        property_address_city: sfAccount.ShippingCity ||
-                              sfAccount.Parent_City__c ||
+        property_address_city: sfAccount.Parent_City__c ||
                               sfAccount.BillingCity ||
+                              sfAccount.ShippingCity ||
                               null,
-        property_address_state: sfAccount.ShippingState ||
-                               sfAccount.Parent_State__c ||
+        property_address_state: sfAccount.Parent_State__c ||
                                sfAccount.BillingState ||
+                               sfAccount.ShippingState ||
                                null,
-        property_address_postal_code: sfAccount.ShippingPostalCode ||
-                                     sfAccount.Parent_Zip__c ||
+        property_address_postal_code: sfAccount.Parent_Zip__c ||
                                      sfAccount.BillingPostalCode ||
+                                     sfAccount.ShippingPostalCode ||
                                      null,
-        property_address_country: sfAccount.ShippingCountry ||
-                                 sfAccount.BillingCountry ||
+        property_address_country: sfAccount.BillingCountry ||
+                                 sfAccount.ShippingCountry ||
                                  null,
         // Billing address (fallback)
         billing_address_street: sfAccount.BillingStreet || null,
