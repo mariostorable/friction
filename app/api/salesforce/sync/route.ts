@@ -162,36 +162,8 @@ export async function POST(request: NextRequest) {
 
     // Deduplicate accounts by corporate name
     // PRIORITY: Keep CORP accounts over child accounts (they have the HQ address we need)
-    // Group by corporate name, then pick CORP account if exists, otherwise highest ARR
-    const accountsByCorporateName = new Map<string, any[]>();
-
-    accountsData.records.forEach((sfAccount: any) => {
-      const corporateName = (sfAccount.dL_Product_s_Corporate_Name__c || sfAccount.Name || '').trim();
-      if (!corporateName) return; // Skip accounts with no name
-
-      if (!accountsByCorporateName.has(corporateName)) {
-        accountsByCorporateName.set(corporateName, []);
-      }
-      accountsByCorporateName.get(corporateName)!.push(sfAccount);
-    });
-
-    const uniqueAccounts: any[] = [];
-    accountsByCorporateName.forEach((accounts) => {
-      // Prefer CORP accounts (they have HQ address)
-      const corpAccount = accounts.find(a =>
-        a.Name && (a.Name.includes('- CORP') || a.Name.includes('-CORP') || a.Name.includes('CORP.'))
-      );
-
-      if (corpAccount) {
-        uniqueAccounts.push(corpAccount);
-        console.log(`Selected CORP account: ${corpAccount.Name}`);
-      } else {
-        // No CORP account, take the first one (highest ARR due to query sort)
-        uniqueAccounts.push(accounts[0]);
-      }
-    });
-
-    console.log(`Deduped ${accountsData.records.length} accounts to ${uniqueAccounts.length} unique corporate names`);
+    // Use all accounts from query (no deduplication needed - simple query)
+    const uniqueAccounts = accountsData.records;
 
     // Helper function to map Salesforce Type/Industry to business unit
     const mapTypeToVertical = (type: string | null, industry: string | null): 'storage' | 'marine' | 'rv' => {
@@ -266,9 +238,8 @@ export async function POST(request: NextRequest) {
       return {
         user_id: user.id,
         salesforce_id: sfAccount.Id,
-        name: sfAccount.dL_Product_s_Corporate_Name__c || sfAccount.Name,
-        // Use MRR_MVR__c if available (converted to ARR), otherwise AnnualRevenue
-        arr: sfAccount.MRR_MVR__c ? sfAccount.MRR_MVR__c * 12 : (sfAccount.AnnualRevenue || null),
+        name: sfAccount.Name,
+        arr: sfAccount.MRR_MVR__c ? sfAccount.MRR_MVR__c * 12 : null,
         vertical: businessUnit,
         products: products.length > 0 ? products.join(', ') : null,
         segment: sfAccount.Type || null,
@@ -278,49 +249,6 @@ export async function POST(request: NextRequest) {
         service_level: sfAccount.LevelOfService__c || null,
         managed_account: sfAccount.Managed_Account__c || null,
         cs_segment: sfAccount.VitallyClient_Success_Tier__c || null,
-        // Property address - PRIORITY: Parent (Corporate HQ) > Billing > Shipping
-        // Parent_Street__c, Parent_City__c, etc. contain corporate HQ address (e.g., 10 Federal Storage = Raleigh)
-        property_address_street: sfAccount.Parent_Street__c ||
-                                sfAccount.BillingStreet ||
-                                sfAccount.ShippingStreet ||
-                                null,
-        property_address_city: sfAccount.Parent_City__c ||
-                              sfAccount.BillingCity ||
-                              sfAccount.ShippingCity ||
-                              null,
-        property_address_state: sfAccount.Parent_State__c ||
-                               sfAccount.BillingState ||
-                               sfAccount.ShippingState ||
-                               null,
-        property_address_postal_code: sfAccount.Parent_Zip__c ||
-                                     sfAccount.BillingPostalCode ||
-                                     sfAccount.ShippingPostalCode ||
-                                     null,
-        property_address_country: sfAccount.BillingCountry ||
-                                 sfAccount.ShippingCountry ||
-                                 null,
-        // Billing address (store separately for reference)
-        billing_address_street: sfAccount.BillingStreet || null,
-        billing_address_city: sfAccount.BillingCity || null,
-        billing_address_state: sfAccount.BillingState || null,
-        billing_address_postal_code: sfAccount.BillingPostalCode || null,
-        billing_address_country: sfAccount.BillingCountry || null,
-        // Geocoding - SmartyStreets coordinates from Billing or Shipping addresses
-        // NOTE: Parent fields don't have SmartyStreets coords, so accounts using Parent address
-        // will have address but no coordinates and need manual geocoding via Google Maps API
-        latitude: sfAccount.smartystreets__Billing_Latitude__c ||
-                  sfAccount.smartystreets__Shipping_Latitude__c ||
-                  null,
-        longitude: sfAccount.smartystreets__Billing_Longitude__c ||
-                   sfAccount.smartystreets__Shipping_Longitude__c ||
-                   null,
-        geocode_source: (sfAccount.smartystreets__Billing_Latitude__c || sfAccount.smartystreets__Shipping_Latitude__c) ? 'salesforce' : null,
-        geocode_quality: sfAccount.smartystreets__Billing_Latitude__c ? 'high' :
-                        (sfAccount.smartystreets__Shipping_Verified__c ? 'high' : 'medium'),
-        geocoded_at: (sfAccount.smartystreets__Billing_Latitude__c || sfAccount.smartystreets__Shipping_Latitude__c) ?
-                     new Date().toISOString() : null,
-        // Account hierarchy
-        ultimate_parent_id: sfAccount.UltimateParentId || null,
         metadata: {
           industry: sfAccount.Industry,
           type: sfAccount.Type,
@@ -425,89 +353,6 @@ export async function POST(request: NextRequest) {
 
     await supabase.from('integrations').update({ last_synced_at: new Date().toISOString() }).eq('id', integration.id);
 
-    // AUTO-GEOCODE: Geocode accounts that have addresses but no coordinates
-    // PRIORITY: Top 25 portfolio accounts first, then other accounts
-    const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    let geocodedInSync = 0;
-
-    if (GOOGLE_MAPS_API_KEY) {
-      // Get all portfolio account IDs
-      const portfolioAccountIds = topAccounts?.map(a => a.id) || [];
-
-      // Priority 1: Geocode Top 25 accounts that need it
-      let needsGeocoding: any[] = [];
-      if (portfolioAccountIds.length > 0) {
-        const { data: portfolioNeedsGeo } = await supabase
-          .from('accounts')
-          .select('id, property_address_street, property_address_city, property_address_state, property_address_postal_code')
-          .in('id', portfolioAccountIds)
-          .not('property_address_street', 'is', null)
-          .is('latitude', null);
-
-        needsGeocoding = portfolioNeedsGeo || [];
-      }
-
-      // Priority 2: Add other accounts up to limit of 50 total
-      if (needsGeocoding.length < 50) {
-        const { data: otherNeedsGeo } = await supabase
-          .from('accounts')
-          .select('id, property_address_street, property_address_city, property_address_state, property_address_postal_code')
-          .eq('user_id', user.id)
-          .eq('status', 'active')
-          .not('property_address_street', 'is', null)
-          .is('latitude', null)
-          .limit(50 - needsGeocoding.length);
-
-        if (otherNeedsGeo) {
-          needsGeocoding = [...needsGeocoding, ...otherNeedsGeo];
-        }
-      }
-
-      if (needsGeocoding && needsGeocoding.length > 0) {
-        console.log(`Auto-geocoding ${needsGeocoding.length} accounts...`);
-
-        for (const account of needsGeocoding) {
-          const addressParts = [
-            account.property_address_street,
-            account.property_address_city,
-            account.property_address_state,
-            account.property_address_postal_code
-          ].filter(Boolean);
-
-          const fullAddress = addressParts.join(', ');
-          if (!fullAddress) continue;
-
-          try {
-            const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${GOOGLE_MAPS_API_KEY}`;
-            const geocodeResponse = await fetch(geocodeUrl);
-            const geocodeData = await geocodeResponse.json();
-
-            if (geocodeData.status === 'OK' && geocodeData.results && geocodeData.results.length > 0) {
-              const location = geocodeData.results[0].geometry.location;
-
-              await supabase
-                .from('accounts')
-                .update({
-                  latitude: location.lat,
-                  longitude: location.lng,
-                  geocode_source: 'google_maps',
-                  geocode_quality: geocodeData.results[0].geometry.location_type || 'APPROXIMATE',
-                  geocoded_at: new Date().toISOString()
-                })
-                .eq('id', account.id);
-
-              geocodedInSync++;
-            }
-
-            // Rate limit: 100ms between requests
-            await new Promise(resolve => setTimeout(resolve, 100));
-          } catch (error) {
-            console.error(`Failed to geocode account ${account.id}:`, error);
-          }
-        }
-      }
-    }
-
     // Trigger friction analysis (wait for it to complete so we can report errors)
     let analysisResult = null;
     let analysisError = null;
@@ -559,10 +404,6 @@ export async function POST(request: NextRequest) {
     // Build response message
     let message = `Synced ${upsertedAccounts?.length || 0} accounts successfully!`;
 
-    if (geocodedInSync > 0) {
-      message += `\n\n📍 Auto-geocoded ${geocodedInSync} accounts with missing coordinates.`;
-    }
-
     if (analysisError) {
       message += `\n\n⚠️ Warning: Analysis trigger failed - ${analysisError}\n\nYou may need to manually trigger analysis from the dashboard or check Vercel logs.`;
     } else if (analysisResult) {
@@ -593,7 +434,6 @@ export async function POST(request: NextRequest) {
         marine: marineAccounts?.length || 0,
       },
       geocoded: geocodedCount || 0,
-      geocodedInSync: geocodedInSync || 0,
       analysisResult,
       analysisError,
       message,
