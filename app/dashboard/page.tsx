@@ -337,7 +337,7 @@ export default function Dashboard() {
 
         if (storage > 0 || marine > 0) {
           message += `\nTop Portfolios:\n`;
-          if (storage > 0) message += `  • ${storage} Storage w/ EDGE/SiteLink\n`;
+          if (storage > 0) message += `  • ${storage} Storage accounts\n`;
           if (marine > 0) message += `  • ${marine} Marine accounts\n`;
         }
       }

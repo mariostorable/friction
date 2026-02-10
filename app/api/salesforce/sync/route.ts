@@ -215,24 +215,26 @@ export async function POST(request: NextRequest) {
       const industryLower = (industry || '').toLowerCase().trim();
       const combined = typeLower + ' ' + industryLower;
 
-      // Check for marine indicators
-      if (combined.includes('marine') || combined.includes('marina') || combined.includes('boat')) {
-        return 'marine';
-      }
-
-      // Check for RV indicators
-      if (combined.includes('rv') || combined.includes('recreational vehicle') ||
-          combined.includes('recreation vehicle')) {
-        return 'rv';
-      }
-
-      // Check for storage indicators (or default)
-      if (combined.includes('storage') || combined.includes('self storage') ||
-          combined.includes('self-storage') || !combined.trim()) {
+      // PRIORITY: Check for storage first (most common at Storable)
+      // This catches "Self Storage", "RV Storage", "Boat Storage", etc.
+      if (combined.includes('self storage') || combined.includes('self-storage') ||
+          combined.includes('storage') || combined.includes('mini storage')) {
         return 'storage';
       }
 
-      // Default to storage if unclear (most Storable accounts are storage)
+      // Then check for marine-specific (not just "boat" which appears in "Boat Storage")
+      if (combined.includes('marine') || combined.includes('marina') ||
+          industryLower.includes('boat') && !industryLower.includes('storage')) {
+        return 'marine';
+      }
+
+      // RV-only facilities (not "RV Storage" which is storage)
+      if ((combined.includes('rv') || combined.includes('recreational vehicle')) &&
+          !combined.includes('storage')) {
+        return 'rv';
+      }
+
+      // Default to storage (most Storable customers are storage)
       return 'storage';
     };
 
@@ -394,20 +396,15 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // Top 25 Storage Accounts (ONLY EDGE + SiteLink - exclude accounts without software)
-    const storageAccounts = allAccounts?.filter(a => {
-      if (a.vertical !== 'storage') return false;
-      // ONLY include accounts with EDGE or SiteLink software
-      if (!a.products || !a.products.trim()) return false;
-      return a.products.includes('EDGE') || a.products.includes('SiteLink');
-    }).slice(0, 25);
+    // Top 25 Storage Accounts (by ARR, regardless of products)
+    const storageAccounts = allAccounts?.filter(a => a.vertical === 'storage').slice(0, 25);
 
     if (storageAccounts && storageAccounts.length > 0) {
       await supabase.from('portfolios').insert({
         user_id: user.id,
         name: 'Top 25 Storage Accounts',
-        portfolio_type: 'top_25_edge',
-        criteria: { type: 'top_mrr_storage', limit: 25, vertical: 'storage', requires_software: true },
+        portfolio_type: 'top_25_storage',
+        criteria: { type: 'top_mrr_storage', limit: 25, vertical: 'storage' },
         account_ids: storageAccounts.map(a => a.id),
       });
     }
