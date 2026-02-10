@@ -190,20 +190,35 @@ export async function POST(request: NextRequest) {
       console.log('📍 End address field test\n');
     }
 
-    // Deduplicate accounts by corporate name to avoid syncing child accounts multiple times
-    // Keep only the first occurrence of each corporate name (highest ARR due to sort order)
-    const seenCorporateNames = new Set<string>();
-    const uniqueAccounts = accountsData.records.filter((sfAccount: any) => {
+    // Deduplicate accounts by corporate name
+    // PRIORITY: Keep CORP accounts over child accounts (they have the HQ address we need)
+    // Group by corporate name, then pick CORP account if exists, otherwise highest ARR
+    const accountsByCorporateName = new Map<string, any[]>();
+
+    accountsData.records.forEach((sfAccount: any) => {
       const corporateName = (sfAccount.dL_Product_s_Corporate_Name__c || sfAccount.Name || '').trim();
-      if (!corporateName) return true; // Keep accounts with no name (edge case)
+      if (!corporateName) return; // Skip accounts with no name
 
-      if (seenCorporateNames.has(corporateName)) {
-        console.log(`Skipping duplicate account: ${corporateName} (ARR: ${sfAccount.MRR_MVR__c})`);
-        return false; // Skip duplicate
+      if (!accountsByCorporateName.has(corporateName)) {
+        accountsByCorporateName.set(corporateName, []);
       }
+      accountsByCorporateName.get(corporateName)!.push(sfAccount);
+    });
 
-      seenCorporateNames.add(corporateName);
-      return true; // Keep first occurrence
+    const uniqueAccounts: any[] = [];
+    accountsByCorporateName.forEach((accounts) => {
+      // Prefer CORP accounts (they have HQ address)
+      const corpAccount = accounts.find(a =>
+        a.Name && (a.Name.includes('- CORP') || a.Name.includes('-CORP') || a.Name.includes('CORP.'))
+      );
+
+      if (corpAccount) {
+        uniqueAccounts.push(corpAccount);
+        console.log(`Selected CORP account: ${corpAccount.Name}`);
+      } else {
+        // No CORP account, take the first one (highest ARR due to query sort)
+        uniqueAccounts.push(accounts[0]);
+      }
     });
 
     console.log(`Deduped ${accountsData.records.length} accounts to ${uniqueAccounts.length} unique corporate names`);
