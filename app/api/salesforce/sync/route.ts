@@ -359,9 +359,10 @@ export async function POST(request: NextRequest) {
     console.log(`  Total storage accounts with software: ${allStorageAccounts.length}`);
     console.log(`  Excluded test accounts and accounts without software`);
 
-    // Top 25 EDGE Accounts (have SE_Company_UUID__c or "EDGE" in products)
+    // Top 25 EDGE Accounts - sort by ARR and filter for Edge/EDGE (case-insensitive)
     const edgeAccounts = allStorageAccounts
-      .filter(a => a.products?.includes('EDGE'))
+      .filter(a => a.products?.toLowerCase().includes('edge'))
+      .sort((a, b) => (b.arr || 0) - (a.arr || 0))
       .slice(0, 25);
 
     console.log(`  EDGE accounts: ${edgeAccounts.length}`);
@@ -376,9 +377,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Top 25 SiteLink Accounts (have Corp_Code__c or "SiteLink" in products)
+    // Top 25 SiteLink Accounts - sort by ARR and filter for SiteLink
     const sitelinkAccounts = allStorageAccounts
-      .filter(a => a.products?.includes('SiteLink'))
+      .filter(a => a.products?.toLowerCase().includes('sitelink'))
+      .sort((a, b) => (b.arr || 0) - (a.arr || 0))
       .slice(0, 25);
 
     console.log(`  SiteLink accounts: ${sitelinkAccounts.length}`);
