@@ -129,7 +129,9 @@ BEGIN
       p_radius_miles * 1609.34 -- Convert miles to meters
     )
     AND (p_vertical IS NULL OR a.vertical = p_vertical)
-    AND (a.arr >= p_min_arr OR a.arr IS NULL)
+    AND a.arr IS NOT NULL
+    AND a.arr > 0
+    AND a.arr >= p_min_arr
   ORDER BY distance_miles ASC;
 END;
 $$;

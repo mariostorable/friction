@@ -257,6 +257,16 @@ export async function POST(request: NextRequest) {
       const hasShippingGeocode = sfAccount.smartystreets__Shipping_Latitude__c && sfAccount.smartystreets__Shipping_Longitude__c;
       const hasBillingGeocode = sfAccount.smartystreets__Billing_Latitude__c && sfAccount.smartystreets__Billing_Longitude__c;
 
+      // DEBUG: Log SmartyStreets data for 10 Federal Storage to diagnose geocoding issue
+      if (sfAccount.Name?.includes('10 Federal Storage')) {
+        console.log('\n🔍 DEBUG: SmartyStreets data for', sfAccount.Name);
+        console.log('  Shipping Lat/Lng:', sfAccount.smartystreets__Shipping_Latitude__c, '/', sfAccount.smartystreets__Shipping_Longitude__c);
+        console.log('  Billing Lat/Lng:', sfAccount.smartystreets__Billing_Latitude__c, '/', sfAccount.smartystreets__Billing_Longitude__c);
+        console.log('  Shipping Status:', sfAccount.smartystreets__Shipping_Address_Status__c);
+        console.log('  Has Shipping Geocode:', hasShippingGeocode);
+        console.log('  Has Billing Geocode:', hasBillingGeocode);
+      }
+
       // Prefer shipping address/geocode, fallback to billing
       const latitude = hasShippingGeocode ? sfAccount.smartystreets__Shipping_Latitude__c :
                       (hasBillingGeocode ? sfAccount.smartystreets__Billing_Latitude__c : null);
