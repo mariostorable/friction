@@ -491,9 +491,8 @@ export async function POST(request: NextRequest) {
                   user_id: userId,
                   jira_issue_id: issue.id,
                   theme_key: themeKey,
-                  jira_key: issue.jira_key,
-                  match_type: 'salesforce_case',
-                  confidence: 1.0
+                  match_type: 'keyword',
+                  match_confidence: 1.0
                 });
               });
             }
@@ -524,11 +523,18 @@ export async function POST(request: NextRequest) {
     // Batch insert theme links
     let linksCreated = 0;
     if (themeLinksToCreate.length > 0) {
-      const { data: createdThemeLinks } = await supabaseAdmin
+      console.log(`Attempting to create ${themeLinksToCreate.length} theme links...`);
+      const { data: createdThemeLinks, error: linkError } = await supabaseAdmin
         .from('theme_jira_links')
-        .upsert(themeLinksToCreate, { onConflict: 'user_id,jira_issue_id,theme_key', ignoreDuplicates: true })
+        .upsert(themeLinksToCreate, { onConflict: 'jira_issue_id,theme_key', ignoreDuplicates: true })
         .select();
-      linksCreated = createdThemeLinks?.length || themeLinksToCreate.length;
+
+      if (linkError) {
+        console.error('❌ Failed to create theme links:', linkError);
+      } else {
+        linksCreated = createdThemeLinks?.length || 0;
+        console.log(`✅ Created ${linksCreated} theme links successfully`);
+      }
     }
 
     // STRATEGY 3: Link accounts via themes (Jira→Theme→Account transitive linking)
@@ -679,9 +685,8 @@ function getThemeLinks(userId: string, issue: any): any[] {
         user_id: userId,
         jira_issue_id: issue.id,
         theme_key: labelLower,
-        jira_key: issue.jira_key,
         match_type: 'label',
-        confidence: 1.0
+        match_confidence: 1.0
       });
       linkedThemes.push(labelLower);
     }
@@ -699,9 +704,8 @@ function getThemeLinks(userId: string, issue: any): any[] {
           user_id: userId,
           jira_issue_id: issue.id,
           theme_key: themeKey,
-          jira_key: issue.jira_key,
           match_type: 'component',
-          confidence: 0.9
+          match_confidence: 0.9
         });
         linkedThemes.push(themeKey);
       }
@@ -719,9 +723,8 @@ function getThemeLinks(userId: string, issue: any): any[] {
         user_id: userId,
         jira_issue_id: issue.id,
         theme_key: themeKey,
-        jira_key: issue.jira_key,
         match_type: 'keyword',
-        confidence: 0.8
+        match_confidence: 0.8
       });
       linkedThemes.push(themeKey);
     } else if (matchCount === 1) {
@@ -729,9 +732,8 @@ function getThemeLinks(userId: string, issue: any): any[] {
         user_id: userId,
         jira_issue_id: issue.id,
         theme_key: themeKey,
-        jira_key: issue.jira_key,
         match_type: 'keyword',
-        confidence: 0.5
+        match_confidence: 0.5
       });
       linkedThemes.push(themeKey);
     }
@@ -759,9 +761,8 @@ function getThemeLinksFromActualThemes(userId: string, issue: any, actualThemes:
         user_id: userId,
         jira_issue_id: issue.id,
         theme_key: themeKey,
-        jira_key: issue.jira_key,
         match_type: 'keyword',
-        confidence: 0.8
+        match_confidence: 0.8
       });
     } else if (matchCount === 1 && themeWords.length === 1) {
       // Single word theme that matches - medium confidence
@@ -769,9 +770,8 @@ function getThemeLinksFromActualThemes(userId: string, issue: any, actualThemes:
         user_id: userId,
         jira_issue_id: issue.id,
         theme_key: themeKey,
-        jira_key: issue.jira_key,
         match_type: 'keyword',
-        confidence: 0.6
+        match_confidence: 0.6
       });
     }
 
@@ -784,9 +784,8 @@ function getThemeLinksFromActualThemes(userId: string, issue: any, actualThemes:
             user_id: userId,
             jira_issue_id: issue.id,
             theme_key: themeKey,
-            jira_key: issue.jira_key,
             match_type: 'label',
-            confidence: 1.0
+            match_confidence: 1.0
           });
           break;
         }

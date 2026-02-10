@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { GoogleMap, LoadScript, Marker, InfoWindow, Circle } from '@react-google-maps/api';
+import { useState } from 'react';
+import { GoogleMap, Marker, InfoWindow, Circle } from '@react-google-maps/api';
 import { useRouter } from 'next/navigation';
 import { ExternalLink } from 'lucide-react';
 
@@ -48,24 +48,9 @@ export default function AccountMap({ accounts, center, radiusMiles }: AccountMap
     return '#10B981'; // Green - low friction
   };
 
-  // Memoize API key to avoid unnecessary re-renders
-  const apiKey = useMemo(() => process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!, []);
-
-  if (!apiKey) {
-    return (
-      <div className="h-[600px] bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
-        <div className="text-center">
-          <p className="text-gray-600 font-medium">Map unavailable</p>
-          <p className="text-sm text-gray-500 mt-1">Google Maps API key not configured</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="rounded-lg overflow-hidden border border-gray-200 shadow-sm">
-      <LoadScript googleMapsApiKey={apiKey}>
-        <GoogleMap
+      <GoogleMap
           mapContainerStyle={mapContainerStyle}
           center={center}
           zoom={8}
@@ -189,7 +174,6 @@ export default function AccountMap({ accounts, center, radiusMiles }: AccountMap
             </InfoWindow>
           )}
         </GoogleMap>
-      </LoadScript>
 
       {/* Legend */}
       <div className="bg-white border-t border-gray-200 px-4 py-3">

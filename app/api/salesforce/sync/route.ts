@@ -96,7 +96,9 @@ export async function POST(request: NextRequest) {
     // Helper function to fetch accounts from Salesforce
     const fetchSalesforceAccounts = async (accessToken: string) => {
       // Try full query with custom fields first (for Storable orgs)
-      const fullQuery = `SELECT Id,Name,dL_Product_s_Corporate_Name__c,MRR_MVR__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,ShippingStreet,ShippingCity,ShippingState,ShippingPostalCode,ShippingCountry,BillingStreet,BillingCity,BillingState,BillingPostalCode,BillingCountry,smartystreets__Shipping_Latitude__c,smartystreets__Shipping_Longitude__c,smartystreets__Billing_Latitude__c,smartystreets__Billing_Longitude__c,smartystreets__Shipping_Address_Status__c,smartystreets__Shipping_Verified__c,UltimateParentId,(SELECT Id FROM Assets) FROM Account WHERE ParentId=null AND MRR_MVR__c>0 ORDER BY MRR_MVR__c DESC LIMIT 500`;
+      // Property Address fields: ShippingStreet__c, ShippingCity__c (CUSTOM fields with __c suffix, labeled as "Property Address" in Salesforce UI)
+      // Parent Address fields: Parent_Street__c, Parent_City__c, Parent_State__c, Parent_Zip__c (for corporate parent accounts)
+      const fullQuery = `SELECT Id,Name,dL_Product_s_Corporate_Name__c,MRR_MVR__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,ShippingStreet__c,ShippingCity__c,ShippingPostalCode__c,ShippingCountry__c,Parent_Street__c,Parent_City__c,Parent_State__c,Parent_Zip__c,BillingStreet,BillingCity,BillingState,BillingPostalCode,BillingCountry,smartystreets__Shipping_Latitude__c,smartystreets__Shipping_Longitude__c,smartystreets__Billing_Latitude__c,smartystreets__Billing_Longitude__c,smartystreets__Shipping_Address_Status__c,smartystreets__Shipping_Verified__c,UltimateParentId,(SELECT Id FROM Assets) FROM Account WHERE ParentId=null AND MRR_MVR__c>0 ORDER BY MRR_MVR__c DESC LIMIT 500`;
 
       const fullResponse = await fetch(
         `${integration.instance_url}/services/data/v59.0/query?q=${encodeURIComponent(fullQuery)}`,
@@ -157,6 +159,28 @@ export async function POST(request: NextRequest) {
 
     if (!accountsData.records || accountsData.records.length === 0) {
       return NextResponse.json({ message: 'No accounts found', synced: 0 });
+    }
+
+    // DEBUG: Check which address fields exist and have data
+    if (accountsData.records.length > 0) {
+      const firstAccount = accountsData.records[0];
+      console.log('\n🔍 ADDRESS FIELD TEST:');
+      console.log(`Account: ${firstAccount.Name}`);
+
+      const addressFields = [
+        'ShippingStreet__c', 'ShippingCity__c', 'ShippingPostalCode__c', 'ShippingCountry__c',
+        'Parent_Street__c', 'Parent_City__c', 'Parent_State__c', 'Parent_Zip__c',
+        'BillingStreet', 'BillingCity', 'BillingState', 'BillingPostalCode',
+        'smartystreets__Shipping_Latitude__c', 'smartystreets__Shipping_Longitude__c',
+        'smartystreets__Billing_Latitude__c', 'smartystreets__Billing_Longitude__c'
+      ];
+
+      addressFields.forEach(field => {
+        if (firstAccount[field] !== undefined && firstAccount[field] !== null) {
+          console.log(`✅ ${field}: ${firstAccount[field]}`);
+        }
+      });
+      console.log('📍 End address field test\n');
     }
 
     // Deduplicate accounts by corporate name to avoid syncing child accounts multiple times
@@ -263,28 +287,35 @@ export async function POST(request: NextRequest) {
         service_level: sfAccount.LevelOfService__c || null,
         managed_account: sfAccount.Managed_Account__c || null,
         cs_segment: sfAccount.VitallyClient_Success_Tier__c || null,
-        // Property address (from ShippingAddress - preferred for visit planning)
-        property_address_street: sfAccount.ShippingStreet || null,
-        property_address_city: sfAccount.ShippingCity || null,
-        property_address_state: sfAccount.ShippingState || null,
-        property_address_postal_code: sfAccount.ShippingPostalCode || null,
-        property_address_country: sfAccount.ShippingCountry || null,
+        // Property address - PRIORITY: ShippingStreet__c (Property Address) > Parent_Street__c (Parent Address) > BillingStreet
+        // ShippingStreet__c is the CUSTOM field labeled as "Property Address" in Salesforce UI
+        property_address_street: sfAccount.ShippingStreet__c ||
+                                sfAccount.Parent_Street__c ||
+                                null,
+        property_address_city: sfAccount.ShippingCity__c ||
+                              sfAccount.Parent_City__c ||
+                              null,
+        property_address_state: sfAccount.Parent_State__c ||
+                               null,
+        property_address_postal_code: sfAccount.ShippingPostalCode__c ||
+                                     sfAccount.Parent_Zip__c ||
+                                     null,
+        property_address_country: sfAccount.ShippingCountry__c ||
+                                 null,
         // Billing address (fallback)
         billing_address_street: sfAccount.BillingStreet || null,
         billing_address_city: sfAccount.BillingCity || null,
         billing_address_state: sfAccount.BillingState || null,
         billing_address_postal_code: sfAccount.BillingPostalCode || null,
         billing_address_country: sfAccount.BillingCountry || null,
-        // Geocoding from SmartyStreets (via Salesforce custom fields)
-        // Prefer property address (Shipping) over billing address
+        // Geocoding - PRIORITY: SmartyStreets Shipping > SmartyStreets Billing
         latitude: sfAccount.smartystreets__Shipping_Latitude__c ||
                   sfAccount.smartystreets__Billing_Latitude__c ||
                   null,
         longitude: sfAccount.smartystreets__Shipping_Longitude__c ||
                    sfAccount.smartystreets__Billing_Longitude__c ||
                    null,
-        geocode_source: sfAccount.smartystreets__Shipping_Latitude__c ? 'salesforce' :
-                       (sfAccount.smartystreets__Billing_Latitude__c ? 'salesforce' : null),
+        geocode_source: (sfAccount.smartystreets__Shipping_Latitude__c || sfAccount.smartystreets__Billing_Latitude__c) ? 'salesforce' : null,
         geocode_quality: sfAccount.smartystreets__Shipping_Verified__c ? 'high' :
                         (sfAccount.smartystreets__Shipping_Address_Status__c === 'Valid' ? 'medium' : 'low'),
         geocoded_at: (sfAccount.smartystreets__Shipping_Latitude__c || sfAccount.smartystreets__Billing_Latitude__c) ?
