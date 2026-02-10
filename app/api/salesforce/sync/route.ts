@@ -412,6 +412,66 @@ export async function POST(request: NextRequest) {
 
     await supabase.from('integrations').update({ last_synced_at: new Date().toISOString() }).eq('id', integration.id);
 
+    // AUTO-GEOCODE: Geocode accounts that have addresses but no coordinates
+    // This handles accounts using Parent address fields which don't have SmartyStreets coords
+    const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    let geocodedInSync = 0;
+
+    if (GOOGLE_MAPS_API_KEY) {
+      const { data: needsGeocoding } = await supabase
+        .from('accounts')
+        .select('id, property_address_street, property_address_city, property_address_state, property_address_postal_code')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .not('property_address_street', 'is', null)
+        .is('latitude', null)
+        .limit(50); // Geocode up to 50 accounts per sync
+
+      if (needsGeocoding && needsGeocoding.length > 0) {
+        console.log(`Auto-geocoding ${needsGeocoding.length} accounts...`);
+
+        for (const account of needsGeocoding) {
+          const addressParts = [
+            account.property_address_street,
+            account.property_address_city,
+            account.property_address_state,
+            account.property_address_postal_code
+          ].filter(Boolean);
+
+          const fullAddress = addressParts.join(', ');
+          if (!fullAddress) continue;
+
+          try {
+            const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${GOOGLE_MAPS_API_KEY}`;
+            const geocodeResponse = await fetch(geocodeUrl);
+            const geocodeData = await geocodeResponse.json();
+
+            if (geocodeData.status === 'OK' && geocodeData.results && geocodeData.results.length > 0) {
+              const location = geocodeData.results[0].geometry.location;
+
+              await supabase
+                .from('accounts')
+                .update({
+                  latitude: location.lat,
+                  longitude: location.lng,
+                  geocode_source: 'google_maps',
+                  geocode_quality: geocodeData.results[0].geometry.location_type || 'APPROXIMATE',
+                  geocoded_at: new Date().toISOString()
+                })
+                .eq('id', account.id);
+
+              geocodedInSync++;
+            }
+
+            // Rate limit: 100ms between requests
+            await new Promise(resolve => setTimeout(resolve, 100));
+          } catch (error) {
+            console.error(`Failed to geocode account ${account.id}:`, error);
+          }
+        }
+      }
+    }
+
     // Trigger friction analysis (wait for it to complete so we can report errors)
     let analysisResult = null;
     let analysisError = null;
@@ -463,6 +523,10 @@ export async function POST(request: NextRequest) {
     // Build response message
     let message = `Synced ${upsertedAccounts?.length || 0} accounts successfully!`;
 
+    if (geocodedInSync > 0) {
+      message += `\n\n📍 Auto-geocoded ${geocodedInSync} accounts with missing coordinates.`;
+    }
+
     if (analysisError) {
       message += `\n\n⚠️ Warning: Analysis trigger failed - ${analysisError}\n\nYou may need to manually trigger analysis from the dashboard or check Vercel logs.`;
     } else if (analysisResult) {
@@ -492,6 +556,7 @@ export async function POST(request: NextRequest) {
         marine: marineAccounts?.length || 0,
       },
       geocoded: geocodedCount || 0,
+      geocodedInSync: geocodedInSync || 0,
       analysisResult,
       analysisError,
       message
