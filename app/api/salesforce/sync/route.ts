@@ -21,6 +21,8 @@ export async function POST(request: NextRequest) {
       .eq('user_id', user.id)
       .eq('integration_type', 'salesforce')
       .eq('status', 'active')
+      .order('connected_at', { ascending: false })
+      .limit(1)
       .single();
 
     if (!integration) {
