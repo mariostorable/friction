@@ -31,7 +31,7 @@ export async function GET() {
     });
 
     // Get unique IDs
-    allAccountIds = [...new Set(allAccountIds)];
+    allAccountIds = Array.from(new Set(allAccountIds));
 
     if (allAccountIds.length === 0) {
       return NextResponse.json({ message: 'No accounts in portfolios' });
