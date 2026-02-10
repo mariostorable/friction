@@ -11,7 +11,7 @@ export async function GET() {
     // Query database for 10 Federal and Elite accounts
     const { data: accounts, error } = await supabase
       .from('accounts')
-      .select('id, salesforce_id, name, property_address_street, property_address_city, property_address_state, billing_address_street, billing_address_city, billing_address_state, updated_at')
+      .select('id, salesforce_id, name, property_address_street, property_address_city, property_address_state, billing_address_street, billing_address_city, billing_address_state')
       .or('name.ilike.%10 Federal%,name.ilike.%Elite%')
       .order('name');
 
@@ -30,8 +30,7 @@ export async function GET() {
         billing_address: acc.billing_address_street
           ? `${acc.billing_address_street}, ${acc.billing_address_city}, ${acc.billing_address_state}`
           : null,
-        has_address: !!(acc.property_address_street || acc.billing_address_street),
-        updated_at: acc.updated_at
+        has_address: !!(acc.property_address_street || acc.billing_address_street)
       }))
     });
 
