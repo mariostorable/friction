@@ -322,18 +322,28 @@ export default function Dashboard() {
       let message = `✓ Salesforce Sync Complete!\n\n`;
       message += `Accounts synced: ${result.synced}\n`;
 
+      // Show vertical distribution
+      if (result.verticals) {
+        const { storage, marine, rv } = result.verticals;
+        if (storage > 0) message += `Storage: ${storage} accounts\n`;
+        if (marine > 0) message += `Marine: ${marine} accounts\n`;
+        if (rv > 0) message += `RV: ${rv} accounts\n`;
+      }
+
+      // Show portfolio counts (filtered subsets)
       if (result.portfolios) {
         const storage = result.portfolios.storage || 0;
         const marine = result.portfolios.marine || 0;
-        const top50 = result.portfolios.top_50 || 0;
 
-        if (storage > 0) message += `Storage accounts: ${storage}\n`;
-        if (marine > 0) message += `Marine accounts: ${marine}\n`;
-        if (top50 > 0 && storage === 0 && marine === 0) message += `Top portfolio accounts: ${top50}\n`;
+        if (storage > 0 || marine > 0) {
+          message += `\nTop Portfolios:\n`;
+          if (storage > 0) message += `  • ${storage} Storage w/ EDGE/SiteLink\n`;
+          if (marine > 0) message += `  • ${marine} Marine accounts\n`;
+        }
       }
 
       if (result.geocoded !== undefined) {
-        message += `Geocoded (for Visit Planner): ${result.geocoded}\n`;
+        message += `\nGeocoded (for Visit Planner): ${result.geocoded}\n`;
       }
 
       if (result.message) {

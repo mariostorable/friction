@@ -369,14 +369,30 @@ export async function POST(request: NextRequest) {
 
     await supabase.from('portfolios').delete().eq('user_id', user.id);
 
-    // Get all accounts (active only, has ARR)
+    // Get all accounts (active only, has ARR or is corporate parent)
     const { data: allAccounts } = await supabase
       .from('accounts')
-      .select('id, vertical, products, arr')
+      .select('id, vertical, products, arr, name')
       .eq('user_id', user.id)
       .eq('status', 'active')
-      .not('arr', 'is', null)
       .order('arr', { ascending: false });
+
+    // Calculate actual vertical distribution
+    const verticalCounts = {
+      storage: 0,
+      marine: 0,
+      rv: 0,
+      unknown: 0
+    };
+
+    allAccounts?.forEach(a => {
+      const v = a.vertical || 'unknown';
+      if (v in verticalCounts) {
+        verticalCounts[v as keyof typeof verticalCounts]++;
+      } else {
+        verticalCounts.unknown++;
+      }
+    });
 
     // Top 25 Storage Accounts (ONLY EDGE + SiteLink - exclude accounts without software)
     const storageAccounts = allAccounts?.filter(a => {
@@ -554,6 +570,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       synced: upsertedAccounts?.length || 0,
+      verticals: verticalCounts,
       portfolios: {
         storage: storageAccounts?.length || 0,
         marine: marineAccounts?.length || 0,
