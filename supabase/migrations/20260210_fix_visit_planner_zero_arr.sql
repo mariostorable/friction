@@ -1,9 +1,13 @@
 -- Fix Visit Planner to exclude accounts with NULL or $0 ARR
 -- Purpose: Prevent accounts with no revenue from appearing in Visit Planner results
 -- Created: 2026-02-10
+-- Updated: Fix ambiguous ofi_score column reference
 
--- Replace the find_nearby_accounts function with fixed ARR filtering
-CREATE OR REPLACE FUNCTION find_nearby_accounts(
+-- Drop all versions first to avoid conflicts
+DROP FUNCTION IF EXISTS find_nearby_accounts CASCADE;
+
+-- Create the function with fixed ARR filtering and unambiguous column references
+CREATE FUNCTION find_nearby_accounts(
   p_latitude DECIMAL,
   p_longitude DECIMAL,
   p_radius_miles INTEGER DEFAULT 50,
@@ -47,19 +51,19 @@ BEGIN
       ),
       1
     ) AS distance_miles,
-    COALESCE(s.ofi_score, 0) AS ofi_score,
+    COALESCE(snap.snapshot_ofi_score, 0)::INTEGER AS ofi_score,
     a.owner_name,
     a.property_address_city,
     a.property_address_state,
     a.salesforce_id
   FROM accounts a
   LEFT JOIN LATERAL (
-    SELECT ofi_score
+    SELECT ofi_score AS snapshot_ofi_score
     FROM account_snapshots
     WHERE account_id = a.id
     ORDER BY snapshot_date DESC
     LIMIT 1
-  ) s ON true
+  ) snap ON true
   WHERE
     (p_user_id IS NULL OR a.user_id = p_user_id)
     AND a.latitude IS NOT NULL
