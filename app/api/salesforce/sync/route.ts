@@ -410,12 +410,21 @@ export async function POST(request: NextRequest) {
     });
 
     // Top 25 Storage Accounts (ONLY EDGE + SiteLink - exclude accounts without software)
-    const storageAccounts = allAccounts?.filter(a => {
-      if (a.vertical !== 'storage') return false;
-      // ONLY include accounts with EDGE or SiteLink software
-      if (!a.products || !a.products.trim()) return false;
-      return a.products.includes('EDGE') || a.products.includes('SiteLink');
-    }).slice(0, 25);
+    const allStorageAccounts = allAccounts?.filter(a => a.vertical === 'storage') || [];
+    const storageWithProducts = allStorageAccounts.filter(a => a.products && a.products.trim());
+    const storageWithSoftware = storageWithProducts.filter(a =>
+      a.products.includes('EDGE') || a.products.includes('SiteLink')
+    );
+
+    console.log('🔍 Storage Account Filtering:');
+    console.log(`  Total storage accounts: ${allStorageAccounts.length}`);
+    console.log(`  With any products: ${storageWithProducts.length}`);
+    console.log(`  With EDGE/SiteLink: ${storageWithSoftware.length}`);
+    if (storageWithSoftware.length > 0) {
+      console.log(`  Sample products:`, storageWithSoftware.slice(0, 3).map(a => ({ name: a.name, products: a.products })));
+    }
+
+    const storageAccounts = storageWithSoftware.slice(0, 25);
 
     if (storageAccounts && storageAccounts.length > 0) {
       await supabase.from('portfolios').insert({
