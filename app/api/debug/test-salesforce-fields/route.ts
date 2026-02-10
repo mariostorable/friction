@@ -14,15 +14,27 @@ export async function GET() {
     }
 
     // Get Salesforce integration
-    const { data: integration } = await supabase
+    const { data: integration, error: integrationError } = await supabase
       .from('integrations')
       .select('*')
       .eq('user_id', user.id)
       .eq('integration_type', 'salesforce')
       .single();
 
-    if (!integration || !integration.credentials) {
-      return NextResponse.json({ error: 'Salesforce not connected' }, { status: 400 });
+    if (integrationError || !integration) {
+      return NextResponse.json({
+        error: 'Salesforce not connected',
+        integrationError: integrationError?.message,
+        userId: user.id
+      }, { status: 400 });
+    }
+
+    if (!integration.credentials) {
+      return NextResponse.json({
+        error: 'Salesforce has no credentials',
+        integrationId: integration.id,
+        hasCredentials: !!integration.credentials
+      }, { status: 400 });
     }
 
     const tokens = integration.credentials as any;
