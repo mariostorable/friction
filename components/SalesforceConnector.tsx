@@ -69,12 +69,37 @@ export default function SalesforceConnector() {
         let message = `✓ Salesforce Sync Complete!\n\n`;
         message += `Accounts synced: ${result.synced}\n`;
 
+        if (result.verticals) {
+          message += `Storage: ${result.verticals.storage || 0} accounts\n`;
+          message += `Marine: ${result.verticals.marine || 0} accounts\n`;
+        }
+
         if (result.portfolios) {
-          message += `Top portfolio accounts: ${result.portfolios.top_50 || 0}\n`;
+          message += `\nTop Portfolios:\n`;
+          if (result.portfolios.storage > 0) {
+            message += `  • ${result.portfolios.storage} Storage accounts\n`;
+          }
+          if (result.portfolios.marine > 0) {
+            message += `  • ${result.portfolios.marine} Marine accounts\n`;
+          }
         }
 
         if (result.geocoded !== undefined) {
-          message += `Geocoded (for Visit Planner): ${result.geocoded}\n`;
+          message += `\nGeocoded (for Visit Planner): ${result.geocoded}\n`;
+        }
+
+        // DEBUG INFO for troubleshooting
+        if (result.debug) {
+          message += `\n⚠️ DEBUG: Top 25 Storage Filter:\n`;
+          message += `  • Total storage accounts: ${result.debug.totalStorage}\n`;
+          message += `  • With products field: ${result.debug.withProducts}\n`;
+          message += `  • With EDGE/SiteLink: ${result.debug.withEDGEorSiteLink}\n`;
+          if (result.debug.sampleProducts && result.debug.sampleProducts.length > 0) {
+            message += `\n  Sample products from top storage accounts:\n`;
+            result.debug.sampleProducts.forEach((acc: any) => {
+              message += `    - ${acc.name}: ${acc.products || 'NO PRODUCTS'}\n`;
+            });
+          }
         }
 
         // Include analysis status if provided
