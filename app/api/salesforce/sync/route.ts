@@ -96,9 +96,9 @@ export async function POST(request: NextRequest) {
     // Helper function to fetch accounts from Salesforce
     const fetchSalesforceAccounts = async (accessToken: string) => {
       // Try full query with custom fields first (for Storable orgs)
-      // Property Address fields: ShippingStreet__c, ShippingCity__c (CUSTOM fields with __c suffix, labeled as "Property Address" in Salesforce UI)
+      // Property Address in UI = STANDARD ShippingAddress compound field (ShippingStreet, ShippingCity, ShippingState, etc. WITHOUT __c)
       // Parent Address fields: Parent_Street__c, Parent_City__c, Parent_State__c, Parent_Zip__c (for corporate parent accounts)
-      const fullQuery = `SELECT Id,Name,dL_Product_s_Corporate_Name__c,MRR_MVR__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,ShippingStreet__c,ShippingCity__c,ShippingPostalCode__c,ShippingCountry__c,Parent_Street__c,Parent_City__c,Parent_State__c,Parent_Zip__c,BillingStreet,BillingCity,BillingState,BillingPostalCode,BillingCountry,smartystreets__Shipping_Latitude__c,smartystreets__Shipping_Longitude__c,smartystreets__Billing_Latitude__c,smartystreets__Billing_Longitude__c,smartystreets__Shipping_Address_Status__c,smartystreets__Shipping_Verified__c,UltimateParentId,(SELECT Id FROM Assets) FROM Account WHERE ParentId=null AND MRR_MVR__c>0 ORDER BY MRR_MVR__c DESC LIMIT 500`;
+      const fullQuery = `SELECT Id,Name,dL_Product_s_Corporate_Name__c,MRR_MVR__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,ShippingStreet,ShippingCity,ShippingState,ShippingPostalCode,ShippingCountry,Parent_Street__c,Parent_City__c,Parent_State__c,Parent_Zip__c,BillingStreet,BillingCity,BillingState,BillingPostalCode,BillingCountry,smartystreets__Shipping_Latitude__c,smartystreets__Shipping_Longitude__c,smartystreets__Billing_Latitude__c,smartystreets__Billing_Longitude__c,smartystreets__Shipping_Address_Status__c,smartystreets__Shipping_Verified__c,UltimateParentId,(SELECT Id FROM Assets) FROM Account WHERE ParentId=null AND MRR_MVR__c>0 ORDER BY MRR_MVR__c DESC LIMIT 500`;
 
       const fullResponse = await fetch(
         `${integration.instance_url}/services/data/v59.0/query?q=${encodeURIComponent(fullQuery)}`,
@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
       console.log(`Account: ${firstAccount.Name}`);
 
       const addressFields = [
-        'ShippingStreet__c', 'ShippingCity__c', 'ShippingPostalCode__c', 'ShippingCountry__c',
+        'ShippingStreet', 'ShippingCity', 'ShippingState', 'ShippingPostalCode', 'ShippingCountry',
         'Parent_Street__c', 'Parent_City__c', 'Parent_State__c', 'Parent_Zip__c',
         'BillingStreet', 'BillingCity', 'BillingState', 'BillingPostalCode',
         'smartystreets__Shipping_Latitude__c', 'smartystreets__Shipping_Longitude__c',
@@ -287,20 +287,21 @@ export async function POST(request: NextRequest) {
         service_level: sfAccount.LevelOfService__c || null,
         managed_account: sfAccount.Managed_Account__c || null,
         cs_segment: sfAccount.VitallyClient_Success_Tier__c || null,
-        // Property address - PRIORITY: ShippingStreet__c (Property Address) > Parent_Street__c (Parent Address) > BillingStreet
-        // ShippingStreet__c is the CUSTOM field labeled as "Property Address" in Salesforce UI
-        property_address_street: sfAccount.ShippingStreet__c ||
+        // Property address - PRIORITY: ShippingStreet (standard Property Address field) > Parent_Street__c > BillingStreet
+        // "Property Address" in Salesforce UI = STANDARD ShippingAddress compound field (ShippingStreet, ShippingCity, etc.)
+        property_address_street: sfAccount.ShippingStreet ||
                                 sfAccount.Parent_Street__c ||
                                 null,
-        property_address_city: sfAccount.ShippingCity__c ||
+        property_address_city: sfAccount.ShippingCity ||
                               sfAccount.Parent_City__c ||
                               null,
-        property_address_state: sfAccount.Parent_State__c ||
+        property_address_state: sfAccount.ShippingState ||
+                               sfAccount.Parent_State__c ||
                                null,
-        property_address_postal_code: sfAccount.ShippingPostalCode__c ||
+        property_address_postal_code: sfAccount.ShippingPostalCode ||
                                      sfAccount.Parent_Zip__c ||
                                      null,
-        property_address_country: sfAccount.ShippingCountry__c ||
+        property_address_country: sfAccount.ShippingCountry ||
                                  null,
         // Billing address (fallback)
         billing_address_street: sfAccount.BillingStreet || null,
