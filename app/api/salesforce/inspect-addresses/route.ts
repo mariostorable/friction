@@ -115,6 +115,17 @@ export async function GET(request: Request) {
       return await detailResponse.json();
     };
 
+    // Check if tokens are valid
+    console.log('Decrypted tokens:', { hasTokens: !!tokens, tokenKeys: tokens ? Object.keys(tokens) : [] });
+
+    if (!tokens || !tokens.access_token) {
+      return NextResponse.json({
+        error: 'Invalid tokens',
+        details: 'No access token found. Please reconnect Salesforce.',
+        debug: { hasTokens: !!tokens, tokenKeys: tokens ? Object.keys(tokens) : [] }
+      }, { status: 400 });
+    }
+
     // Try to fetch accounts, refresh token if needed
     let accessToken = tokens.access_token;
 
