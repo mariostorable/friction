@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
         const errorText = await fullResponse.text();
         if (errorText.includes('INVALID_FIELD') || errorText.includes('No such column')) {
           console.log('Custom fields not found, using standard fields only');
-          const simpleQuery = `SELECT Id,Name,AnnualRevenue,Industry,Type,Owner.Name,CreatedDate,ShippingStreet,ShippingCity,ShippingState,ShippingPostalCode,ShippingCountry,BillingStreet,BillingCity,BillingState,BillingPostalCode,BillingCountry,(SELECT Id FROM Assets) FROM Account WHERE ParentId=null ORDER BY AnnualRevenue DESC NULLS LAST LIMIT 500`;
+          const simpleQuery = `SELECT Id,Name,AnnualRevenue,Industry,Type,Owner.Name,CreatedDate,ShippingStreet,ShippingCity,ShippingState,ShippingPostalCode,ShippingCountry,BillingStreet,BillingCity,BillingState,BillingPostalCode,BillingCountry,Parent_Street__c,Parent_City__c,Parent_State__c,Parent_Zip__c,(SELECT Id FROM Assets) FROM Account WHERE ParentId=null ORDER BY AnnualRevenue DESC NULLS LAST LIMIT 500`;
 
           return await fetch(
             `${integration.instance_url}/services/data/v59.0/query?q=${encodeURIComponent(simpleQuery)}`,
