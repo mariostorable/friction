@@ -52,6 +52,10 @@ export async function GET(request: Request) {
 
     // Helper function to refresh Salesforce token if needed
     const refreshSalesforceToken = async () => {
+      if (!tokens.refresh_token) {
+        throw new Error('No refresh token available. Please reconnect Salesforce.');
+      }
+
       const refreshResponse = await fetch(`${integration.instance_url}/services/oauth2/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
