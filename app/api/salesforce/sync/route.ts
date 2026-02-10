@@ -409,8 +409,13 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // Top 25 Storage Accounts (by ARR, regardless of products)
-    const storageAccounts = allAccounts?.filter(a => a.vertical === 'storage').slice(0, 25);
+    // Top 25 Storage Accounts (ONLY EDGE + SiteLink software)
+    const storageAccounts = allAccounts?.filter(a => {
+      if (a.vertical !== 'storage') return false;
+      if (!a.products || !a.products.trim()) return false;
+      // Products are stored as "Software (EDGE)" or "Software (SiteLink)"
+      return a.products.includes('Software (EDGE)') || a.products.includes('Software (SiteLink)');
+    }).slice(0, 25);
 
     if (storageAccounts && storageAccounts.length > 0) {
       await supabase.from('portfolios').insert({
