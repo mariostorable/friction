@@ -307,22 +307,19 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // Top 25 Storage Accounts (ONLY EDGE + SiteLink - exclude accounts without software)
+    // Top 25 Storage Accounts by ARR (any products for now - filter broken)
     const allStorageAccounts = allAccounts?.filter(a => a.vertical === 'storage') || [];
     const storageWithProducts = allStorageAccounts.filter(a => a.products && a.products.trim());
-    const storageWithSoftware = storageWithProducts.filter(a =>
-      a.products.includes('EDGE') || a.products.includes('SiteLink')
-    );
 
     console.log('🔍 Storage Account Filtering:');
     console.log(`  Total storage accounts: ${allStorageAccounts.length}`);
     console.log(`  With any products: ${storageWithProducts.length}`);
-    console.log(`  With EDGE/SiteLink: ${storageWithSoftware.length}`);
-    if (storageWithSoftware.length > 0) {
-      console.log(`  Sample products:`, storageWithSoftware.slice(0, 3).map(a => ({ name: a.name, products: a.products })));
+    if (storageWithProducts.length > 0) {
+      console.log(`  Sample products:`, storageWithProducts.slice(0, 3).map(a => ({ name: a.name, products: a.products })));
     }
 
-    const storageAccounts = storageWithSoftware.slice(0, 25);
+    // TEMPORARY: Remove software filter to get dashboard working
+    const storageAccounts = allStorageAccounts.slice(0, 25);
 
     if (storageAccounts && storageAccounts.length > 0) {
       await supabase.from('portfolios').insert({
@@ -440,7 +437,6 @@ export async function POST(request: NextRequest) {
       debug: {
         totalStorage: allStorageAccounts.length,
         withProducts: storageWithProducts.length,
-        withEDGEorSiteLink: storageWithSoftware.length,
         sampleProducts: storageWithProducts.slice(0, 5).map(a => ({
           name: a.name,
           products: a.products
