@@ -6,11 +6,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { MapPin, List as ListIcon, Search, Filter, AlertCircle, Loader2, X } from 'lucide-react';
-import dynamic from 'next/dynamic';
+import dynamicImport from 'next/dynamic';
 import { useLoadScript, Autocomplete } from '@react-google-maps/api';
 
 // Dynamically import map to avoid SSR issues with Google Maps
-const AccountMap = dynamic(() => import('@/components/AccountMap'), {
+const AccountMap = dynamicImport(() => import('@/components/AccountMap'), {
   ssr: false,
   loading: () => (
     <div className="h-[600px] bg-gray-100 rounded-lg flex items-center justify-center">
