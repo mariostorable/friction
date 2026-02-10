@@ -21,13 +21,21 @@ export async function GET(request: Request) {
       .select('*')
       .eq('user_id', userId)
       .eq('integration_type', 'salesforce')
+      .eq('status', 'active')
       .single();
 
     if (integrationError || !integration) {
-      return NextResponse.json({ error: 'Salesforce not connected' }, { status: 400 });
+      return NextResponse.json({ error: 'Salesforce not connected', details: integrationError }, { status: 400 });
     }
 
-    const tokens = integration.credentials as any;
+    // Use encryption helper to get tokens
+    const { getDecryptedToken } = await import('@/lib/encryption');
+    let tokens;
+    try {
+      tokens = await getDecryptedToken(supabase, integration.id);
+    } catch (error) {
+      return NextResponse.json({ error: 'Failed to decrypt tokens', details: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
+    }
 
     // Helper function to refresh Salesforce token if needed
     const refreshSalesforceToken = async () => {
