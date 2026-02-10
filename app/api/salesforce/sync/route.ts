@@ -156,26 +156,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'No accounts found', synced: 0 });
     }
 
-    // DEBUG: Check which address fields exist and have data
+    // DEBUG: Check product fields in Salesforce response
     if (accountsData.records.length > 0) {
-      const firstAccount = accountsData.records[0];
-      console.log('\n🔍 ADDRESS FIELD TEST:');
-      console.log(`Account: ${firstAccount.Name}`);
+      console.log('\n🔍 SALESFORCE FIELD DEBUG:');
+      console.log(`Total records returned: ${accountsData.records.length}`);
 
-      const addressFields = [
-        'ShippingStreet', 'ShippingCity', 'ShippingState', 'ShippingPostalCode', 'ShippingCountry',
-        'Parent_Street__c', 'Parent_City__c', 'Parent_State__c', 'Parent_Zip__c',
-        'BillingStreet', 'BillingCity', 'BillingState', 'BillingPostalCode',
-        'smartystreets__Shipping_Latitude__c', 'smartystreets__Shipping_Longitude__c',
-        'smartystreets__Billing_Latitude__c', 'smartystreets__Billing_Longitude__c'
-      ];
-
-      addressFields.forEach(field => {
-        if (firstAccount[field] !== undefined && firstAccount[field] !== null) {
-          console.log(`✅ ${field}: ${firstAccount[field]}`);
-        }
+      // Check first 5 accounts for product fields
+      const sampleAccounts = accountsData.records.slice(0, 5);
+      sampleAccounts.forEach((account: any, index: number) => {
+        console.log(`\nAccount ${index + 1}: ${account.Name}`);
+        console.log(`  MRR_MVR__c: ${account.MRR_MVR__c || 'NULL'}`);
+        console.log(`  Corp_Code__c: ${account.Corp_Code__c || 'NULL'}`);
+        console.log(`  SE_Company_UUID__c: ${account.SE_Company_UUID__c || 'NULL'}`);
+        console.log(`  Current_FMS__c: ${account.Current_FMS__c || 'NULL'}`);
+        console.log(`  Industry: ${account.Industry || 'NULL'}`);
+        console.log(`  Type: ${account.Type || 'NULL'}`);
       });
-      console.log('📍 End address field test\n');
+
+      // Count how many have each field
+      const withMRR = accountsData.records.filter((a: any) => a.MRR_MVR__c).length;
+      const withCorpCode = accountsData.records.filter((a: any) => a.Corp_Code__c).length;
+      const withSEUUID = accountsData.records.filter((a: any) => a.SE_Company_UUID__c).length;
+      const withFMS = accountsData.records.filter((a: any) => a.Current_FMS__c).length;
+
+      console.log(`\n📊 Field Coverage:`);
+      console.log(`  With MRR_MVR__c: ${withMRR}/${accountsData.records.length}`);
+      console.log(`  With Corp_Code__c: ${withCorpCode}/${accountsData.records.length}`);
+      console.log(`  With SE_Company_UUID__c: ${withSEUUID}/${accountsData.records.length}`);
+      console.log(`  With Current_FMS__c: ${withFMS}/${accountsData.records.length}`);
+      console.log('📍 End field debug\n');
     }
 
     // Deduplicate accounts by corporate name
