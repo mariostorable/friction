@@ -139,16 +139,8 @@ export default function SalesforceConnector() {
   }
 
   async function connectSalesforce() {
-    const clientId = process.env.NEXT_PUBLIC_SALESFORCE_CLIENT_ID;
-    const redirectUri = `${window.location.origin}/api/auth/salesforce/callback`;
-    
-    const authUrl = `https://storable.my.salesforce.com/services/oauth2/authorize?` +
-      `client_id=${clientId}&` +
-      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-      `response_type=code&` +
-      `scope=api%20refresh_token`;
-    
-    window.location.href = authUrl;
+    // Use the server-side OAuth route which handles the redirect properly
+    window.location.href = '/api/auth/salesforce';
   }
 
   if (loading) {
