@@ -135,16 +135,23 @@ export async function GET(request: Request) {
     // Check if tokens are valid
     console.log('Decrypted tokens:', { hasTokens: !!tokens, tokenKeys: tokens ? Object.keys(tokens) : [] });
 
-    if (!tokens || !tokens.access_token) {
+    if (!tokens) {
       return NextResponse.json({
-        error: 'Invalid tokens',
-        details: 'No access token found. Please reconnect Salesforce.',
-        debug: { hasTokens: !!tokens, tokenKeys: tokens ? Object.keys(tokens) : [] }
+        error: 'No tokens',
+        details: 'Tokens are null or undefined. Please reconnect Salesforce.'
       }, { status: 400 });
     }
 
-    // Try to fetch accounts, refresh token if needed
-    let accessToken = tokens.access_token;
+    if (!tokens.access_token) {
+      return NextResponse.json({
+        error: 'No access token',
+        details: 'Access token not found in decrypted tokens. Please reconnect Salesforce.',
+        debug: { tokenKeys: Object.keys(tokens) }
+      }, { status: 400 });
+    }
+
+    // Try to fetch accounts
+    const accessToken = tokens.access_token;
 
     let eliteStorData = await fetchAccount(accessToken, 'Elite-Stor');
 
