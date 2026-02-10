@@ -10,16 +10,6 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request: NextRequest) {
   try {
-    // Check if user is authenticated
-    const supabase = createRouteHandlerClient({ cookies });
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      // Redirect to login page if not authenticated
-      const requestUrl = new URL(request.url);
-      return NextResponse.redirect(`${requestUrl.origin}/?error=not_authenticated`);
-    }
-
     // Build Salesforce OAuth URL
     const authUrl = new URL('https://storable.my.salesforce.com/services/oauth2/authorize');
     authUrl.searchParams.set('response_type', 'code');
@@ -30,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     console.log('Redirecting to Salesforce OAuth:', authUrl.toString());
 
-    // Redirect to Salesforce
+    // Redirect to Salesforce (auth check happens in callback)
     return NextResponse.redirect(authUrl.toString());
 
   } catch (error) {
