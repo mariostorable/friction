@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
       // Pull accounts where ParentId=null (parent accounts only)
       // Include: (Industry=Storage/Marine/RV with revenue) OR (corporate parent accounts with - CORP in name)
       // This ensures we get operational accounts AND corporate parents regardless of Industry field
-      const fullQuery = `SELECT Id,Name,dL_Product_s_Corporate_Name__c,MRR_MVR__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,ShippingStreet,ShippingCity,ShippingState,ShippingPostalCode,ShippingCountry,Parent_Street__c,Parent_City__c,Parent_State__c,Parent_Zip__c,BillingStreet,BillingCity,BillingState,BillingPostalCode,BillingCountry,smartystreets__Shipping_Latitude__c,smartystreets__Shipping_Longitude__c,smartystreets__Billing_Latitude__c,smartystreets__Billing_Longitude__c,smartystreets__Shipping_Address_Status__c,smartystreets__Shipping_Verified__c,UltimateParentId,(SELECT Id FROM Assets) FROM Account WHERE ParentId=null AND ((Industry LIKE '%Storage%' OR Industry LIKE '%Marine%' OR Industry LIKE '%RV%') OR (Name LIKE '% - CORP%' OR Name LIKE '%-CORP%' OR Name LIKE '%CORP.%')) AND (MRR_MVR__c>0 OR Name LIKE '% - CORP%' OR Name LIKE '%-CORP%' OR Name LIKE '%CORP.%') ORDER BY MRR_MVR__c DESC NULLS LAST LIMIT 1000`;
+      const fullQuery = `SELECT Id,Name,dL_Product_s_Corporate_Name__c,MRR_MVR__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,ShippingStreet,ShippingCity,ShippingState,ShippingPostalCode,ShippingCountry,Parent_Street__c,Parent_City__c,Parent_State__c,Parent_Zip__c,BillingStreet,BillingCity,BillingState,BillingPostalCode,BillingCountry,smartystreets__Shipping_Latitude__c,smartystreets__Shipping_Longitude__c,smartystreets__Billing_Latitude__c,smartystreets__Billing_Longitude__c,smartystreets__Shipping_Address_Status__c,smartystreets__Shipping_Verified__c,(SELECT Id FROM Assets) FROM Account WHERE ParentId=null AND ((Industry LIKE '%Storage%' OR Industry LIKE '%Marine%' OR Industry LIKE '%RV%') OR (Name LIKE '% - CORP%' OR Name LIKE '%-CORP%' OR Name LIKE '%CORP.%')) AND (MRR_MVR__c>0 OR Name LIKE '% - CORP%' OR Name LIKE '%-CORP%' OR Name LIKE '%CORP.%') ORDER BY MRR_MVR__c DESC NULLS LAST LIMIT 1000`;
 
       const fullResponse = await fetch(
         `${integration.instance_url}/services/data/v59.0/query?q=${encodeURIComponent(fullQuery)}`,
@@ -626,7 +626,16 @@ export async function POST(request: NextRequest) {
       geocodedInSync: geocodedInSync || 0,
       analysisResult,
       analysisError,
-      message
+      message,
+      debug: {
+        totalStorage: allStorageAccounts.length,
+        withProducts: storageWithProducts.length,
+        withEDGEorSiteLink: storageWithSoftware.length,
+        sampleProducts: storageWithProducts.slice(0, 5).map(a => ({
+          name: a.name,
+          products: a.products
+        }))
+      }
     });
 
   } catch (error) {
