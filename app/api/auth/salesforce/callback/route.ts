@@ -98,22 +98,54 @@ export async function GET(request: NextRequest) {
     console.log('Token exchange successful! Instance URL:', tokenData.instance_url);
 
     // Use regular client for integration (user owns this)
-    const { data: integration, error: integrationError } = await supabase
+    // Check if integration exists first
+    const { data: existingIntegration } = await supabase
       .from('integrations')
-      .upsert({
-        user_id: user.id,
-        integration_type: 'salesforce',
-        status: 'active',
-        instance_url: tokenData.instance_url || null,
-        metadata: {},
-        connected_at: new Date().toISOString(),
-      })
-      .select()
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('integration_type', 'salesforce')
       .single();
 
-    if (integrationError) {
-      console.error('Integration storage error:', integrationError);
-      throw integrationError;
+    let integration;
+    if (existingIntegration) {
+      // Update existing integration
+      const { data, error: integrationError } = await supabase
+        .from('integrations')
+        .update({
+          status: 'active',
+          instance_url: tokenData.instance_url || null,
+          metadata: {},
+          connected_at: new Date().toISOString(),
+        })
+        .eq('id', existingIntegration.id)
+        .select()
+        .single();
+
+      if (integrationError) {
+        console.error('Integration update error:', integrationError);
+        throw integrationError;
+      }
+      integration = data;
+    } else {
+      // Insert new integration
+      const { data, error: integrationError } = await supabase
+        .from('integrations')
+        .insert({
+          user_id: user.id,
+          integration_type: 'salesforce',
+          status: 'active',
+          instance_url: tokenData.instance_url || null,
+          metadata: {},
+          connected_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (integrationError) {
+        console.error('Integration insert error:', integrationError);
+        throw integrationError;
+      }
+      integration = data;
     }
 
     console.log('Integration stored:', integration.id);
