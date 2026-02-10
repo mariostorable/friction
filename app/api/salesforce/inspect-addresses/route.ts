@@ -28,12 +28,25 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Salesforce not connected', details: integrationError }, { status: 400 });
     }
 
+    // Create admin client for decryption
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+
     // Use encryption helper to get tokens
     const { getDecryptedToken } = await import('@/lib/encryption');
     let tokens;
     try {
-      tokens = await getDecryptedToken(supabase, integration.id);
+      tokens = await getDecryptedToken(supabaseAdmin, integration.id);
     } catch (error) {
+      console.error('Failed to decrypt tokens:', error);
       return NextResponse.json({ error: 'Failed to decrypt tokens', details: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
     }
 
