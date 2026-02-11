@@ -70,48 +70,14 @@ export default function SalesforceConnector() {
       const result = await response.json();
 
       if (response.ok) {
-        let message = `✓ Salesforce Sync Complete!\n\n`;
-        message += `Accounts synced: ${result.synced}\n`;
-
-        if (result.verticals) {
-          message += `Storage: ${result.verticals.storage || 0} accounts\n`;
-          message += `Marine: ${result.verticals.marine || 0} accounts\n`;
-        }
-
-        if (result.portfolios) {
-          message += `\nTop Portfolios:\n`;
-          if (result.portfolios.storage > 0) {
-            message += `  • ${result.portfolios.storage} Storage accounts\n`;
-          }
-          if (result.portfolios.marine > 0) {
-            message += `  • ${result.portfolios.marine} Marine accounts\n`;
-          }
-        }
+        let message = `✓ Sync Complete!\n\n`;
+        message += `${result.synced} accounts synced\n`;
 
         if (result.geocoded !== undefined) {
-          message += `\nGeocoded (for Visit Planner): ${result.geocoded}\n`;
+          message += `${result.geocoded} geocoded for Visit Planner\n`;
         }
 
-        // DEBUG INFO for troubleshooting
-        if (result.debug) {
-          message += `\n⚠️ DEBUG: Top 25 Storage Filter:\n`;
-          message += `  • Total storage accounts: ${result.debug.totalStorage}\n`;
-          message += `  • With products field: ${result.debug.withProducts}\n`;
-          message += `  • With EDGE/SiteLink: ${result.debug.withEDGEorSiteLink}\n`;
-          if (result.debug.sampleProducts && result.debug.sampleProducts.length > 0) {
-            message += `\n  Sample products from top storage accounts:\n`;
-            result.debug.sampleProducts.forEach((acc: any) => {
-              message += `    - ${acc.name}: ${acc.products || 'NO PRODUCTS'}\n`;
-            });
-          }
-        }
-
-        // Include analysis status if provided
-        if (result.message) {
-          message += `\n${result.message}`;
-        }
-
-        message += `\n\nAddress/location data has been updated.\nRefresh the dashboard to see latest data.`;
+        message += `\nRefresh the dashboard to see updates.`;
 
         setSuccess(message);
         await checkIntegration();
