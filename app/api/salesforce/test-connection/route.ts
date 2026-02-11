@@ -7,8 +7,8 @@ import { getDecryptedToken } from '@/lib/encryption';
 export const dynamic = 'force-dynamic';
 
 /**
- * Test Salesforce connection endpoint
- * Returns detailed diagnostics about the Salesforce integration
+ * Test Salesforce connection
+ * Makes a simple API call to verify tokens work
  */
 export async function GET(request: NextRequest) {
   try {
@@ -19,31 +19,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    console.log('🔍 Testing Salesforce connection for user:', user.id);
-
-    // Get integration
-    const { data: integration, error: intError } = await supabase
+    const { data: integration, error: integrationError } = await supabase
       .from('integrations')
       .select('*')
       .eq('user_id', user.id)
       .eq('integration_type', 'salesforce')
-      .maybeSingle();
-
-    if (intError) {
-      return NextResponse.json({
-        error: 'Failed to fetch integration',
-        details: intError.message
-      }, { status: 500 });
-    }
+      .eq('status', 'active')
+      .order('connected_at', { ascending: false })
+      .limit(1)
+      .single();
 
     if (!integration) {
       return NextResponse.json({
+        connected: false,
         error: 'Salesforce not connected',
-        message: 'Please connect Salesforce from Settings'
-      }, { status: 400 });
+        integrationError: integrationError?.message
+      }, { status: 200 });
     }
 
-    // Get tokens
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -55,50 +48,28 @@ export async function GET(request: NextRequest) {
       }
     );
 
+    // Retrieve and decrypt tokens
     let tokens;
     try {
       tokens = await getDecryptedToken(supabaseAdmin, integration.id);
     } catch (error) {
       return NextResponse.json({
+        connected: false,
         error: 'Failed to decrypt tokens',
-        details: error instanceof Error ? error.message : 'Unknown error',
-        action: 'Please reconnect Salesforce from Settings'
-      }, { status: 500 });
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, { status: 200 });
     }
 
     if (!tokens) {
       return NextResponse.json({
-        error: 'No tokens found',
-        action: 'Please reconnect Salesforce from Settings'
-      }, { status: 400 });
+        connected: false,
+        error: 'No tokens found'
+      }, { status: 200 });
     }
 
-    // Test 1: Simple API call to verify credentials
-    console.log('Test 1: Verifying credentials...');
-    const identityResponse = await fetch(`${integration.instance_url}/services/oauth2/userinfo`, {
-      headers: {
-        'Authorization': `Bearer ${tokens.access_token}`,
-      },
-    });
-
-    if (!identityResponse.ok) {
-      const errorText = await identityResponse.text();
-      return NextResponse.json({
-        error: 'Invalid or expired token',
-        details: errorText,
-        status: identityResponse.status,
-        action: 'Please reconnect Salesforce from Settings'
-      }, { status: 401 });
-    }
-
-    const userInfo = await identityResponse.json();
-    console.log('✅ Credentials valid. User:', userInfo.name);
-
-    // Test 2: Simple SOQL query
-    console.log('Test 2: Testing simple SOQL query...');
-    const simpleQuery = 'SELECT Id, Name FROM Account LIMIT 1';
-    const simpleResponse = await fetch(
-      `${integration.instance_url}/services/data/v59.0/query?q=${encodeURIComponent(simpleQuery)}`,
+    // Test Salesforce API with a simple query
+    const testResponse = await fetch(
+      `${integration.instance_url}/services/data/v59.0/query?q=SELECT+Id,Name+FROM+Account+LIMIT+1`,
       {
         headers: {
           'Authorization': `Bearer ${tokens.access_token}`,
@@ -107,117 +78,51 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    if (!simpleResponse.ok) {
-      const errorText = await simpleResponse.text();
+    if (testResponse.status === 401) {
       return NextResponse.json({
-        error: 'Simple query failed',
-        query: simpleQuery,
-        details: errorText,
-        status: simpleResponse.status
-      }, { status: 500 });
+        connected: false,
+        error: 'Access token expired or invalid',
+        hasRefreshToken: !!tokens.refresh_token,
+        statusCode: 401
+      }, { status: 200 });
     }
 
-    const simpleData = await simpleResponse.json();
-    console.log('✅ Simple query works. Found', simpleData.totalSize, 'accounts');
-
-    // Test 3: Full query with all fields (the one used in sync)
-    console.log('Test 3: Testing full sync query...');
-
-    // Try with custom fields first
-    let fullQuery = 'SELECT Id,Name,dL_Product_s_Corporate_Name__c,MRR_MVR__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,(SELECT Id FROM Assets) FROM Account WHERE ParentId=null AND MRR_MVR__c>0 ORDER BY MRR_MVR__c DESC LIMIT 5';
-    let useStandardFields = false;
-
-    let fullResponse = await fetch(
-      `${integration.instance_url}/services/data/v59.0/query?q=${encodeURIComponent(fullQuery)}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${tokens.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    // If custom fields don't exist, try standard fields
-    if (!fullResponse.ok) {
-      const errorText = await fullResponse.text();
-
-      if (errorText.includes('INVALID_FIELD') || errorText.includes('No such column')) {
-        console.log('Custom fields not found, trying standard fields...');
-        useStandardFields = true;
-        fullQuery = 'SELECT Id,Name,AnnualRevenue,Industry,Type,Owner.Name,CreatedDate,(SELECT Id FROM Assets) FROM Account WHERE ParentId=null ORDER BY AnnualRevenue DESC NULLS LAST LIMIT 5';
-
-        fullResponse = await fetch(
-          `${integration.instance_url}/services/data/v59.0/query?q=${encodeURIComponent(fullQuery)}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${tokens.access_token}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-
-        if (!fullResponse.ok) {
-          const fallbackError = await fullResponse.text();
-          return NextResponse.json({
-            error: 'Both custom and standard field queries failed',
-            details: fallbackError,
-            status: fullResponse.status,
-          }, { status: 500 });
-        }
-      } else {
-        let errorJson;
-        try {
-          errorJson = JSON.parse(errorText);
-        } catch {
-          errorJson = { message: errorText };
-        }
-
-        return NextResponse.json({
-          error: 'Full sync query failed',
-          query: fullQuery,
-          details: errorJson,
-          status: fullResponse.status,
-        }, { status: 500 });
-      }
+    if (!testResponse.ok) {
+      const errorText = await testResponse.text();
+      return NextResponse.json({
+        connected: false,
+        error: 'Salesforce API error',
+        statusCode: testResponse.status,
+        details: errorText
+      }, { status: 200 });
     }
 
-    const fullData = await fullResponse.json();
-    console.log(`✅ Full query works. Found ${fullData.totalSize} accounts (${useStandardFields ? 'standard' : 'custom'} fields)`);
+    const data = await testResponse.json();
 
     return NextResponse.json({
-      success: true,
-      message: `All Salesforce connection tests passed! ${useStandardFields ? '(Using standard fields only - custom fields not available)' : '(Using custom Storable fields)'}`,
+      connected: true,
       integration: {
-        status: integration.status,
-        instance_url: integration.instance_url,
-        connected_at: integration.connected_at,
-        last_synced_at: integration.last_synced_at,
+        id: integration.id,
+        instanceUrl: integration.instance_url,
+        connectedAt: integration.connected_at
       },
-      user_info: {
-        name: userInfo.name,
-        email: userInfo.email,
-        organization_id: userInfo.organization_id,
+      tokens: {
+        hasAccessToken: !!tokens.access_token,
+        hasRefreshToken: !!tokens.refresh_token,
+        expiresAt: tokens.expires_at
       },
-      tests: {
-        credentials: '✅ Valid',
-        simple_query: `✅ ${simpleData.totalSize} accounts found`,
-        full_query: `✅ ${fullData.totalSize} accounts found (${useStandardFields ? 'standard fields' : 'custom fields'})`,
-      },
-      sample_accounts: fullData.records?.slice(0, 3).map((acc: any) => ({
-        id: acc.Id,
-        name: acc.Name,
-        annual_revenue: acc.AnnualRevenue || (acc.MRR_MVR__c ? acc.MRR_MVR__c * 12 : null),
-        type: acc.Type,
-        products: useStandardFields ? 'N/A (no custom fields)' : 'Detected from custom fields',
-      })),
+      test: {
+        success: true,
+        recordsReturned: data.records?.length || 0
+      }
     });
 
   } catch (error) {
-    console.error('Test connection error:', error);
+    console.error('Salesforce connection test error:', error);
     return NextResponse.json({
-      error: 'Connection test failed',
-      details: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
+      connected: false,
+      error: 'Test failed',
+      details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 }
