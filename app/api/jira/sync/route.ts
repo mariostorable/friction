@@ -429,6 +429,44 @@ export async function POST(request: NextRequest) {
       const customFields = issue.metadata?.custom_fields || {};
       const salesforceCaseIds: string[] = [];
 
+      // STRATEGY 1.5 (VERY HIGH CONFIDENCE): Client field matching
+      // Extract customfield_12184 which contains comma-separated client names
+      const clientFieldValue = customFields['customfield_12184'];
+      if (clientFieldValue && typeof clientFieldValue === 'string') {
+        // Parse comma-separated client names
+        const clientNames = clientFieldValue.split(',').map(name => name.trim()).filter(name => name.length > 0);
+
+        if (clientNames.length > 0) {
+          console.log(`${issue.jira_key} has Client(s) field: ${clientNames.join(', ')}`);
+
+          // Match each client name against accounts
+          for (const clientName of clientNames) {
+            const matchingAccounts = accounts?.filter(acc => {
+              const accNameLower = acc.name.toLowerCase();
+              const clientNameLower = clientName.toLowerCase();
+
+              // Match if account name contains client name or vice versa
+              return accNameLower.includes(clientNameLower) || clientNameLower.includes(accNameLower);
+            });
+
+            if (matchingAccounts && matchingAccounts.length > 0) {
+              for (const account of matchingAccounts) {
+                accountLinksToCreate.push({
+                  user_id: userId,
+                  account_id: account.id,
+                  jira_issue_id: issue.id,
+                  match_type: 'client_field',
+                  match_confidence: 0.95 // Very high confidence - explicit metadata
+                });
+                console.log(`  ✓ Matched "${clientName}" → ${account.name}`);
+              }
+            } else {
+              console.log(`  ✗ No account match for client "${clientName}"`);
+            }
+          }
+        }
+      }
+
       // Look for Salesforce Case ID in ALL custom fields by checking the VALUE
       // Don't filter by field name - just scan all field values for case numbers
       for (const [key, value] of Object.entries(customFields)) {
