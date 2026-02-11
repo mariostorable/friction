@@ -307,7 +307,8 @@ export async function GET(request: NextRequest) {
             const { data: existingCards } = await supabase
               .from('friction_cards')
               .select('*')
-              .eq('account_id', accountId);
+              .eq('account_id', accountId)
+              .eq('is_friction', true);
 
             if (!existingCards || existingCards.length === 0) {
               // No cards at all, create OFI 0 snapshot
@@ -569,7 +570,8 @@ Return ONLY the JSON object, nothing else.`;
           const { data: allFrictionCards } = await supabase
             .from('friction_cards')
             .select('*')
-            .eq('account_id', accountId);
+            .eq('account_id', accountId)
+            .eq('is_friction', true);
 
           if (!allFrictionCards || allFrictionCards.length === 0) {
             console.log(`No friction cards found for ${account.name} after analysis`);
