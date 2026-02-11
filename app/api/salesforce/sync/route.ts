@@ -65,10 +65,13 @@ export async function POST(request: NextRequest) {
     // Helper function to refresh Salesforce token
     const refreshSalesforceToken = async () => {
       if (!tokens.refresh_token) {
-        throw new Error('No refresh token available. Please reconnect Salesforce.');
+        console.error('❌ No refresh token available - user must reconnect Salesforce');
+        throw new Error('No refresh token available. Please reconnect Salesforce in Settings.');
       }
 
-      console.log('Refreshing Salesforce token...');
+      console.log('🔄 Refreshing Salesforce token...');
+      console.log('  Integration ID:', integration.id);
+      console.log('  Token ID:', tokens.id);
 
       const refreshResponse = await fetch('https://storable.my.salesforce.com/services/oauth2/token', {
         method: 'POST',
@@ -85,12 +88,12 @@ export async function POST(request: NextRequest) {
 
       if (!refreshResponse.ok) {
         const errorText = await refreshResponse.text();
-        console.error('Token refresh failed:', errorText);
-        throw new Error('Failed to refresh Salesforce token. Please reconnect Salesforce.');
+        console.error('❌ Token refresh failed:', refreshResponse.status, errorText);
+        throw new Error(`Token refresh failed (${refreshResponse.status}). Please reconnect Salesforce in Settings.`);
       }
 
       const refreshData = await refreshResponse.json();
-      console.log('Token refreshed successfully');
+      console.log('✅ Token refreshed successfully');
 
       // Update encrypted token in database
       await updateEncryptedAccessToken(
@@ -99,6 +102,9 @@ export async function POST(request: NextRequest) {
         refreshData.access_token,
         new Date(Date.now() + 7200000).toISOString() // 2 hours from now
       );
+
+      // Update local tokens object so subsequent operations use the new token
+      tokens.access_token = refreshData.access_token;
 
       return refreshData.access_token;
     };

@@ -15,8 +15,9 @@ export async function GET(request: NextRequest) {
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('client_id', process.env.SALESFORCE_CLIENT_ID!);
     authUrl.searchParams.set('redirect_uri', process.env.SALESFORCE_REDIRECT_URI!);
-    authUrl.searchParams.set('scope', 'api refresh_token');
-    authUrl.searchParams.set('prompt', 'login'); // Force login to ensure fresh credentials
+    authUrl.searchParams.set('scope', 'api refresh_token offline_access');
+    // Only prompt for consent on first connection, not every time
+    // authUrl.searchParams.set('prompt', 'login');
 
     console.log('Redirecting to Salesforce OAuth:', authUrl.toString());
 
