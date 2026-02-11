@@ -115,7 +115,8 @@ export default function Dashboard() {
 
       if (uniqueAccountIds.length > 0) {
         const accountIds = uniqueAccountIds;
-        const { data: accounts } = await supabase
+        console.log('🔍 Loading accounts for', accountIds.length, 'portfolio accounts');
+        const { data: accounts, error: accountsError } = await supabase
           .from('accounts')
           .select(`
             id,
@@ -183,6 +184,12 @@ export default function Dashboard() {
           .in('id', accountIds)
           .eq('status', 'active')
           .order('arr', { ascending: false });
+
+        if (accountsError) {
+          console.error('❌ Error loading accounts:', accountsError);
+        } else {
+          console.log('✅ Loaded', accounts?.length || 0, 'accounts');
+        }
 
         if (accounts) {
           const accountsWithSnapshot = accounts.map(acc => ({
