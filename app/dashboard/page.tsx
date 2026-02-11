@@ -134,8 +134,6 @@ export default function Dashboard() {
             managed_account,
             cs_segment,
             status,
-            created_at,
-            updated_at,
             last_synced_at,
             user_id,
             property_address_street,
