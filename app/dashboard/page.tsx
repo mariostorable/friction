@@ -170,8 +170,6 @@ export default function Dashboard() {
               top_themes,
               case_volume,
               friction_card_count,
-              health_status,
-              alert_count,
               high_severity_count,
               score_breakdown,
               trend_vs_prior_period,
