@@ -34,18 +34,25 @@ interface JiraPortfolioData {
   accountsByIssue: SharedIssue[];
 }
 
-export default function JiraPortfolioOverview() {
+interface JiraPortfolioOverviewProps {
+  businessUnit?: 'all' | 'storage' | 'marine';
+}
+
+export default function JiraPortfolioOverview({ businessUnit = 'all' }: JiraPortfolioOverviewProps) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<JiraPortfolioData | null>(null);
   const supabase = createClientComponentClient();
 
   useEffect(() => {
     fetchPortfolioStats();
-  }, []);
+  }, [businessUnit]);
 
   async function fetchPortfolioStats() {
     try {
-      const response = await fetch('/api/jira/portfolio-stats');
+      const url = businessUnit === 'all'
+        ? '/api/jira/portfolio-stats'
+        : `/api/jira/portfolio-stats?vertical=${businessUnit}`;
+      const response = await fetch(url);
       if (response.ok) {
         const result = await response.json();
         setData(result);

@@ -921,12 +921,12 @@ export default function Dashboard() {
 
             {/* Jira Portfolio Overview */}
             <div className="mt-6">
-              <JiraPortfolioOverview />
+              <JiraPortfolioOverview businessUnit={businessUnit} />
             </div>
 
             {/* Jira Account Breakdown */}
             <div className="mt-6">
-              <JiraAccountBreakdown />
+              <JiraAccountBreakdown businessUnit={businessUnit} />
             </div>
 
             <section className="mt-8">

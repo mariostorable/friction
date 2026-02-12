@@ -22,7 +22,11 @@ interface AccountTicketData {
   }>;
 }
 
-export default function JiraAccountBreakdown() {
+interface JiraAccountBreakdownProps {
+  businessUnit?: 'all' | 'storage' | 'marine';
+}
+
+export default function JiraAccountBreakdown({ businessUnit = 'all' }: JiraAccountBreakdownProps) {
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState<AccountTicketData[]>([]);
   const [sortBy, setSortBy] = useState<'total' | 'arr' | 'name'>('total');
@@ -31,11 +35,14 @@ export default function JiraAccountBreakdown() {
 
   useEffect(() => {
     fetchAccountBreakdown();
-  }, []);
+  }, [businessUnit]);
 
   async function fetchAccountBreakdown() {
     try {
-      const response = await fetch('/api/jira/account-breakdown');
+      const url = businessUnit === 'all'
+        ? '/api/jira/account-breakdown'
+        : `/api/jira/account-breakdown?vertical=${businessUnit}`;
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
         setAccounts(data.accounts || []);

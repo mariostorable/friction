@@ -13,11 +13,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
+    // Get vertical filter from query params
+    const searchParams = request.nextUrl.searchParams;
+    const vertical = searchParams.get('vertical') as 'storage' | 'marine' | null;
+
     // Get all friction themes across portfolio (from analyzed accounts)
-    const { data: allThemes } = await supabase
+    let themesQuery = supabase
       .from('friction_cards')
-      .select('theme_key, severity, account_id, accounts(name, arr)')
+      .select('theme_key, severity, account_id, accounts(name, arr, vertical)')
       .eq('user_id', user.id);
+
+    // Filter by vertical if specified
+    if (vertical) {
+      themesQuery = themesQuery.eq('accounts.vertical', vertical);
+    }
+
+    const { data: allThemes } = await themesQuery;
 
     if (!allThemes || allThemes.length === 0) {
       return NextResponse.json({
@@ -163,11 +174,20 @@ export async function GET(request: NextRequest) {
 
     // Per-account ticket counts (using account_jira_links as single source of truth)
     // Get ALL accounts from portfolios, not just those with friction_cards
+    let portfolioTypes = ['top_25_edge', 'top_25_marine', 'top_25_sitelink'];
+
+    // Filter portfolio types by vertical if specified
+    if (vertical === 'marine') {
+      portfolioTypes = ['top_25_marine'];
+    } else if (vertical === 'storage') {
+      portfolioTypes = ['top_25_edge', 'top_25_sitelink'];
+    }
+
     const { data: portfolios } = await supabase
       .from('portfolios')
       .select('account_ids')
       .eq('user_id', user.id)
-      .in('portfolio_type', ['top_25_edge', 'top_25_marine', 'top_25_sitelink']);
+      .in('portfolio_type', portfolioTypes);
 
     const allAccountIds = new Set<string>();
     portfolios?.forEach(p => p.account_ids.forEach((id: string) => allAccountIds.add(id)));

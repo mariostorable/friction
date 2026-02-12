@@ -13,12 +13,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
+    // Get vertical filter from query params
+    const searchParams = request.nextUrl.searchParams;
+    const vertical = searchParams.get('vertical') as 'storage' | 'marine' | null;
+
+    // Filter portfolio types by vertical
+    let portfolioTypes = ['top_25_edge', 'top_25_marine', 'top_25_sitelink'];
+    if (vertical === 'marine') {
+      portfolioTypes = ['top_25_marine'];
+    } else if (vertical === 'storage') {
+      portfolioTypes = ['top_25_edge', 'top_25_sitelink'];
+    }
+
     // Get all accounts in portfolios
     const { data: portfolios } = await supabase
       .from('portfolios')
       .select('account_ids')
       .eq('user_id', user.id)
-      .in('portfolio_type', ['top_25_edge', 'top_25_marine', 'top_25_sitelink']);
+      .in('portfolio_type', portfolioTypes);
 
     if (!portfolios || portfolios.length === 0) {
       return NextResponse.json({ accounts: [] });
