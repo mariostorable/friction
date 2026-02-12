@@ -597,6 +597,16 @@ function VisitPlannerContent() {
           </div>
         )}
 
+        {/* Info Note */}
+        {accounts.length > 0 && (
+          <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-900">
+              <span className="font-medium">Note:</span> Showing accounts from 2,000 recently active accounts with MRR ≥ $50.
+              Not all Salesforce accounts are included—optimized for geographic coverage across all cities.
+            </p>
+          </div>
+        )}
+
         {/* Content */}
         {accounts.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
