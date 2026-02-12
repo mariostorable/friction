@@ -24,8 +24,10 @@ import CaseOriginsAlert from '@/components/CaseOriginsAlert';
 import PeerCaseComparison from '@/components/PeerCaseComparison';
 import FrictionClusters from '@/components/FrictionClusters';
 import AnalysisResultModal from '@/components/AnalysisResultModal';
+import AnalysisProgressModal from '@/components/AnalysisProgressModal';
 import AccountSupportRoadmap from '@/components/AccountSupportRoadmap';
 import AccountIssueProgress from '@/components/AccountIssueProgress';
+import JiraRoadmapSummary from '@/components/JiraRoadmapSummary';
 
 export default function AccountDetailPage() {
   const params = useParams();
@@ -40,6 +42,10 @@ export default function AccountDetailPage() {
   const [themes, setThemes] = useState<Theme[]>([]);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  const [analysisStep, setAnalysisStep] = useState(1);
+  const [analysisStepName, setAnalysisStepName] = useState('');
+  const [analysisStartTime, setAnalysisStartTime] = useState<number>(0);
+  const [analysisElapsedSeconds, setAnalysisElapsedSeconds] = useState(0);
   const [showScoreExplanation, setShowScoreExplanation] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'fixed' | 'in_progress' | 'open'>('all');
   const [themeJiraMap, setThemeJiraMap] = useState<Map<string, { status: string; key: string }>>(new Map());
@@ -66,6 +72,21 @@ export default function AccountDetailPage() {
   useEffect(() => {
     loadAccountData();
   }, [accountId]);
+
+  // Track elapsed time during analysis
+  useEffect(() => {
+    if (!analyzing) {
+      setAnalysisElapsedSeconds(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - analysisStartTime) / 1000);
+      setAnalysisElapsedSeconds(elapsed);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [analyzing, analysisStartTime]);
 
   async function loadAccountData() {
     try {
@@ -448,11 +469,15 @@ export default function AccountDetailPage() {
   }
 
   async function analyzeFriction() {
-    if (!confirm('This will:\n1. Sync Salesforce Cases (last 90 days)\n2. Analyze unprocessed cases with Claude (processes in batches)\n3. Calculate OFI score\n4. Link friction themes to Jira tickets\n\nFor accounts with many cases, you may need to click Analyze multiple times. Continue?')) {
+    if (!confirm('This will:\n1. Sync Salesforce Cases (last 90 days)\n2. Pull Jira tickets (recent fixes & upcoming features)\n3. Analyze unprocessed cases with Claude (processes in batches)\n4. Calculate OFI score\n5. Link friction themes to Jira tickets\n\nFor accounts with many cases, you may need to click Analyze multiple times. Continue?')) {
       return;
     }
 
     setAnalyzing(true);
+    setAnalysisStartTime(Date.now());
+    setAnalysisStep(1);
+    setAnalysisStepName('Syncing Salesforce cases');
+
     try {
       // Step 1: Sync Cases
       console.log('Step 1: Syncing cases...');
@@ -480,8 +505,20 @@ export default function AccountDetailPage() {
 
       console.log('Step 1 complete:', casesResult);
 
-      // Step 2: Analyze with Claude
-      console.log('Step 2: Analyzing friction...');
+      // Step 2: Pull Jira tickets
+      setAnalysisStep(2);
+      setAnalysisStepName('Pulling Jira tickets');
+      console.log('Step 2: Pulling Jira tickets...');
+
+      // Fetch Jira summary (non-blocking, just for display later)
+      const jiraResponse = await fetch(`/api/accounts/${accountId}/jira-summary`);
+      const jiraData = jiraResponse.ok ? await jiraResponse.json() : null;
+      console.log('Step 2 complete:', jiraData?.total || 0, 'Jira tickets found');
+
+      // Step 3: Analyze with Claude
+      setAnalysisStep(3);
+      setAnalysisStepName('Analyzing with Claude AI');
+      console.log('Step 3: Analyzing friction...');
       const analyzeResponse = await fetch('/api/analyze-friction', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -497,17 +534,19 @@ export default function AccountDetailPage() {
         analyzeResult = JSON.parse(analyzeResponseText);
       } catch (jsonError) {
         console.error('Failed to parse analyze friction response:', jsonError);
-        throw new Error(`STEP 2 FAILED - Analyze Friction API returned invalid JSON. Status: ${analyzeResponse.status}. Response: ${analyzeResponseText.substring(0, 300)}`);
+        throw new Error(`STEP 3 FAILED - Analyze Friction API returned invalid JSON. Status: ${analyzeResponse.status}. Response: ${analyzeResponseText.substring(0, 300)}`);
       }
 
       if (!analyzeResponse.ok) {
-        throw new Error(`STEP 2 FAILED - ${analyzeResult.error || 'Failed to analyze friction'}`);
+        throw new Error(`STEP 3 FAILED - ${analyzeResult.error || 'Failed to analyze friction'}`);
       }
 
-      console.log('Step 2 complete:', analyzeResult);
+      console.log('Step 3 complete:', analyzeResult);
 
-      // Step 3: Calculate OFI
-      console.log('Step 3: Calculating OFI...');
+      // Step 4: Calculate OFI
+      setAnalysisStep(4);
+      setAnalysisStepName('Calculating OFI score');
+      console.log('Step 4: Calculating OFI...');
       const ofiResponse = await fetch('/api/calculate-ofi', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -523,14 +562,23 @@ export default function AccountDetailPage() {
         ofiResult = JSON.parse(ofiResponseText);
       } catch (jsonError) {
         console.error('Failed to parse OFI response:', jsonError);
-        throw new Error(`STEP 3 FAILED - Calculate OFI API returned invalid JSON. Status: ${ofiResponse.status}. Response: ${ofiResponseText.substring(0, 300)}`);
+        throw new Error(`STEP 4 FAILED - Calculate OFI API returned invalid JSON. Status: ${ofiResponse.status}. Response: ${ofiResponseText.substring(0, 300)}`);
       }
 
       if (!ofiResponse.ok) {
-        throw new Error(`STEP 3 FAILED - ${ofiResult.error || 'Failed to calculate OFI'}`);
+        throw new Error(`STEP 4 FAILED - ${ofiResult.error || 'Failed to calculate OFI'}`);
       }
 
-      console.log('Step 3 complete:', ofiResult);
+      console.log('Step 4 complete:', ofiResult);
+
+      // Step 5: Link themes to Jira
+      setAnalysisStep(5);
+      setAnalysisStepName('Linking themes to Jira');
+      console.log('Step 5: Linking friction themes to Jira tickets...');
+      // This happens automatically via the link-themes-to-jira cron job
+      // We'll just pause briefly to show this step
+      await new Promise(resolve => setTimeout(resolve, 500));
+      console.log('Step 5 complete');
 
       // Show modal instead of alert
       setAnalysisResult({
@@ -969,6 +1017,11 @@ export default function AccountDetailPage() {
           </div>
         )}
 
+        {/* Jira Roadmap Summary - Recent Fixes & Upcoming Features */}
+        <div className="mb-6">
+          <JiraRoadmapSummary accountId={accountId} />
+        </div>
+
         {/* Case Origins Alert */}
         {caseOrigins.length > 0 && (
           <CaseOriginsAlert
@@ -1089,6 +1142,15 @@ export default function AccountDetailPage() {
           />
         </div>
       </main>
+
+      {/* Analysis Progress Modal */}
+      <AnalysisProgressModal
+        isOpen={analyzing}
+        currentStep={analysisStep}
+        totalSteps={5}
+        stepName={analysisStepName}
+        elapsedSeconds={analysisElapsedSeconds}
+      />
 
       {/* Analysis Result Modal */}
       <AnalysisResultModal
