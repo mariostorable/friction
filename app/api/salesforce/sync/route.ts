@@ -282,7 +282,7 @@ export async function POST(request: NextRequest) {
       const geocodeQuality = sfAccount.smartystreets__Shipping_Address_Status__c === 'Verified' ? 'high' :
                              (hasShippingGeocode || hasBillingGeocode ? 'medium' : null);
 
-      return {
+      const accountData: any = {
         user_id: user.id,
         salesforce_id: sfAccount.Id,
         name: sfAccount.Name,
@@ -308,12 +308,6 @@ export async function POST(request: NextRequest) {
         billing_address_state: sfAccount.BillingState || null,
         billing_address_postal_code: sfAccount.BillingPostalCode || null,
         billing_address_country: sfAccount.BillingCountry || null,
-        // Geocoding from SmartyStreets
-        latitude: latitude,
-        longitude: longitude,
-        geocode_source: (hasShippingGeocode || hasBillingGeocode) ? 'salesforce' : null,
-        geocode_quality: geocodeQuality,
-        geocoded_at: (latitude && longitude) ? new Date().toISOString() : null,
         metadata: {
           industry: sfAccount.Industry,
           type: sfAccount.Type,
@@ -322,6 +316,18 @@ export async function POST(request: NextRequest) {
         },
         // Don't set status here - preserve existing status on update, default to 'active' via column default on insert
       };
+
+      // Only include geocoding fields if Salesforce has coordinates
+      // This prevents overwriting Google-geocoded coordinates with NULL
+      if (latitude && longitude) {
+        accountData.latitude = latitude;
+        accountData.longitude = longitude;
+        accountData.geocode_source = 'salesforce';
+        accountData.geocode_quality = geocodeQuality;
+        accountData.geocoded_at = new Date().toISOString();
+      }
+
+      return accountData;
     });
 
     // DEBUG: Log first 3 accounts being upserted
