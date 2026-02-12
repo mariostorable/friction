@@ -1,125 +1,79 @@
-# 🚀 START HERE - Debug Issues Fixed While You Were Away
+# 👋 START HERE - Quick Reference for Claude
 
-## 📊 Summary
-
-While you were away, I investigated both issues and prepared comprehensive fixes:
-
-### ✅ Issue #1: Visit Planner - READY TO FIX
-**Error**: `"ofi_score is ambiguous"`
-**Status**: Fix ready, just needs to be applied
-**Time to fix**: 30 seconds
-
-### 🔍 Issue #2: Jira Theme Linking - NEEDS ONE MORE STEP
-**Error**: 0 theme links despite keyword matches
-**Status**: Diagnostic ready, need to run one SQL query
-**Time to diagnose**: 2 minutes
+**Last Updated**: February 11, 2026
 
 ---
 
-## 🎯 Quick Action Plan (5 minutes total)
+## 📖 Read These Files First (Every Session)
 
-### Step 1: Fix Visit Planner (30 seconds)
+### 1. CLAUDE.md (ALWAYS READ FIRST)
+**Purpose**: Complete developer guide
+**Contains**:
+- Project overview (what this app does)
+- Architecture (92 API routes, 43 components, 12+ tables)
+- Database schema with relationships
+- API patterns (auth, cron, sync workflows)
+- Development conventions
+- Key gotchas and common issues
 
-1. Open **Supabase Dashboard** → SQL Editor
-2. Copy the contents of: `supabase/migrations/20260209_fix_visit_planner_ofi_ambiguous.sql`
-3. Paste and run in SQL Editor
-4. ✅ Visit Planner should now work!
+**Read Time**: 15-20 minutes
+**Update**: At end of session if architecture changes
 
----
+### 2. TODO.md
+**Purpose**: Current priorities and roadmap
+**Contains**:
+- Immediate actions (what to do today)
+- High priority tasks (this week)
+- Medium/long-term roadmap
+- Known bugs
+- Recent completions
 
-### Step 2: Diagnose Jira Linking (2 minutes)
+**Read Time**: 5-10 minutes
+**Update**: At end of session with new tasks
 
-1. Open **Supabase Dashboard** → SQL Editor
-2. Copy the contents of: `scripts/quick-jira-diagnostic.sql`
-3. Paste and run in SQL Editor (it runs 7 diagnostic queries at once)
-4. **Share the results** - they'll show exactly what's wrong
+### 3. Latest Session Summary
+**Location**: SESSION_SUMMARY_YYYY-MM-DD.md
+**Purpose**: What happened in the last session
+**Contains**:
+- What we accomplished
+- What we fixed
+- What to do next
 
-The diagnostic will tell us if:
-- The database constraint is correct
-- Manual inserts work (= sync code issue)
-- Manual inserts fail (= database issue)
-- What the exact error is
-
----
-
-## 📁 Files Created For You
-
-| File | Purpose |
-|------|---------|
-| **`START_HERE.md`** | This file - your starting point |
-| **`DEBUG_SUMMARY.md`** | High-level overview of both issues |
-| **`JIRA_LINKING_DEBUG.md`** | Deep dive on Jira linking problem |
-| **`JIRA_SYNC_FIX.md`** | Code patch to add error logging |
-| **`scripts/quick-jira-diagnostic.sql`** | Run this in Supabase! |
-| **`scripts/debug-jira-linking-mismatch.sql`** | Individual diagnostic queries |
-| **`supabase/migrations/20260209_fix_visit_planner_ofi_ambiguous.sql`** | Visit Planner fix |
-
----
-
-## 🎯 What I Found
-
-### Visit Planner Issue
-The `find_nearby_accounts` function had an ambiguous column reference. Both `accounts` and `account_snapshots` tables have an `ofi_score` column, and PostgreSQL couldn't determine which one to use.
-
-**Fix**: Explicitly qualify the column as `account_snapshots.ofi_score` in the LATERAL join.
-
-### Jira Linking Issue
-Your diagnostic query showed:
-- ✅ **63 Jira tickets** match themes via keywords
-- ✅ **15 unique themes** found
-- ✅ **159 Jira tickets** have Salesforce Case IDs
-- ❌ **0 links** created in database
-
-This means:
-1. The data exists
-2. The matching logic works
-3. But database inserts are failing silently
-
-**Most likely causes**:
-- Database constraint mismatch (wrong `onConflict` key)
-- Silent error not being logged
-- Permissions issue preventing inserts
-
-The diagnostic SQL will pinpoint the exact issue.
+**Read Time**: 5 minutes
+**Create New**: At end of each session
 
 ---
 
-## 🆘 If You Need Help
+## 🚀 Quick Start Commands
 
-After running the diagnostic SQL (`scripts/quick-jira-diagnostic.sql`), share the results and I can:
-1. Identify the exact problem
-2. Provide a targeted fix
-3. Get your Jira links working
+### Start Dev Server
+```bash
+npm run dev
+# Open http://localhost:3000
+```
 
----
+### Run Jira Sync
+```bash
+npx tsx scripts/direct-jira-sync.ts
+```
 
-## 📝 Next Steps After Fixes
-
-Once both issues are resolved:
-
-1. **Test Visit Planner**:
-   - Go to `/visit-planner`
-   - Search for "Austin, TX"
-   - Should see nearby accounts on map
-
-2. **Test Jira Linking**:
-   - Go to `/settings` → Integrations
-   - Run Jira sync
-   - Check if "Jira Theme Links" shows >0
-   - Go to dashboard → Click on a friction theme
-   - Should see related Jira tickets
-
-3. **Verify Account Support Roadmap**:
-   - Go to an account page (`/account/[id]`)
-   - Scroll to "Support Roadmap" section
-   - Should see Jira tickets grouped by status
+### Common Diagnostic Scripts
+```bash
+npx tsx scripts/test-client-field-linking.ts
+npx tsx scripts/count-west-coast-tickets.ts
+npx tsx scripts/check-client-field-12184.ts
+```
 
 ---
 
-## 🚀 Ready to Go?
+## 🎯 Current Priorities (As of Feb 11, 2026)
 
-1. **Fix Visit Planner** → Run the migration
-2. **Run Jira diagnostic** → Run quick-jira-diagnostic.sql
-3. **Share results** → I'll provide the final fix
+1. **Verify Dashboard** - Check West Coast account shows 10-11 Jira tickets
+2. **Investigate Missing Accounts** - Why StorageMart (18 tickets) doesn't match
+3. **Improve Matching Logic** - Reduce false positives
 
-You've got this! 💪
+See TODO.md for full list.
+
+---
+
+**Ready to Start?** Read CLAUDE.md, then check TODO.md for current priorities!
