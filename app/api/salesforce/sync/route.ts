@@ -264,9 +264,13 @@ export async function POST(request: NextRequest) {
       const hasShippingGeocode = sfAccount.smartystreets__Shipping_Latitude__c && sfAccount.smartystreets__Shipping_Longitude__c;
       const hasBillingGeocode = sfAccount.smartystreets__Billing_Latitude__c && sfAccount.smartystreets__Billing_Longitude__c;
 
-      // DEBUG: Log SmartyStreets data for 10 Federal Storage to diagnose geocoding issue
-      if (sfAccount.Name?.includes('10 Federal Storage')) {
-        console.log('\n🔍 DEBUG: SmartyStreets data for', sfAccount.Name);
+      // DEBUG: Log data for specific accounts to diagnose issues
+      if (sfAccount.Name?.includes('10 Federal Storage') || sfAccount.Name?.includes('Commonwealth Storage')) {
+        console.log('\n🔍 DEBUG: Account data for', sfAccount.Name);
+        console.log('  MRR_MVR__c:', sfAccount.MRR_MVR__c);
+        console.log('  Calculated ARR:', sfAccount.MRR_MVR__c ? sfAccount.MRR_MVR__c * 12 : null);
+        console.log('  ShippingCity:', sfAccount.ShippingCity);
+        console.log('  BillingCity:', sfAccount.BillingCity);
         console.log('  Shipping Lat/Lng:', sfAccount.smartystreets__Shipping_Latitude__c, '/', sfAccount.smartystreets__Shipping_Longitude__c);
         console.log('  Billing Lat/Lng:', sfAccount.smartystreets__Billing_Latitude__c, '/', sfAccount.smartystreets__Billing_Longitude__c);
         console.log('  Shipping Status:', sfAccount.smartystreets__Shipping_Address_Status__c);
