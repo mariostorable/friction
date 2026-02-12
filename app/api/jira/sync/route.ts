@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
     // Fetch recent issues from Jira with pagination
     // Fetch most recent issues (Pro plan has 60s timeout, can handle more)
     const MAX_ISSUES_PER_SYNC = 1000; // Process most recent 1000 issues per sync
-    const jql = `updated >= -90d ORDER BY updated DESC`; // Most recent first
+    const jql = `updated >= "-180d" ORDER BY updated DESC`; // Most recent first - 6 months of history (quoted for compatibility)
     const maxResults = 100; // Jira's max per request
     let startAt = 0;
     let allIssues: any[] = [];
@@ -577,8 +577,9 @@ export async function POST(request: NextRequest) {
     }
 
     // STRATEGY 3: Link accounts via themes (Jira→Theme→Account transitive linking)
-    // For each Jira ticket that matched a theme, link to accounts that have friction in that theme
-    console.log('Creating account links via theme associations...');
+    // UPDATED: Now requires account name to appear in ticket for theme-based linking
+    // This prevents broad many-to-many associations that cause duplicate counts
+    console.log('Creating account links via theme associations (with account name verification)...');
 
     // Build map: theme_key → Set of account_ids that have friction in that theme
     const themeToAccounts = new Map<string, Set<string>>();
@@ -589,24 +590,56 @@ export async function POST(request: NextRequest) {
       themeToAccounts.get(card.theme_key)!.add(card.account_id);
     });
 
-    // For each theme link, create account links to all accounts with that theme
+    // Build map: account_id → account name for matching
+    const accountIdToName = new Map<string, string>();
+    accounts?.forEach(acc => {
+      accountIdToName.set(acc.id, acc.name);
+    });
+
+    // Build map: jira_issue_id → issue details for text matching
+    const issueDetailsMap = new Map<string, { summary: string; description: string }>();
+    insertedIssues?.forEach(issue => {
+      issueDetailsMap.set(issue.id, {
+        summary: issue.summary || '',
+        description: issue.description || ''
+      });
+    });
+
+    // For each theme link, create account links ONLY if account name appears in ticket
     const themeBasedAccountLinks: any[] = [];
+    let filteredOutCount = 0;
+
     for (const themeLink of themeLinksToCreate) {
       const accountsForTheme = themeToAccounts.get(themeLink.theme_key);
-      if (accountsForTheme) {
+      const issueDetails = issueDetailsMap.get(themeLink.jira_issue_id);
+
+      if (accountsForTheme && issueDetails) {
+        const searchText = `${issueDetails.summary} ${issueDetails.description}`.toLowerCase();
+
         accountsForTheme.forEach(accountId => {
-          themeBasedAccountLinks.push({
-            user_id: userId,
-            account_id: accountId,
-            jira_issue_id: themeLink.jira_issue_id,
-            match_type: 'theme_association',
-            match_confidence: 0.7 // Medium confidence - linked via theme
-          });
+          const accountName = accountIdToName.get(accountId);
+          if (!accountName) return;
+
+          // Check if account name (or significant parts) appears in ticket
+          const nameParts = accountName.toLowerCase().split(/[\s-,]+/).filter(part => part.length > 3);
+          const hasAccountMatch = nameParts.some(part => searchText.includes(part));
+
+          if (hasAccountMatch) {
+            themeBasedAccountLinks.push({
+              user_id: userId,
+              account_id: accountId,
+              jira_issue_id: themeLink.jira_issue_id,
+              match_type: 'theme_and_name',
+              match_confidence: 0.85 // High confidence - both theme AND name match
+            });
+          } else {
+            filteredOutCount++;
+          }
         });
       }
     }
 
-    console.log(`Created ${themeBasedAccountLinks.length} account links via theme associations`);
+    console.log(`Created ${themeBasedAccountLinks.length} account links via theme associations (filtered out ${filteredOutCount} without account name match)`);
     accountLinksToCreate.push(...themeBasedAccountLinks);
 
     // Batch insert account links (includes both direct Case ID links AND theme-based links)
