@@ -611,9 +611,56 @@ function VisitPlannerContent() {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 space-y-6">
               {activeTab === 'map' ? (
-                <AccountMap accounts={sortedAccounts} center={mapCenter} radiusMiles={radiusMiles} />
+                <>
+                  <AccountMap accounts={sortedAccounts} center={mapCenter} radiusMiles={radiusMiles} />
+                  <div className="bg-white rounded-lg border border-gray-200">
+                    <div className="p-4 border-b border-gray-200">
+                      <h3 className="font-medium text-gray-900">
+                        {sortedAccounts.length} accounts found
+                      </h3>
+                    </div>
+                    <div className="divide-y divide-gray-200">
+                      {sortedAccounts.map(account => (
+                        <div
+                          key={account.id}
+                          className="p-4 hover:bg-gray-50 cursor-pointer"
+                          onClick={() => router.push(`/account/${account.id}`)}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <h4 className="font-medium text-gray-900">{account.name}</h4>
+                              <p className="text-sm text-gray-600">
+                                {account.property_address_city}, {account.property_address_state} •{' '}
+                                {account.distance_miles} mi away
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-lg font-bold text-blue-600">{account.priority_score}</p>
+                              <p className="text-xs text-gray-500">Priority</p>
+                            </div>
+                          </div>
+                          <div className="mt-2 flex items-center gap-4 text-sm">
+                            <span className="text-gray-600">
+                              ARR: ${((account.arr || 0) / 1000).toFixed(0)}K
+                            </span>
+                            <span className="text-gray-600">Friction: {account.ofi_score}</span>
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              account.ofi_score >= 70
+                                ? 'bg-red-100 text-red-800'
+                                : account.ofi_score >= 40
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-green-100 text-green-800'
+                            }`}>
+                              {account.ofi_score >= 70 ? 'High' : account.ofi_score >= 40 ? 'Medium' : 'Low'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
               ) : (
                 <div className="bg-white rounded-lg border border-gray-200">
                   <div className="p-4 border-b border-gray-200">
