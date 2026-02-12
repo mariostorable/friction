@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { GoogleMap, Marker, InfoWindow, Circle } from '@react-google-maps/api';
 import { useRouter } from 'next/navigation';
 import { ExternalLink } from 'lucide-react';
@@ -15,12 +15,21 @@ interface AccountMapProps {
     priority_score: number;
     latitude: number;
     longitude: number;
+    property_address_street: string | null;
     property_address_city: string | null;
     property_address_state: string | null;
+    property_address_postal_code: string | null;
+    billing_address_street: string | null;
+    billing_address_city: string | null;
+    billing_address_state: string | null;
+    billing_address_postal_code: string | null;
     products: string | null;
+    facility_count: number;
   }>;
   center: { lat: number; lng: number };
   radiusMiles: number;
+  selectedAccountId?: string | null;
+  onAccountSelect?: (accountId: string | null) => void;
 }
 
 const mapContainerStyle = {
@@ -36,9 +45,39 @@ const mapOptions = {
   fullscreenControl: true,
 };
 
-export default function AccountMap({ accounts, center, radiusMiles }: AccountMapProps) {
+export default function AccountMap({
+  accounts,
+  center,
+  radiusMiles,
+  selectedAccountId,
+  onAccountSelect
+}: AccountMapProps) {
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
   const router = useRouter();
+
+  // Sync selectedAccount with selectedAccountId prop
+  useEffect(() => {
+    if (selectedAccountId) {
+      const account = accounts.find(a => a.id === selectedAccountId);
+      setSelectedAccount(account || null);
+    } else {
+      setSelectedAccount(null);
+    }
+  }, [selectedAccountId, accounts]);
+
+  const handleAccountClick = (account: any) => {
+    setSelectedAccount(account);
+    if (onAccountSelect) {
+      onAccountSelect(account.id);
+    }
+  };
+
+  const handleCloseInfoWindow = () => {
+    setSelectedAccount(null);
+    if (onAccountSelect) {
+      onAccountSelect(null);
+    }
+  };
 
   // Get pin color based on friction score
   const getPinColor = (ofiScore: number | null): string => {
@@ -99,7 +138,7 @@ export default function AccountMap({ accounts, center, radiusMiles }: AccountMap
                 strokeColor: '#ffffff',
                 strokeWeight: 2,
               }}
-              onClick={() => setSelectedAccount(account)}
+              onClick={() => handleAccountClick(account)}
               title={account.name}
             />
           ))}
@@ -111,17 +150,19 @@ export default function AccountMap({ accounts, center, radiusMiles }: AccountMap
                 lat: selectedAccount.latitude,
                 lng: selectedAccount.longitude,
               }}
-              onCloseClick={() => setSelectedAccount(null)}
+              onCloseClick={handleCloseInfoWindow}
             >
-              <div className="p-2 min-w-[250px]">
+              <div className="p-2 min-w-[280px]">
                 <h3 className="font-bold text-gray-900 mb-2 pr-4">{selectedAccount.name}</h3>
 
                 <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Location:</span>
-                    <span className="font-medium">
-                      {selectedAccount.property_address_city}, {selectedAccount.property_address_state}
-                    </span>
+                  <div>
+                    <span className="text-gray-600 block mb-1">Address:</span>
+                    <div className="font-medium text-xs">
+                      {selectedAccount.property_address_street || selectedAccount.billing_address_street || 'No street address'}
+                      <br />
+                      {selectedAccount.property_address_city || selectedAccount.billing_address_city}, {selectedAccount.property_address_state || selectedAccount.billing_address_state} {selectedAccount.property_address_postal_code || selectedAccount.billing_address_postal_code}
+                    </div>
                   </div>
 
                   <div className="flex justify-between">
@@ -134,6 +175,11 @@ export default function AccountMap({ accounts, center, radiusMiles }: AccountMap
                     <span className="font-medium">
                       ${((selectedAccount.arr || 0) / 1000).toFixed(0)}K
                     </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Locations:</span>
+                    <span className="font-medium">{selectedAccount.facility_count || 0}</span>
                   </div>
 
                   <div className="flex justify-between">

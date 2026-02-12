@@ -31,8 +31,14 @@ interface NearbyAccount {
   ofi_score: number;
   priority_score: number;
   owner_name: string | null;
+  property_address_street: string | null;
   property_address_city: string | null;
   property_address_state: string | null;
+  property_address_postal_code: string | null;
+  billing_address_street: string | null;
+  billing_address_city: string | null;
+  billing_address_state: string | null;
+  billing_address_postal_code: string | null;
   salesforce_id: string;
   facility_count: number;
 }
@@ -78,6 +84,7 @@ function VisitPlannerContent() {
   }); // US center
   const [sortBy, setSortBy] = useState<'priority' | 'distance' | 'revenue' | 'friction' | 'locations'>('priority');
   const [error, setError] = useState<string | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
 
   const supabase = createClientComponentClient();
   const router = useRouter();
@@ -631,7 +638,13 @@ function VisitPlannerContent() {
             <div className="lg:col-span-2 space-y-6">
               {activeTab === 'map' ? (
                 <>
-                  <AccountMap accounts={sortedAccounts} center={mapCenter} radiusMiles={radiusMiles} />
+                  <AccountMap
+                    accounts={sortedAccounts}
+                    center={mapCenter}
+                    radiusMiles={radiusMiles}
+                    selectedAccountId={selectedAccountId}
+                    onAccountSelect={setSelectedAccountId}
+                  />
                   <div className="bg-white rounded-lg border border-gray-200">
                     <div className="p-4 border-b border-gray-200">
                       <h3 className="font-medium text-gray-900">
@@ -642,14 +655,24 @@ function VisitPlannerContent() {
                       {sortedAccounts.map(account => (
                         <div
                           key={account.id}
-                          className="p-4 hover:bg-gray-50 cursor-pointer"
-                          onClick={() => router.push(`/account/${account.id}`)}
+                          className={`p-4 hover:bg-blue-50 cursor-pointer border-l-4 ${
+                            selectedAccountId === account.id ? 'bg-blue-50 border-blue-600' : 'border-transparent'
+                          }`}
+                          onClick={() => {
+                            setSelectedAccountId(account.id);
+                            setActiveTab('map');
+                          }}
                         >
                           <div className="flex items-start justify-between">
-                            <div>
+                            <div className="flex-1">
                               <h4 className="font-medium text-gray-900">{account.name}</h4>
                               <p className="text-sm text-gray-600">
-                                {account.property_address_city}, {account.property_address_state} •{' '}
+                                {account.property_address_street || account.billing_address_street || 'No street address'}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                {account.property_address_city || account.billing_address_city}, {account.property_address_state || account.billing_address_state} {account.property_address_postal_code || account.billing_address_postal_code}
+                              </p>
+                              <p className="text-xs text-gray-500 mt-1">
                                 {account.distance_miles} mi away
                               </p>
                             </div>
@@ -675,6 +698,13 @@ function VisitPlannerContent() {
                             }`}>
                               {account.ofi_score >= 70 ? 'High' : account.ofi_score >= 40 ? 'Medium' : 'Low'}
                             </span>
+                            <a
+                              href={`/account/${account.id}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-blue-600 hover:text-blue-800 text-xs font-medium underline"
+                            >
+                              View Details →
+                            </a>
                           </div>
                         </div>
                       ))}
@@ -696,10 +726,15 @@ function VisitPlannerContent() {
                         onClick={() => router.push(`/account/${account.id}`)}
                       >
                         <div className="flex items-start justify-between">
-                          <div>
+                          <div className="flex-1">
                             <h4 className="font-medium text-gray-900">{account.name}</h4>
                             <p className="text-sm text-gray-600">
-                              {account.property_address_city}, {account.property_address_state} •{' '}
+                              {account.property_address_street || account.billing_address_street || 'No street address'}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              {account.property_address_city || account.billing_address_city}, {account.property_address_state || account.billing_address_state} {account.property_address_postal_code || account.billing_address_postal_code}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
                               {account.distance_miles} mi away
                             </p>
                           </div>
