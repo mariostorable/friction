@@ -177,6 +177,28 @@ ${shouldPrioritize?.slice(0, 3).map((theme: any) =>
 ).join('\n') || 'All covered'}`;
   }
 
+  // Format Vitally health data
+  let vitallySection = '';
+  if (account.vitally_health_score !== null || account.vitally_nps_score !== null) {
+    vitallySection = '\n\nVITALLY CUSTOMER HEALTH:';
+    if (account.vitally_health_score !== null) {
+      const healthStatus = account.vitally_health_score >= 80 ? 'Healthy' :
+                          account.vitally_health_score >= 60 ? 'At Risk' : 'Critical';
+      vitallySection += `\n- Health Score: ${Math.round(account.vitally_health_score)}/100 (${healthStatus})`;
+    }
+    if (account.vitally_nps_score !== null) {
+      const npsStatus = account.vitally_nps_score >= 50 ? 'Promoter' :
+                       account.vitally_nps_score >= 0 ? 'Passive' : 'Detractor';
+      vitallySection += `\n- NPS Score: ${Math.round(account.vitally_nps_score)} (${npsStatus})`;
+    }
+    if (account.vitally_status) {
+      vitallySection += `\n- Status: ${account.vitally_status}`;
+    }
+    if (account.vitally_last_activity_at) {
+      vitallySection += `\n- Last Activity: ${new Date(account.vitally_last_activity_at).toLocaleDateString()}`;
+    }
+  }
+
   return `You are preparing a quick customer visit briefing for a business executive.
 
 ACCOUNT INFORMATION:
@@ -186,7 +208,7 @@ ACCOUNT INFORMATION:
 - Business Unit: ${account.vertical || 'Unknown'}
 - Segment: ${account.segment || 'Unknown'}
 - Customer Since: ${account.customer_since || 'Unknown'}
-- OFI Score: ${ofiScore.toFixed(0)} ${trendText} (${trend > 0 ? '+' : ''}${trend.toFixed(0)}%)
+- OFI Score: ${ofiScore.toFixed(0)} ${trendText} (${trend > 0 ? '+' : ''}${trend.toFixed(0)}%)${vitallySection}
 
 IMPORTANT - OFI SCORE INTERPRETATION:
 - The OFI (Operational Friction Index) ranges from 0-100
@@ -197,6 +219,13 @@ IMPORTANT - OFI SCORE INTERPRETATION:
   * 40-69: Medium friction (needs attention)
   * 70-100: High friction (critical, at-risk)
 - Current score of ${ofiScore.toFixed(0)} means: ${ofiScore >= 70 ? 'HIGH FRICTION - Critical issues requiring immediate action' : ofiScore >= 40 ? 'MEDIUM FRICTION - Notable issues to address' : 'LOW FRICTION - Account is healthy'}
+
+IMPORTANT - VITALLY & JIRA CONTEXT:
+- Use Vitally health scores to contextualize friction: Low health + high friction = urgent concern
+- Reference recent Jira fixes as "wins" and proof of responsiveness
+- Highlight in-progress Jira tickets as "coming improvements" when discussing friction themes
+- If high friction themes have no Jira tickets, flag these as priorities for product team
+- Consider NPS alongside OFI: Detractors with high OFI need immediate intervention
 
 RECENT FRICTION SIGNALS (Last 30 days):
 ${cardsSummary || 'No recent friction signals'}
@@ -231,15 +260,16 @@ Generate a JSON object for a QUICK customer visit briefing (2-3 minute read):
     // Include top 3 most critical issues based on severity and recency
   ],
   "talking_points": [
-    "Specific action item 1 (acknowledge X, share Y)",
-    "Specific action item 2",
-    "Specific action item 3"
-    // 3-5 concrete, actionable talking points
+    "Specific action item 1 (acknowledge friction, share roadmap progress)",
+    "Specific action item 2 (reference Jira tickets addressing their issues)",
+    "Specific action item 3 (commit to prioritizing high-impact themes)"
+    // 3-5 concrete, actionable talking points linking friction to roadmap
   ],
   "wins": [
-    "Specific positive development 1",
-    "Specific positive development 2"
-    // 2-3 recent wins or positive signals to reinforce
+    "Recent Jira fix that addresses their friction (with ticket number)",
+    "Positive trend in Vitally health/NPS or declining OFI score",
+    "Specific case resolution or improved response time"
+    // 2-3 wins - prioritize recently resolved Jira tickets that fix their issues
   ]
 }
 
@@ -346,5 +376,9 @@ CRITICAL INSTRUCTIONS:
 - Be honest about gaps in data rather than speculating
 - Make this briefing significantly more valuable than the quick version
 - Think like a management consultant preparing for a high-stakes client meeting
-- Quality over speed - take the time to analyze deeply and synthesize insights`;
+- Quality over speed - take the time to analyze deeply and synthesize insights
+- INTEGRATE JIRA & VITALLY: Reference specific Jira tickets in friction analysis, cite Vitally health trends, connect roadmap progress to customer satisfaction
+- For each friction theme, check if there's a Jira ticket addressing it - if yes, reference the ticket and status; if no, flag it as needing prioritization
+- Use Vitally NPS and health scores to validate or contextualize friction patterns (e.g., "Despite NPS of 65, OFI shows underlying issues")
+- In wins/talking points, lead with recently resolved Jira tickets that address their specific friction points`;
 }
