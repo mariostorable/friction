@@ -111,11 +111,12 @@ export async function POST(request: NextRequest) {
 
     // Helper function to fetch accounts from Salesforce
     const fetchSalesforceAccounts = async (accessToken: string) => {
-      // Query top 2000 accounts by MRR (no city filter - geocoding happens separately)
-      // This ensures high-value accounts like Commonwealth are included even if city data is missing
-      // Visit Planner geocoding will add coordinates for accounts with address data
+      // Query 2000 recently active accounts with MRR >= $50 for geographic distribution
+      // Order by LastModifiedDate to get accounts across all cities, not just top MRR
+      // Filters out tiny accounts while including medium/large accounts in every region
+      // Perfect for Visit Planner: see nearby accounts when driving around any city
       return await fetch(
-        `${integration.instance_url}/services/data/v59.0/query?q=SELECT+Id,Name,MRR_Core_Products__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,ShippingStreet,ShippingCity,ShippingState,ShippingPostalCode,ShippingCountry,BillingStreet,BillingCity,BillingState,BillingPostalCode,BillingCountry,smartystreets__Shipping_Latitude__c,smartystreets__Shipping_Longitude__c,smartystreets__Billing_Latitude__c,smartystreets__Billing_Longitude__c,smartystreets__Shipping_Address_Status__c,(SELECT+Id+FROM+Assets)+FROM+Account+ORDER+BY+MRR_Core_Products__c+DESC+NULLS+LAST+LIMIT+2000`,
+        `${integration.instance_url}/services/data/v59.0/query?q=SELECT+Id,Name,MRR_Core_Products__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,ShippingStreet,ShippingCity,ShippingState,ShippingPostalCode,ShippingCountry,BillingStreet,BillingCity,BillingState,BillingPostalCode,BillingCountry,smartystreets__Shipping_Latitude__c,smartystreets__Shipping_Longitude__c,smartystreets__Billing_Latitude__c,smartystreets__Billing_Longitude__c,smartystreets__Shipping_Address_Status__c,(SELECT+Id+FROM+Assets)+FROM+Account+WHERE+MRR_Core_Products__c+>=+50+ORDER+BY+LastModifiedDate+DESC+LIMIT+2000`,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
