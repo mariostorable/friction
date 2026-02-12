@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
       // Increased limit to 2000 to get comprehensive coverage
       // Includes accounts with $0 MRR for Visit Planner mapping
       return await fetch(
-        `${integration.instance_url}/services/data/v59.0/query?q=SELECT+Id,Name,MRR_MVR__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,ShippingStreet,ShippingCity,ShippingState,ShippingPostalCode,ShippingCountry,BillingStreet,BillingCity,BillingState,BillingPostalCode,BillingCountry,smartystreets__Shipping_Latitude__c,smartystreets__Shipping_Longitude__c,smartystreets__Billing_Latitude__c,smartystreets__Billing_Longitude__c,smartystreets__Shipping_Address_Status__c,(SELECT+Id+FROM+Assets)+FROM+Account+WHERE+(ShippingCity+!=+null+OR+BillingCity+!=+null)+ORDER+BY+MRR_MVR__c+DESC+NULLS+LAST+LIMIT+2000`,
+        `${integration.instance_url}/services/data/v59.0/query?q=SELECT+Id,Name,MRR_Core_Products__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,ShippingStreet,ShippingCity,ShippingState,ShippingPostalCode,ShippingCountry,BillingStreet,BillingCity,BillingState,BillingPostalCode,BillingCountry,smartystreets__Shipping_Latitude__c,smartystreets__Shipping_Longitude__c,smartystreets__Billing_Latitude__c,smartystreets__Billing_Longitude__c,smartystreets__Shipping_Address_Status__c,(SELECT+Id+FROM+Assets)+FROM+Account+WHERE+(ShippingCity+!=+null+OR+BillingCity+!=+null)+ORDER+BY+MRR_Core_Products__c+DESC+NULLS+LAST+LIMIT+2000`,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
       const sampleAccounts = accountsData.records.slice(0, 5);
       sampleAccounts.forEach((account: any, index: number) => {
         console.log(`\nAccount ${index + 1}: ${account.Name}`);
-        console.log(`  MRR_MVR__c: ${account.MRR_MVR__c || 'NULL'}`);
+        console.log(`  MRR_Core_Products__c: ${account.MRR_Core_Products__c || 'NULL'}`);
         console.log(`  Corp_Code__c: ${account.Corp_Code__c || 'NULL'}`);
         console.log(`  SE_Company_UUID__c: ${account.SE_Company_UUID__c || 'NULL'}`);
         console.log(`  Current_FMS__c: ${account.Current_FMS__c || 'NULL'}`);
@@ -172,13 +172,13 @@ export async function POST(request: NextRequest) {
       });
 
       // Count how many have each field
-      const withMRR = accountsData.records.filter((a: any) => a.MRR_MVR__c).length;
+      const withMRR = accountsData.records.filter((a: any) => a.MRR_Core_Products__c).length;
       const withCorpCode = accountsData.records.filter((a: any) => a.Corp_Code__c).length;
       const withSEUUID = accountsData.records.filter((a: any) => a.SE_Company_UUID__c).length;
       const withFMS = accountsData.records.filter((a: any) => a.Current_FMS__c).length;
 
       console.log(`\n📊 Field Coverage:`);
-      console.log(`  With MRR_MVR__c: ${withMRR}/${accountsData.records.length}`);
+      console.log(`  With MRR_Core_Products__c: ${withMRR}/${accountsData.records.length}`);
       console.log(`  With Corp_Code__c: ${withCorpCode}/${accountsData.records.length}`);
       console.log(`  With SE_Company_UUID__c: ${withSEUUID}/${accountsData.records.length}`);
       console.log(`  With Current_FMS__c: ${withFMS}/${accountsData.records.length}`);
@@ -267,8 +267,8 @@ export async function POST(request: NextRequest) {
       // DEBUG: Log data for specific accounts to diagnose issues
       if (sfAccount.Name?.includes('10 Federal Storage') || sfAccount.Name?.includes('Commonwealth Storage')) {
         console.log('\n🔍 DEBUG: Account data for', sfAccount.Name);
-        console.log('  MRR_MVR__c:', sfAccount.MRR_MVR__c);
-        console.log('  Calculated ARR:', sfAccount.MRR_MVR__c ? sfAccount.MRR_MVR__c * 12 : null);
+        console.log('  MRR_Core_Products__c:', sfAccount.MRR_Core_Products__c);
+        console.log('  Calculated ARR:', sfAccount.MRR_Core_Products__c ? sfAccount.MRR_Core_Products__c * 12 : null);
         console.log('  ShippingCity:', sfAccount.ShippingCity);
         console.log('  BillingCity:', sfAccount.BillingCity);
         console.log('  Shipping Lat/Lng:', sfAccount.smartystreets__Shipping_Latitude__c, '/', sfAccount.smartystreets__Shipping_Longitude__c);
@@ -291,7 +291,7 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         salesforce_id: sfAccount.Id,
         name: sfAccount.Name,
-        arr: sfAccount.MRR_MVR__c ? sfAccount.MRR_MVR__c * 12 : null,
+        arr: sfAccount.MRR_Core_Products__c ? sfAccount.MRR_Core_Products__c * 12 : null,
         vertical: businessUnit,
         products: products.length > 0 ? products.join(', ') : null,
         segment: sfAccount.Type || null,
