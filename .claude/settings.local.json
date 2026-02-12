@@ -23,7 +23,12 @@
       "Bash(npx tsc:*)",
       "Bash(curl \"https://friction-intelligence.vercel.app/api/salesforce/inspect-addresses?user_id=ab953672-7bad-4601-9289-5d766e73fec9\")",
       "Bash(python3:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(if [ -f .env.local ])",
+      "Bash(then grep \"ENCRYPTION_KEY\" .env.local)",
+      "Bash(else echo \"No .env.local file\")",
+      "Bash(fi)",
+      "Bash(ls:*)"
     ]
   }
 }
