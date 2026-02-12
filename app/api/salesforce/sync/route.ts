@@ -111,10 +111,11 @@ export async function POST(request: NextRequest) {
 
     // Helper function to fetch accounts from Salesforce
     const fetchSalesforceAccounts = async (accessToken: string) => {
-      // Query top accounts by MRR with software/product detection fields and addresses
-      // Remove ParentId filter - get ALL accounts with revenue
+      // Query ALL active accounts (removed MRR > 0 filter for Visit Planner)
+      // Increased limit to 2000 to get comprehensive coverage
+      // Includes accounts with $0 MRR for Visit Planner mapping
       return await fetch(
-        `${integration.instance_url}/services/data/v59.0/query?q=SELECT+Id,Name,MRR_MVR__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,ShippingStreet,ShippingCity,ShippingState,ShippingPostalCode,ShippingCountry,BillingStreet,BillingCity,BillingState,BillingPostalCode,BillingCountry,smartystreets__Shipping_Latitude__c,smartystreets__Shipping_Longitude__c,smartystreets__Billing_Latitude__c,smartystreets__Billing_Longitude__c,smartystreets__Shipping_Address_Status__c,(SELECT+Id+FROM+Assets)+FROM+Account+WHERE+MRR_MVR__c>0+ORDER+BY+MRR_MVR__c+DESC+LIMIT+200`,
+        `${integration.instance_url}/services/data/v59.0/query?q=SELECT+Id,Name,MRR_MVR__c,Industry,Type,Owner.Name,CreatedDate,Current_FMS__c,Online_Listing_Service__c,Current_Website_Provider__c,Current_Payment_Provider__c,Insurance_Company__c,Gate_System__c,LevelOfService__c,Managed_Account__c,VitallyClient_Success_Tier__c,Locations__c,Corp_Code__c,SE_Company_UUID__c,SpareFoot_Client_Key__c,Insurance_ZCRM_ID__c,ShippingStreet,ShippingCity,ShippingState,ShippingPostalCode,ShippingCountry,BillingStreet,BillingCity,BillingState,BillingPostalCode,BillingCountry,smartystreets__Shipping_Latitude__c,smartystreets__Shipping_Longitude__c,smartystreets__Billing_Latitude__c,smartystreets__Billing_Longitude__c,smartystreets__Shipping_Address_Status__c,(SELECT+Id+FROM+Assets)+FROM+Account+WHERE+(ShippingCity+!=+null+OR+BillingCity+!=+null)+ORDER+BY+MRR_MVR__c+DESC+NULLS+LAST+LIMIT+2000`,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
