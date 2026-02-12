@@ -34,6 +34,7 @@ interface NearbyAccount {
   property_address_city: string | null;
   property_address_state: string | null;
   salesforce_id: string;
+  facility_count: number;
 }
 
 interface AccountSuggestion {
@@ -75,7 +76,7 @@ function VisitPlannerContent() {
     lat: 39.8283,
     lng: -98.5795,
   }); // US center
-  const [sortBy, setSortBy] = useState<'priority' | 'distance' | 'revenue' | 'friction'>('priority');
+  const [sortBy, setSortBy] = useState<'priority' | 'distance' | 'revenue' | 'friction' | 'locations'>('priority');
   const [error, setError] = useState<string | null>(null);
 
   const supabase = createClientComponentClient();
@@ -295,20 +296,25 @@ function VisitPlannerContent() {
     }
   }
 
-  const sortedAccounts = [...accounts].sort((a, b) => {
-    switch (sortBy) {
-      case 'priority':
-        return b.priority_score - a.priority_score;
-      case 'distance':
-        return a.distance_miles - b.distance_miles;
-      case 'revenue':
-        return (b.arr || 0) - (a.arr || 0);
-      case 'friction':
-        return b.ofi_score - a.ofi_score;
-      default:
-        return 0;
-    }
-  });
+  // Filter out $0 ARR accounts, then sort
+  const sortedAccounts = [...accounts]
+    .filter(account => account.arr && account.arr > 0) // Exclude $0 ARR
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'priority':
+          return b.priority_score - a.priority_score;
+        case 'distance':
+          return a.distance_miles - b.distance_miles;
+        case 'revenue':
+          return (b.arr || 0) - (a.arr || 0);
+        case 'friction':
+          return b.ofi_score - a.ofi_score;
+        case 'locations':
+          return (b.facility_count || 0) - (a.facility_count || 0);
+        default:
+          return 0;
+      }
+    });
 
   if (loading) {
     return (
@@ -590,6 +596,7 @@ function VisitPlannerContent() {
                   <option value="priority">Priority</option>
                   <option value="distance">Distance</option>
                   <option value="revenue">Revenue</option>
+                  <option value="locations">Locations</option>
                   <option value="friction">Friction</option>
                 </select>
               </div>
@@ -655,6 +662,9 @@ function VisitPlannerContent() {
                             <span className="text-gray-600">
                               ARR: ${((account.arr || 0) / 1000).toFixed(0)}K
                             </span>
+                            <span className="text-gray-600">
+                              Locations: {account.facility_count || 0}
+                            </span>
                             <span className="text-gray-600">Friction: {account.ofi_score}</span>
                             <span className={`px-2 py-1 rounded text-xs font-medium ${
                               account.ofi_score >= 70
@@ -701,6 +711,9 @@ function VisitPlannerContent() {
                         <div className="mt-2 flex items-center gap-4 text-sm">
                           <span className="text-gray-600">
                             ARR: ${((account.arr || 0) / 1000).toFixed(0)}K
+                          </span>
+                          <span className="text-gray-600">
+                            Locations: {account.facility_count || 0}
                           </span>
                           <span className="text-gray-600">Friction: {account.ofi_score}</span>
                           <span className={`px-2 py-1 rounded text-xs font-medium ${
