@@ -77,6 +77,42 @@ if (hasAccountMatch) {
 }
 ```
 
+**UPDATED (After MREQ-7606 discovery):** Added product/vertical filtering:
+
+```typescript
+// Product/vertical filtering: prevent cross-industry linking
+const jiraProject = issueDetails.jira_key.split('-')[0];
+const accountProducts = accountIdToProducts.get(accountId)?.toLowerCase() || '';
+
+// Marine projects: MREQ, TOPS, BZD (Boatyard), EASY (EasyStart Marine)
+const isMarineProject = ['mreq', 'tops', 'bzd', 'easy'].includes(jiraProject.toLowerCase());
+const isMarineAccount = accountProducts.includes('dockwa') || accountProducts.includes('marina');
+
+// Storage projects: EDGE, SL, SLT, PAY, CRM, DATA, BUGS
+const isStorageProject = ['edge', 'sl', 'slt', 'pay', 'crm', 'data', 'bugs'].includes(jiraProject.toLowerCase());
+const isStorageAccount = accountProducts.includes('edge') || accountProducts.includes('sitelink') || accountProducts.includes('storable');
+
+// Skip cross-industry matches for theme_association (low confidence) links
+const isCrossIndustry = (isMarineProject && isStorageAccount) || (isStorageProject && isMarineAccount);
+
+if (hasAccountMatch) {
+  // High confidence: Allow even if cross-industry since name match is strong signal
+  create theme_and_name link...
+} else if (!isCrossIndustry) {
+  // Only create theme_association if same industry
+  create theme_association link...
+} else {
+  // Skip: cross-industry match with no name confirmation
+  filteredOutCount++;
+}
+```
+
+This prevents false positives like:
+- ❌ Marine boat rental tickets → Storage companies
+- ❌ Storage software bugs → Marina operators
+- ✅ Marine tickets → Marine accounts only
+- ✅ Storage tickets → Storage accounts only
+
 ### 2. Changed Resolved Window from 30d to 90d
 
 **Files Modified:**
@@ -97,10 +133,25 @@ if (hasAccountMatch) {
 ✅ **Code Changes:** Pushed to production
 - Commit: `f1be928` - Main sync fix + 90d changes
 - Commit: `11cd13a` - JiraPortfolioOverview 90d fix
+- Commit: `f86714b` - Documentation
+- Commit: `54a0569` - **Cross-industry filtering (CRITICAL)**
 
 ✅ **Vercel Deployment:** Auto-deploying (takes 2-3 minutes)
 
 ❌ **Data Sync:** NOT YET RUN - Database still has old links
+
+### Additional Fix: Cross-Industry Filtering
+
+**Issue Found:** After initial deployment, discovered marine tickets (MREQ-7606) were linking to storage accounts through generic themes.
+
+**Example:** "Okanagan Lake Boat Rentals" (marine) was linked to 23 storage companies like Westport Properties, Crystal View Capital, etc.
+
+**Root Cause:** Generic themes like "other" and "support_response_time" match across industries, creating false positives.
+
+**Solution Added:**
+- Marine projects (MREQ, TOPS, BZD, EASY) only create `theme_association` links to marine accounts (Dockwa/Marina products)
+- Storage projects (EDGE, SL, SLT, PAY, CRM, DATA, BUGS) only link to storage accounts (EDGE/SiteLink products)
+- `theme_and_name` links still allowed cross-industry (high confidence with name match)
 
 ## What Needs to Happen Next
 
