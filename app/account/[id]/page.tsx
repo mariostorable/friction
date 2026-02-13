@@ -706,104 +706,106 @@ export default function AccountDetailPage() {
               </button>
             </div>
           </div>
-          <div className="flex justify-between items-start">
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-bold text-gray-900">{account.name}</h1>
-                {getSalesforceUrl() && (
-                  <a
-                    href={getSalesforceUrl()!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    View in Salesforce
-                  </a>
-                )}
-                {account.status !== 'active' && (
-                  <span className="px-3 py-1 bg-gray-100 text-gray-700 text-sm font-medium rounded-full">
-                    {account.status}
-                  </span>
-                )}
-              </div>
-              <div className="flex gap-4 mt-2 text-sm text-gray-600">
-                <span className="font-medium">
-                  {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(account.arr || 0)} ARR
-                </span>
-                <span>•</span>
-                <span>{account.products?.toUpperCase() || 'N/A'}</span>
-                <span>•</span>
-                <span>{account.segment?.replace('_', ' ').toUpperCase() || 'N/A'}</span>
-                {account.customer_since && (
-                  <>
-                    <span>•</span>
-                    <span>Customer since {new Date(account.customer_since).getFullYear()}</span>
-                  </>
-                )}
-              </div>
-              {/* Vitally Health Metrics */}
-              {(account.vitally_health_score !== null || account.vitally_nps_score !== null || account.vitally_status) && (
-                <div className="flex items-center gap-4 mt-3 text-sm">
-                  {account.vitally_health_score !== null && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-600">Health:</span>
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        account.vitally_health_score >= 80
-                          ? 'bg-green-100 text-green-800'
-                          : account.vitally_health_score >= 60
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {Math.round(account.vitally_health_score)}/100
-                      </span>
-                    </div>
+          <div className="flex flex-col gap-6">
+            {/* Title Row */}
+            <div className="flex justify-between items-start">
+              <div>
+                <div className="flex items-center gap-3 mb-3">
+                  <h1 className="text-3xl font-bold text-gray-900">{account.name}</h1>
+                  {getSalesforceUrl() && (
+                    <a
+                      href={getSalesforceUrl()!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-2.5 py-1 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      View in Salesforce
+                    </a>
                   )}
-                  {account.vitally_nps_score !== null && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-600">NPS:</span>
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        account.vitally_nps_score >= 9
-                          ? 'bg-green-100 text-green-800'
-                          : account.vitally_nps_score >= 7
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {account.vitally_nps_score}/10
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        ({account.vitally_nps_score >= 9 ? 'Promoter' : account.vitally_nps_score >= 7 ? 'Passive' : 'Detractor'})
-                      </span>
-                    </div>
-                  )}
-                  {account.vitally_status && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-600">Status:</span>
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        account.vitally_status.toLowerCase().includes('churn') || account.vitally_status.toLowerCase().includes('at risk')
-                          ? 'bg-red-100 text-red-800'
-                          : account.vitally_status.toLowerCase().includes('healthy')
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {account.vitally_status}
-                      </span>
-                    </div>
-                  )}
-                  {account.vitally_last_activity_at && (
-                    <div className="flex items-center gap-2 text-gray-600">
-                      <span>Last Activity:</span>
-                      <span>{new Date(account.vitally_last_activity_at).toLocaleDateString()}</span>
-                    </div>
+                  {account.status !== 'active' && (
+                    <span className="px-3 py-1 bg-gray-100 text-gray-700 text-sm font-medium rounded-full">
+                      {account.status}
+                    </span>
                   )}
                 </div>
-              )}
+
+                {/* Metadata Row with Better Spacing */}
+                <div className="flex items-center gap-5 text-sm text-gray-600">
+                  <span className="font-semibold text-gray-900">
+                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(account.arr || 0)} ARR
+                  </span>
+                  <span className="text-gray-300">|</span>
+                  <span className="font-medium">{account.products?.toUpperCase() || 'N/A'}</span>
+                  <span className="text-gray-300">|</span>
+                  <span>{account.segment?.replace('_', ' ').toUpperCase() || 'N/A'}</span>
+                  {account.customer_since && (
+                    <>
+                      <span className="text-gray-300">|</span>
+                      <span className="text-gray-500">Customer since {new Date(account.customer_since).getFullYear()}</span>
+                    </>
+                  )}
+                </div>
+
+                {/* Vitally Health Metrics with Better Spacing */}
+                {(account.vitally_health_score !== null || account.vitally_nps_score !== null || account.vitally_status) && (
+                  <div className="flex items-center gap-6 mt-4">
+                    {account.vitally_health_score !== null && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-500">Health:</span>
+                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                          account.vitally_health_score >= 80
+                            ? 'bg-green-100 text-green-800'
+                            : account.vitally_health_score >= 60
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {Math.round(account.vitally_health_score)}/100
+                        </span>
+                      </div>
+                    )}
+                    {account.vitally_nps_score !== null && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-500">NPS:</span>
+                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                          account.vitally_nps_score >= 9
+                            ? 'bg-green-100 text-green-800'
+                            : account.vitally_nps_score >= 7
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {account.vitally_nps_score}/10
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {account.vitally_nps_score >= 9 ? 'Promoter' : account.vitally_nps_score >= 7 ? 'Passive' : 'Detractor'}
+                        </span>
+                      </div>
+                    )}
+                    {account.vitally_status && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-500">Status:</span>
+                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                          account.vitally_status.toLowerCase().includes('churn') || account.vitally_status.toLowerCase().includes('at risk')
+                            ? 'bg-red-100 text-red-800'
+                            : account.vitally_status.toLowerCase().includes('healthy')
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {account.vitally_status}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-3">
+
+            {/* Action Buttons Row with Consistent Sizing */}
+            <div className="flex items-center gap-3 flex-wrap">
               <button
                 onClick={analyzeFriction}
                 disabled={analyzing}
-                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+                className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm min-w-[140px]"
               >
                 <AlertCircle className="w-4 h-4" />
                 {analyzing ? 'Analyzing...' : 'Analyze Friction'}
@@ -816,7 +818,7 @@ export default function AccountDetailPage() {
               {account.latitude && account.longitude && (
                 <button
                   onClick={() => router.push(`/visit-planner?account=${accountId}`)}
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors shadow-sm"
+                  className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors shadow-sm min-w-[180px]"
                 >
                   <MapPin className="w-4 h-4" />
                   Find Nearby Accounts
@@ -824,14 +826,14 @@ export default function AccountDetailPage() {
               )}
               <button
                 onClick={createShareLink}
-                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm min-w-[100px]"
               >
                 <Share2 className="w-4 h-4" />
                 Share
               </button>
               <button
                 onClick={exportToCSV}
-                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm min-w-[100px]"
               >
                 <Download className="w-4 h-4" />
                 Export
