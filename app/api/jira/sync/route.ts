@@ -430,24 +430,52 @@ export async function POST(request: NextRequest) {
       const salesforceCaseIds: string[] = [];
 
       // STRATEGY 1.5 (VERY HIGH CONFIDENCE): Client field matching
-      // Extract customfield_12184 which contains comma-separated client names
+      // Extract customfield_12184 which contains semicolon or comma-separated client names
       const clientFieldValue = customFields['customfield_12184'];
       if (clientFieldValue && typeof clientFieldValue === 'string') {
-        // Parse comma-separated client names
-        const clientNames = clientFieldValue.split(',').map(name => name.trim()).filter(name => name.length > 0);
+        // Parse semicolon or comma-separated client names (handle both formats)
+        const clientNames = clientFieldValue
+          .split(/[;,]/) // Split by semicolon OR comma
+          .map(name => name.trim())
+          .filter(name => name.length > 0);
 
         if (clientNames.length > 0) {
-          console.log(`${issue.jira_key} has Client(s) field: ${clientNames.join(', ')}`);
+          console.log(`${issue.jira_key} has Client(s) field (${clientNames.length}): ${clientNames.join(', ')}`);
 
           // Match each client name against accounts
           for (const clientName of clientNames) {
-            const matchingAccounts = accounts?.filter(acc => {
-              const accNameLower = acc.name.toLowerCase();
-              const clientNameLower = clientName.toLowerCase();
+            const clientNameLower = clientName.toLowerCase();
 
-              // Match if account name contains client name or vice versa
-              return accNameLower.includes(clientNameLower) || clientNameLower.includes(accNameLower);
+            // Try exact matches first
+            let matchingAccounts = accounts?.filter(acc => {
+              const accNameLower = acc.name.toLowerCase();
+              return accNameLower === clientNameLower;
             });
+
+            // If no exact match, try partial matching with significant words (>3 chars)
+            if (!matchingAccounts || matchingAccounts.length === 0) {
+              const clientWords = clientNameLower
+                .split(/[\s-]+/) // Split by space or hyphen
+                .filter((word: string) => word.length > 3); // Only significant words
+
+              matchingAccounts = accounts?.filter(acc => {
+                const accNameLower = acc.name.toLowerCase();
+
+                // Match if ALL significant words from client name appear in account name
+                return clientWords.length > 0 && clientWords.every((word: string) => accNameLower.includes(word));
+              });
+
+              // If still no match, try reverse: does account name appear in client name?
+              if (!matchingAccounts || matchingAccounts.length === 0) {
+                matchingAccounts = accounts?.filter(acc => {
+                  const accWords = acc.name.toLowerCase()
+                    .split(/[\s-]+/)
+                    .filter((word: string) => word.length > 3);
+
+                  return accWords.length > 0 && accWords.every((word: string) => clientNameLower.includes(word));
+                });
+              }
+            }
 
             if (matchingAccounts && matchingAccounts.length > 0) {
               for (const account of matchingAccounts) {
