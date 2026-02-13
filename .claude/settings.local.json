@@ -28,7 +28,8 @@
       "Bash(then grep \"ENCRYPTION_KEY\" .env.local)",
       "Bash(else echo \"No .env.local file\")",
       "Bash(fi)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npm run dev:*)"
     ]
   }
 }

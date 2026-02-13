@@ -50,6 +50,41 @@ export async function POST(request: NextRequest) {
       .eq('account_id', accountId)
       .eq('user_id', user.id);
 
+    // Get account-specific Jira tickets for direct friction impact
+    const { data: accountJiraLinks } = await supabase
+      .from('account_jira_links')
+      .select(`
+        jira_issue:jira_issues!inner(
+          status,
+          resolution_date,
+          priority
+        )
+      `)
+      .eq('account_id', accountId)
+      .eq('user_id', user.id);
+
+    // Count Jira tickets by status
+    let jiraOpenCount = 0;
+    let jiraInProgressCount = 0;
+    let jiraResolvedRecently = 0;
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    accountJiraLinks?.forEach((link: any) => {
+      const ticket = link.jira_issue;
+      const statusLower = ticket.status?.toLowerCase() || '';
+
+      if (ticket.resolution_date) {
+        const resolvedDate = new Date(ticket.resolution_date);
+        if (resolvedDate >= thirtyDaysAgo) {
+          jiraResolvedRecently++;
+        }
+      } else if (statusLower.includes('progress') || statusLower.includes('development') || statusLower.includes('review')) {
+        jiraInProgressCount++;
+      } else {
+        jiraOpenCount++;
+      }
+    });
+
     // Count high-severity issues (severity 4 or 5)
     const highSeverityCount = recentCards.filter(c => c.severity >= 4).length;
 
@@ -127,6 +162,12 @@ export async function POST(request: NextRequest) {
     // Reduced from 2 points/+20 cap to 1.5 points/+15 cap
     const highSeverityBoost = Math.min(15, highSeverityCount * 1.5);
 
+    // Jira ticket impact on OFI (direct account-specific tickets)
+    // Open tickets add friction, in-progress tickets add some friction, resolved tickets alleviate
+    const jiraFrictionAdd = (jiraOpenCount * 2) + (jiraInProgressCount * 0.5); // Open = +2, In Progress = +0.5
+    const jiraFrictionRelief = jiraResolvedRecently * -1.5; // Recently resolved = -1.5 points each
+    const jiraNetImpact = Math.max(-10, Math.min(15, jiraFrictionAdd + jiraFrictionRelief)); // Cap between -10 and +15
+
     // Vitally health multipliers (amplify friction for at-risk accounts)
     let vitallyMultiplier = 1.0;
     let vitallyExplanation = '';
@@ -154,8 +195,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Final OFI Score calculation with Vitally amplification
-    let ofiScore = Math.round((baseScore * densityMultiplier + highSeverityBoost) * vitallyMultiplier);
+    // Final OFI Score calculation with Vitally amplification and Jira impact
+    let ofiScore = Math.round((baseScore * densityMultiplier + highSeverityBoost + jiraNetImpact) * vitallyMultiplier);
 
     // Apply ceiling at 100
     ofiScore = Math.min(100, Math.max(0, ofiScore));
@@ -225,6 +266,12 @@ export async function POST(request: NextRequest) {
       frictionDensity: frictionDensity.toFixed(2) + '%',
       densityMultiplier: densityMultiplier.toFixed(2),
       highSeverityBoost,
+      jiraTickets: {
+        open: jiraOpenCount,
+        inProgress: jiraInProgressCount,
+        resolvedRecently: jiraResolvedRecently,
+        netImpact: jiraNetImpact.toFixed(1)
+      },
       vitallyMultiplier: vitallyMultiplier.toFixed(2),
       vitallyExplanation: vitallyExplanation || 'No Vitally amplification',
       finalOfiScore: ofiScore
@@ -249,6 +296,10 @@ export async function POST(request: NextRequest) {
           friction_density: frictionDensity,
           density_multiplier: densityMultiplier,
           high_severity_boost: highSeverityBoost,
+          jira_open_count: jiraOpenCount,
+          jira_in_progress_count: jiraInProgressCount,
+          jira_resolved_recently: jiraResolvedRecently,
+          jira_net_impact: jiraNetImpact,
           vitally_multiplier: vitallyMultiplier,
           vitally_explanation: vitallyExplanation || null,
         },
