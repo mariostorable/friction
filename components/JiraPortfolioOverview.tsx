@@ -5,7 +5,6 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { CheckCircle2, Rocket, Clock, TrendingUp } from 'lucide-react';
 
 interface PortfolioStats {
-  resolved_30d: number;
   resolved_90d: number;
   in_progress: number;
   open: number;
@@ -93,9 +92,9 @@ export default function JiraPortfolioOverview({ businessUnit = 'all' }: JiraPort
         <div className="bg-green-50 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-1">
             <CheckCircle2 className="w-4 h-4 text-green-600" />
-            <span className="text-xs font-medium text-green-700">Resolved (30d)</span>
+            <span className="text-xs font-medium text-green-700">Resolved (90d)</span>
           </div>
-          <div className="text-2xl font-bold text-green-900">{data.portfolio.resolved_30d}</div>
+          <div className="text-2xl font-bold text-green-900">{data.portfolio.resolved_90d}</div>
           <div className="text-xs text-green-600 mt-1">Quick wins</div>
         </div>
 
@@ -120,9 +119,9 @@ export default function JiraPortfolioOverview({ businessUnit = 'all' }: JiraPort
         <div className="bg-purple-50 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-1">
             <TrendingUp className="w-4 h-4 text-purple-600" />
-            <span className="text-xs font-medium text-purple-700">30-Day Total</span>
+            <span className="text-xs font-medium text-purple-700">90-Day Total</span>
           </div>
-          <div className="text-2xl font-bold text-purple-900">{data.portfolio.resolved_30d}</div>
+          <div className="text-2xl font-bold text-purple-900">{data.portfolio.resolved_90d}</div>
           <div className="text-xs text-purple-600 mt-1">Recently resolved</div>
         </div>
       </div>
