@@ -418,7 +418,7 @@ export async function POST(request: NextRequest) {
     // Get all Top 25 accounts for name matching
     const { data: accounts } = await supabaseAdmin
       .from('accounts')
-      .select('id, name')
+      .select('id, name, products')
       .eq('user_id', userId)
       .eq('status', 'active');
 
@@ -620,16 +620,19 @@ export async function POST(request: NextRequest) {
 
     // Build map: account_id → account name for matching
     const accountIdToName = new Map<string, string>();
+    const accountIdToProducts = new Map<string, string>();
     accounts?.forEach(acc => {
       accountIdToName.set(acc.id, acc.name);
+      accountIdToProducts.set(acc.id, acc.products || '');
     });
 
     // Build map: jira_issue_id → issue details for text matching
-    const issueDetailsMap = new Map<string, { summary: string; description: string }>();
+    const issueDetailsMap = new Map<string, { summary: string; description: string; jira_key: string }>();
     insertedIssues?.forEach(issue => {
       issueDetailsMap.set(issue.id, {
         summary: issue.summary || '',
-        description: issue.description || ''
+        description: issue.description || '',
+        jira_key: issue.jira_key
       });
     });
 
@@ -652,8 +655,24 @@ export async function POST(request: NextRequest) {
           const nameParts = accountName.toLowerCase().split(/[\s-,]+/).filter(part => part.length > 3);
           const hasAccountMatch = nameParts.some(part => searchText.includes(part));
 
+          // Product/vertical filtering: prevent cross-industry linking
+          const jiraProject = issueDetails.jira_key.split('-')[0];
+          const accountProducts = accountIdToProducts.get(accountId)?.toLowerCase() || '';
+
+          // Marine projects: MREQ, TOPS, BZD (Boatyard), EASY (EasyStart Marine)
+          const isMarineProject = ['mreq', 'tops', 'bzd', 'easy'].includes(jiraProject.toLowerCase());
+          const isMarineAccount = accountProducts.includes('dockwa') || accountProducts.includes('marina');
+
+          // Storage projects: EDGE, SL, SLT, PAY, CRM, DATA, BUGS
+          const isStorageProject = ['edge', 'sl', 'slt', 'pay', 'crm', 'data', 'bugs'].includes(jiraProject.toLowerCase());
+          const isStorageAccount = accountProducts.includes('edge') || accountProducts.includes('sitelink') || accountProducts.includes('storable');
+
+          // Skip cross-industry matches for theme_association (low confidence) links
+          const isCrossIndustry = (isMarineProject && isStorageAccount) || (isStorageProject && isMarineAccount);
+
           if (hasAccountMatch) {
             // High confidence: both theme AND name match
+            // Allow even if cross-industry since name match is strong signal
             themeBasedAccountLinks.push({
               user_id: userId,
               account_id: accountId,
@@ -661,9 +680,9 @@ export async function POST(request: NextRequest) {
               match_type: 'theme_and_name',
               match_confidence: 0.85
             });
-          } else {
-            // Medium confidence: theme matches, but account name not in ticket
-            // Still create link to provide Jira visibility for accounts with friction themes
+          } else if (!isCrossIndustry) {
+            // Medium confidence: theme matches, account name not in ticket, but same industry
+            // Only create link if not cross-industry to avoid false positives
             themeBasedAccountLinks.push({
               user_id: userId,
               account_id: accountId,
@@ -671,6 +690,9 @@ export async function POST(request: NextRequest) {
               match_type: 'theme_association',
               match_confidence: 0.6 // Lower confidence without name match
             });
+            filteredOutCount++;
+          } else {
+            // Skip: cross-industry match with no name confirmation
             filteredOutCount++;
           }
         });
