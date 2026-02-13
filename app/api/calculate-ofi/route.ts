@@ -181,10 +181,14 @@ export async function POST(request: NextRequest) {
       if (status === 'churning' || status === 'at risk' || status === 'at-risk') {
         vitallyMultiplier *= 1.3;
         vitallyExplanation = `Account marked as ${status} in Vitally (+30% friction weight)`;
-      } else if (healthScore !== null && healthScore < 60) {
-        // Low health score amplification
+      } else if (healthScore !== null && healthScore < 3) {
+        // Poor health score amplification (Vitally uses 1-10 scale, <3 is poor)
         vitallyMultiplier *= 1.2;
-        vitallyExplanation = `Low customer health score (${Math.round(healthScore)}/100) (+20% friction weight)`;
+        vitallyExplanation = `Poor customer health score (${healthScore.toFixed(1)}/10) (+20% friction weight)`;
+      } else if (healthScore !== null && healthScore < 5) {
+        // Concerning health score (Vitally 3-5 is concerning)
+        vitallyMultiplier *= 1.1;
+        vitallyExplanation = `Concerning customer health score (${healthScore.toFixed(1)}/10) (+10% friction weight)`;
       }
 
       // NPS detractor amplification (stacks with status)

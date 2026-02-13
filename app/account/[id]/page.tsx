@@ -754,13 +754,13 @@ export default function AccountDetailPage() {
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-500">Health:</span>
                         <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                          account.vitally_health_score >= 80
+                          account.vitally_health_score > 5
                             ? 'bg-green-100 text-green-800'
-                            : account.vitally_health_score >= 60
+                            : account.vitally_health_score >= 3
                             ? 'bg-yellow-100 text-yellow-800'
                             : 'bg-red-100 text-red-800'
                         }`}>
-                          {Math.round(account.vitally_health_score)}/100
+                          {account.vitally_health_score.toFixed(1)}/10
                         </span>
                       </div>
                     )}
@@ -960,16 +960,16 @@ export default function AccountDetailPage() {
                   <div className="text-center">
                     <div className="text-sm font-medium text-gray-600 mb-1">Health Score</div>
                     <div className={`text-4xl font-bold ${
-                      account.vitally_health_score >= 80 ? 'text-green-600' :
-                      account.vitally_health_score >= 60 ? 'text-yellow-600' :
+                      account.vitally_health_score > 5 ? 'text-green-600' :
+                      account.vitally_health_score >= 3 ? 'text-yellow-600' :
                       'text-red-600'
                     }`}>
-                      {Math.round(account.vitally_health_score)}
+                      {account.vitally_health_score.toFixed(1)}
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
-                      {account.vitally_health_score >= 80 ? 'Healthy' :
-                       account.vitally_health_score >= 60 ? 'At Risk' :
-                       'Critical'}
+                      {account.vitally_health_score > 5 ? 'Healthy' :
+                       account.vitally_health_score >= 3 ? 'Concerning' :
+                       'Poor'}
                     </div>
                   </div>
                 )}
@@ -977,11 +977,11 @@ export default function AccountDetailPage() {
                   <div className="text-center">
                     <div className="text-sm font-medium text-gray-600 mb-1">NPS Score</div>
                     <div className={`text-4xl font-bold ${
-                      account.vitally_nps_score >= 50 ? 'text-green-600' :
-                      account.vitally_nps_score >= 0 ? 'text-yellow-600' :
+                      account.vitally_nps_score >= 9 ? 'text-green-600' :
+                      account.vitally_nps_score >= 7 ? 'text-yellow-600' :
                       'text-red-600'
                     }`}>
-                      {Math.round(account.vitally_nps_score)}
+                      {account.vitally_nps_score}
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
                       {account.vitally_nps_score >= 50 ? 'Promoter' :
