@@ -2,42 +2,43 @@ import * as dotenv from 'dotenv';
 
 dotenv.config({ path: '.env.local' });
 
-async function triggerJiraSync() {
+async function triggerSync() {
   console.log('\n=== Triggering Jira Sync ===\n');
 
-  const url = 'http://localhost:3000/api/jira/sync';
-  const userId = 'ab953672-7bad-4601-9289-5d766e73fec9';
-
-  console.log(`URL: ${url}`);
-  console.log(`User ID: ${userId}\n`);
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
   try {
-    const response = await fetch(url, {
+    const response = await fetch(`${baseUrl}/api/jira/sync`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.CRON_SECRET}`,
-        'x-user-id': userId,
         'Content-Type': 'application/json',
       },
     });
 
-    console.log(`Status: ${response.status} ${response.statusText}`);
-
-    const data = await response.json();
-    console.log('\nResponse:');
-    console.log(JSON.stringify(data, null, 2));
-
-    if (data.success) {
-      console.log(`\n✅ Sync completed successfully!`);
-      console.log(`   Synced: ${data.synced} issues`);
-      console.log(`   Theme links: ${data.links_created}`);
-      console.log(`   Account links: ${data.account_links_created}`);
-    } else {
-      console.log(`\n❌ Sync failed:`, data.error);
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('Sync failed:', error);
+      console.log('\n❌ Could not trigger sync via API (authentication required)');
+      console.log('\n📋 Please trigger the sync manually from the UI:');
+      console.log('   1. Go to http://localhost:3000/dashboard');
+      console.log('   2. Click the "Sync Jira" button in the Jira Roadmap section');
+      console.log('   3. Wait for the sync to complete\n');
+      return;
     }
+
+    const result = await response.json();
+    console.log('✅ Sync completed successfully!');
+    console.log(`   Issues synced: ${result.synced}`);
+    console.log(`   Account links created: ${result.account_links_created}`);
+    console.log(`   Theme links created: ${result.links_created}\n`);
+
   } catch (error) {
-    console.error('\n❌ Error triggering sync:', error);
+    console.error('Error triggering sync:', error);
+    console.log('\n📋 Please trigger the sync manually from the UI:');
+    console.log('   1. Go to http://localhost:3000/dashboard');
+    console.log('   2. Click the "Sync Jira" button in the Jira Roadmap section');
+    console.log('   3. Wait for the sync to complete\n');
   }
 }
 
-triggerJiraSync();
+triggerSync();

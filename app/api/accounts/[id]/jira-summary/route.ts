@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Get Jira ticket summary for an account
- * Returns recent fixes (resolved in last 30 days) and upcoming features (in progress/open)
+ * Returns recent fixes (resolved in last 90 days) and upcoming features (in progress/open)
  */
 export async function GET(
   request: NextRequest,
@@ -72,14 +72,14 @@ export async function GET(
     const tickets = Array.from(uniqueTickets.values());
 
     // Classify tickets
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
     const recentFixes = tickets
       .filter((t: any) => {
         if (!t.resolution_date) return false;
         const resolvedDate = new Date(t.resolution_date);
-        return resolvedDate >= thirtyDaysAgo;
+        return resolvedDate >= ninetyDaysAgo;
       })
       .sort((a: any, b: any) => {
         const dateA = new Date(a.resolution_date);

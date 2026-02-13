@@ -100,7 +100,7 @@ export default function JiraRoadmapSummary({ accountId }: { accountId: string })
               </h3>
             </div>
             <p className="text-sm text-green-700 mt-1">
-              Product improvements rolled out in the last 30 days
+              Product improvements rolled out in the last 90 days
             </p>
           </div>
 
@@ -142,7 +142,7 @@ export default function JiraRoadmapSummary({ accountId }: { accountId: string })
 
           {data.recentFixes.length > 10 && (
             <div className="bg-gray-50 px-4 py-3 text-center text-sm text-gray-600">
-              +{data.recentFixes.length - 10} more fixes in the last 30 days
+              +{data.recentFixes.length - 10} more fixes in the last 90 days
             </div>
           )}
         </div>

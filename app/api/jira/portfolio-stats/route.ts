@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     if (!allThemes || allThemes.length === 0) {
       return NextResponse.json({
-        portfolio: { resolved_7d: 0, resolved_30d: 0, resolved_90d: 0, in_progress: 0, open: 0 },
+        portfolio: { resolved_7d: 0, resolved_90d: 0, in_progress: 0, open: 0 },
         topThemes: [],
         accountsByIssue: [],
         accountTicketCounts: {}
@@ -83,11 +83,9 @@ export async function GET(request: NextRequest) {
     // Aggregate portfolio-level stats
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
 
     let resolved_7d = 0;
-    let resolved_30d = 0;
     let resolved_90d = 0;
     let in_progress = 0;
     let open_count = 0;
@@ -106,7 +104,6 @@ export async function GET(request: NextRequest) {
       if (issue.resolution_date) {
         const resolvedDate = new Date(issue.resolution_date);
         if (resolvedDate >= sevenDaysAgo) resolved_7d++;
-        if (resolvedDate >= thirtyDaysAgo) resolved_30d++;
         if (resolvedDate >= ninetyDaysAgo) resolved_90d++;
       } else {
         const statusLower = issue.status?.toLowerCase() || '';
@@ -206,11 +203,11 @@ export async function GET(request: NextRequest) {
       .in('account_id', accountIds)
       .eq('user_id', user.id);
 
-    const accountTicketCounts: Record<string, { resolved_30d: number; in_progress: number; open: number }> = {};
+    const accountTicketCounts: Record<string, { resolved_90d: number; in_progress: number; open: number }> = {};
 
     // Initialize all accounts with zero counts
     accountIds.forEach(accountId => {
-      accountTicketCounts[accountId] = { resolved_30d: 0, in_progress: 0, open: 0 };
+      accountTicketCounts[accountId] = { resolved_90d: 0, in_progress: 0, open: 0 };
     });
 
     // Group links by account and deduplicate tickets by ID
@@ -234,8 +231,8 @@ export async function GET(request: NextRequest) {
       ticketsMap.forEach((ticket) => {
         if (ticket.resolution_date) {
           const resolvedDate = new Date(ticket.resolution_date);
-          if (resolvedDate >= thirtyDaysAgo) {
-            accountTicketCounts[accountId].resolved_30d++;
+          if (resolvedDate >= ninetyDaysAgo) {
+            accountTicketCounts[accountId].resolved_90d++;
           }
         } else {
           const statusLower = ticket.status?.toLowerCase() || '';
@@ -251,7 +248,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       portfolio: {
         resolved_7d,
-        resolved_30d,
         resolved_90d,
         in_progress,
         open: open_count

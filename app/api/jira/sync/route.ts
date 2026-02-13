@@ -653,21 +653,31 @@ export async function POST(request: NextRequest) {
           const hasAccountMatch = nameParts.some(part => searchText.includes(part));
 
           if (hasAccountMatch) {
+            // High confidence: both theme AND name match
             themeBasedAccountLinks.push({
               user_id: userId,
               account_id: accountId,
               jira_issue_id: themeLink.jira_issue_id,
               match_type: 'theme_and_name',
-              match_confidence: 0.85 // High confidence - both theme AND name match
+              match_confidence: 0.85
             });
           } else {
+            // Medium confidence: theme matches, but account name not in ticket
+            // Still create link to provide Jira visibility for accounts with friction themes
+            themeBasedAccountLinks.push({
+              user_id: userId,
+              account_id: accountId,
+              jira_issue_id: themeLink.jira_issue_id,
+              match_type: 'theme_association',
+              match_confidence: 0.6 // Lower confidence without name match
+            });
             filteredOutCount++;
           }
         });
       }
     }
 
-    console.log(`Created ${themeBasedAccountLinks.length} account links via theme associations (filtered out ${filteredOutCount} without account name match)`);
+    console.log(`Created ${themeBasedAccountLinks.length} account links via theme associations (${themeBasedAccountLinks.length - filteredOutCount} with name match, ${filteredOutCount} theme-only)`);
     accountLinksToCreate.push(...themeBasedAccountLinks);
 
     // Batch insert account links (includes both direct Case ID links AND theme-based links)
