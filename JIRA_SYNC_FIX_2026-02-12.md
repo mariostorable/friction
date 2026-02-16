@@ -155,15 +155,24 @@ This prevents false positives like:
 
 ## What Needs to Happen Next
 
-### CRITICAL: Must Re-sync Jira
+### CRITICAL: Must Re-sync Jira (UPDATED Feb 16, 2026)
 
-**The new code is live, but the database still has old account-jira links.**
+**UPDATE Feb 16, 2026 4:55 PM:** The initial sync on Feb 16 ran with OLD code (before RLS fixes were deployed), creating 71 bad cross-industry links (marine tickets → storage accounts). These have been deleted.
+
+**Cross-Industry Links Removed:**
+- MREQ-7606 (Okanagan Lake Boat Rentals) was linked to 23 storage accounts
+- BZD-1005 (Access Control | Hardware Assets) was linked to 23 storage accounts
+- EASY-324 (Update SSO Branding) was linked to 23 storage accounts
+- EASY-298 was linked to 3 storage accounts
+- **Total deleted: 71 incorrect links**
 
 **Steps:**
-1. Go to https://friction-intelligence.vercel.app/dashboard
-2. Click "Sync Jira" button (top right)
-3. Wait ~30-60 seconds for sync to complete
+1. ✅ DONE: Deleted 71 cross-industry links
+2. ⏳ WAITING: For Vercel to deploy latest code (commit cbf6e4b)
+3. **TODO: Click "Sync Jira" button AGAIN** to recreate links with proper filtering
 4. Refresh the page
+
+**Why another sync is needed:** The Feb 16 sync ran before the RLS fixes and portfolio filtering were deployed to production.
 
 ### Expected Results After Sync:
 
@@ -251,6 +260,54 @@ DELETE FROM account_jira_links WHERE match_type = 'theme_association';
 ```
 
 Then adjust the confidence threshold or add additional filters.
+
+## February 16, 2026 Update - Cross-Industry Cleanup
+
+### Issues Found
+
+User reported Westport Properties (storage company) showing marine tickets:
+- MREQ-7606: Okanagan Lake Boat Rentals (completely unrelated to storage)
+- BZD-1005: Access Control hardware for marine industry
+- EASY-324: Marine SSO branding updates
+
+### Root Cause
+
+The Feb 16 Jira sync ran BEFORE the RLS fixes were deployed to production. At that time:
+- ✅ Cross-industry filtering code was committed (commit 54a0569)
+- ❌ But Vercel hadn't deployed it yet
+- ❌ Sync ran with old code, creating 71 bad cross-industry links
+
+### Fix Applied
+
+**Feb 16, 4:55 PM:**
+1. Created `scripts/clean-cross-industry-links.ts` to identify and delete bad links
+2. Deleted 71 cross-industry links:
+   - MREQ-7606 → 23 storage accounts
+   - BZD-1005 → 23 storage accounts
+   - EASY-324 → 23 storage accounts
+   - EASY-298 → 2 storage accounts
+
+3. Updated documentation to clarify sync needs to run again after deployment
+4. Committed cleanup script for future reference
+
+### Additional Fixes
+
+**Roadmap RLS Issue:**
+- Fixed roadmap API to use service role client (bypasses RLS for joins)
+- Fixed account detail Jira summary API same way
+- Changed roadmap to only query portfolio accounts (67 instead of 1000)
+
+**Commits:**
+- `cbf6e4b` - Fix roadmap to only query portfolio accounts
+- `37221b2` - Fix account detail page Jira roadmap RLS issue
+- `038fae2` - Fix roadmap by account RLS issue preventing joins
+
+### Next Steps
+
+1. Wait for Vercel deployment (commits above)
+2. Run Jira sync again from dashboard
+3. Verify no marine tickets appear for storage accounts
+4. Verify roadmap "By Account" tab populates correctly
 
 ## Future Improvements
 
