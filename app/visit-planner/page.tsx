@@ -705,6 +705,17 @@ function VisitPlannerContent() {
                             >
                               View Details →
                             </a>
+                            {account.salesforce_id && (
+                              <a
+                                href={`https://storable.lightning.force.com/lightning/r/Account/${account.salesforce_id}/view`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-purple-600 hover:text-purple-800 text-xs font-medium underline"
+                              >
+                                Salesforce →
+                              </a>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -760,6 +771,17 @@ function VisitPlannerContent() {
                           }`}>
                             {account.ofi_score >= 70 ? 'High' : account.ofi_score >= 40 ? 'Medium' : 'Low'}
                           </span>
+                          {account.salesforce_id && (
+                            <a
+                              href={`https://storable.lightning.force.com/lightning/r/Account/${account.salesforce_id}/view`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-purple-600 hover:text-purple-800 text-xs font-medium underline"
+                            >
+                              Salesforce →
+                            </a>
+                          )}
                         </div>
                       </div>
                     ))}
