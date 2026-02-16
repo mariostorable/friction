@@ -27,18 +27,37 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    // Get all active accounts
+    // Get portfolio accounts (Top 25 lists) - these are the accounts we track
+    const { data: portfolios } = await supabase
+      .from('portfolios')
+      .select('account_ids')
+      .eq('user_id', user.id)
+      .in('portfolio_type', ['top_25_edge', 'top_25_marine', 'top_25_sitelink']);
+
+    if (!portfolios || portfolios.length === 0) {
+      return NextResponse.json({ accounts: [] });
+    }
+
+    // Collect unique account IDs from all portfolios
+    const portfolioAccountIds = new Set<string>();
+    portfolios.forEach(p => p.account_ids.forEach((id: string) => portfolioAccountIds.add(id)));
+
+    const accountIds = Array.from(portfolioAccountIds);
+
+    if (accountIds.length === 0) {
+      return NextResponse.json({ accounts: [] });
+    }
+
+    // Get account details
     const { data: accounts } = await supabase
       .from('accounts')
       .select('id, name')
-      .eq('user_id', user.id)
+      .in('id', accountIds)
       .eq('status', 'active');
 
     if (!accounts || accounts.length === 0) {
       return NextResponse.json({ accounts: [] });
     }
-
-    const accountIds = accounts.map(a => a.id);
 
     // Get all Jira issues linked to these accounts via account_jira_links
     const { data: accountJiraLinks } = await supabase
