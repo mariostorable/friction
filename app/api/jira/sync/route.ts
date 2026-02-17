@@ -655,24 +655,32 @@ export async function POST(request: NextRequest) {
           const nameParts = accountName.toLowerCase().split(/[\s-,]+/).filter(part => part.length > 3);
           const hasAccountMatch = nameParts.some(part => searchText.includes(part));
 
-          // Product/vertical filtering: prevent cross-industry linking
-          const jiraProject = issueDetails.jira_key.split('-')[0];
+          // Product/vertical filtering: prevent cross-industry and wrong-product linking
+          const jiraProject = issueDetails.jira_key.split('-')[0].toLowerCase();
           const accountProducts = accountIdToProducts.get(accountId)?.toLowerCase() || '';
 
-          // Marine projects: MREQ, TOPS, BZD (Boatyard), EASY (EasyStart Marine)
-          const isMarineProject = ['mreq', 'tops', 'bzd', 'easy'].includes(jiraProject.toLowerCase());
-          const isMarineAccount = accountProducts.includes('dockwa') || accountProducts.includes('marina');
+          // Marine/RV projects: MREQ, TOPS, BZD (Boatyard), EASY (EasyStart Marine), NBK (NewBook), MDEV (Molo Dev)
+          const isMarineProject = ['mreq', 'tops', 'bzd', 'easy', 'nbk', 'mdev', 'esst'].includes(jiraProject);
+          const isMarineAccount = accountProducts.includes('dockwa') || accountProducts.includes('marina') || accountProducts.includes('molo');
 
           // Storage projects: EDGE, SL, SLT, PAY, CRM, DATA, BUGS
-          const isStorageProject = ['edge', 'sl', 'slt', 'pay', 'crm', 'data', 'bugs'].includes(jiraProject.toLowerCase());
+          const isStorageProject = ['edge', 'sl', 'slt', 'pay', 'crm', 'data', 'bugs'].includes(jiraProject);
           const isStorageAccount = accountProducts.includes('edge') || accountProducts.includes('sitelink') || accountProducts.includes('storable');
 
-          // Skip cross-industry matches for theme_association (low confidence) links
-          const isCrossIndustry = (isMarineProject && isStorageAccount) || (isStorageProject && isMarineAccount);
+          // Product-specific matching: EDGE tickets only for EDGE accounts, SL only for SiteLink
+          const isEdgeTicket = jiraProject === 'edge';
+          const isSitelinkTicket = ['sl', 'slt'].includes(jiraProject);
+          const hasEdge = accountProducts.includes('edge');
+          const hasSitelink = accountProducts.includes('sitelink');
 
-          if (hasAccountMatch) {
-            // High confidence: both theme AND name match
-            // Allow even if cross-industry since name match is strong signal
+          const isWrongProduct = (isEdgeTicket && !hasEdge) || (isSitelinkTicket && !hasSitelink);
+
+          // Skip cross-industry or wrong-product matches for theme_association (low confidence) links
+          const isCrossIndustry = (isMarineProject && isStorageAccount) || (isStorageProject && isMarineAccount);
+          const shouldSkip = isCrossIndustry || isWrongProduct;
+
+          if (hasAccountMatch && !shouldSkip) {
+            // High confidence: both theme AND name match, and correct industry/product
             themeBasedAccountLinks.push({
               user_id: userId,
               account_id: accountId,
@@ -680,9 +688,11 @@ export async function POST(request: NextRequest) {
               match_type: 'theme_and_name',
               match_confidence: 0.85
             });
-          } else if (!isCrossIndustry) {
-            // Medium confidence: theme matches, account name not in ticket, but same industry
-            // Only create link if not cross-industry to avoid false positives
+          } else if (hasAccountMatch && shouldSkip) {
+            // Name matches but wrong industry/product - skip to avoid false positive
+            filteredOutCount++;
+          } else if (!shouldSkip) {
+            // Medium confidence: theme matches, account name not in ticket, correct industry/product
             themeBasedAccountLinks.push({
               user_id: userId,
               account_id: accountId,
@@ -690,9 +700,8 @@ export async function POST(request: NextRequest) {
               match_type: 'theme_association',
               match_confidence: 0.6 // Lower confidence without name match
             });
-            filteredOutCount++;
           } else {
-            // Skip: cross-industry match with no name confirmation
+            // Skip: wrong industry/product with no name confirmation
             filteredOutCount++;
           }
         });
