@@ -34,7 +34,8 @@ export default function AccountRoadmapView() {
   const [accounts, setAccounts] = useState<AccountSummary[]>([]);
   const [allAccounts, setAllAccounts] = useState<Array<{ id: string; name: string; products: string }>>([]);
   const [expandedAccount, setExpandedAccount] = useState<string | null>(null);
-  const [expandedStatus, setExpandedStatus] = useState<'resolved' | 'in_progress' | 'open'>('in_progress');
+  const [expandedStatus, setExpandedStatus] = useState<'resolved' | 'in_progress' | 'open'>('resolved');
+  const [expandedTicket, setExpandedTicket] = useState<string | null>(null);
 
   // Filter state
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
@@ -145,37 +146,91 @@ export default function AccountRoadmapView() {
     return 'text-gray-600 bg-gray-50';
   };
 
-  const renderIssue = (issue: JiraIssue) => (
-    <div key={issue.jira_key} className="bg-gray-50 rounded-lg p-3 hover:bg-gray-100 transition-colors">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <a
-              href={issue.issue_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-medium text-purple-700 hover:text-purple-900 flex items-center gap-1"
-            >
-              {issue.jira_key}
-              <ExternalLink className="w-3 h-3" />
-            </a>
-            <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${getPriorityColor(issue.priority)}`}>
-              {issue.priority}
-            </span>
-          </div>
-          <p className="text-sm text-gray-900 line-clamp-2">{issue.summary}</p>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-xs text-gray-500">{issue.status}</span>
-            {issue.resolution_date && (
-              <span className="text-xs text-green-600">
-                Resolved {new Date(issue.resolution_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+  const renderIssue = (issue: JiraIssue) => {
+    const isExpanded = expandedTicket === issue.jira_key;
+
+    return (
+      <div key={issue.jira_key} className="border-b border-gray-200 last:border-b-0">
+        <button
+          onClick={() => setExpandedTicket(isExpanded ? null : issue.jira_key)}
+          className="w-full px-3 py-2 hover:bg-gray-50 transition-colors text-left"
+        >
+          <div className="grid grid-cols-12 gap-3 items-center">
+            {/* Jira Key */}
+            <div className="col-span-2">
+              <span className="text-sm font-medium text-purple-700">{issue.jira_key}</span>
+            </div>
+
+            {/* Priority */}
+            <div className="col-span-1">
+              <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${getPriorityColor(issue.priority)}`}>
+                {issue.priority?.substring(0, 3) || 'N/A'}
               </span>
-            )}
+            </div>
+
+            {/* Summary */}
+            <div className="col-span-6">
+              <p className="text-sm text-gray-900 truncate">{issue.summary}</p>
+            </div>
+
+            {/* Status */}
+            <div className="col-span-2">
+              <span className="text-xs text-gray-600">{issue.status}</span>
+            </div>
+
+            {/* Date */}
+            <div className="col-span-1 text-right">
+              {issue.resolution_date && (
+                <span className="text-xs text-green-600">
+                  {new Date(issue.resolution_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
+        </button>
+
+        {/* Expanded Details */}
+        {isExpanded && (
+          <div className="px-3 py-3 bg-gray-50 border-t border-gray-200">
+            <div className="space-y-2 text-sm">
+              <div>
+                <span className="font-medium text-gray-700">Full Description:</span>
+                <p className="text-gray-900 mt-1">{issue.summary}</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <div>
+                  <span className="font-medium text-gray-700">Priority:</span>{' '}
+                  <span className="text-gray-900">{issue.priority || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-700">Status:</span>{' '}
+                  <span className="text-gray-900">{issue.status}</span>
+                </div>
+                {issue.resolution_date && (
+                  <div>
+                    <span className="font-medium text-gray-700">Resolved:</span>{' '}
+                    <span className="text-green-600">
+                      {new Date(issue.resolution_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div>
+                <a
+                  href={issue.issue_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-purple-700 hover:text-purple-900 font-medium"
+                >
+                  View in Jira <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="space-y-4">

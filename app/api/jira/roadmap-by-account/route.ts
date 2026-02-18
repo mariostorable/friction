@@ -119,12 +119,20 @@ export async function GET(request: NextRequest) {
       .in('account_id', filteredAccountIds)
       .eq('user_id', user.id);
 
-    if (!accountJiraLinks || accountJiraLinks.length === 0) {
+    // Filter out marine/RV tickets by project code
+    const marineProjects = ['NBK', 'MREQ', 'MDEV', 'EASY', 'TOPS', 'BZD', 'ESST'];
+    const filteredLinks = accountJiraLinks?.filter((link: any) => {
+      const issue = link.jira_issues;
+      const projectCode = issue.jira_key.split('-')[0].toUpperCase();
+      return !marineProjects.includes(projectCode);
+    }) || [];
+
+    if (!filteredLinks || filteredLinks.length === 0) {
       return NextResponse.json({ accounts: [] });
     }
 
     // Get theme associations for display purposes
-    const jiraIssueIds = new Set(accountJiraLinks.map((link: any) => link.jira_issues.id));
+    const jiraIssueIds = new Set(filteredLinks.map((link: any) => link.jira_issues.id));
     const { data: themeLinks } = await supabase
       .from('theme_jira_links')
       .select('jira_issue_id, theme_key')
@@ -155,7 +163,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Add issues to accounts
-    accountJiraLinks.forEach((link: any) => {
+    filteredLinks.forEach((link: any) => {
       const issue = link.jira_issues;
       const themes = issueThemes.get(issue.id) || [];
 
