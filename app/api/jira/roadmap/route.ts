@@ -98,11 +98,6 @@ export async function GET(request: NextRequest) {
 
     const jiraIssues = Array.from(issueMap.values());
 
-    if (issuesError) {
-      console.error('Error fetching Jira issues:', issuesError);
-      return NextResponse.json({ error: 'Failed to fetch Jira issues' }, { status: 500 });
-    }
-
     if (!jiraIssues || jiraIssues.length === 0) {
       return NextResponse.json({
         resolved: [],
