@@ -7,10 +7,12 @@ interface RoadmapFiltersProps {
   selectedAccountIds: string[];
   portfolioFilter: 'all' | 'top_25_edge' | 'top_25_sitelink' | 'top_25_marine';
   productFilter: 'all' | 'edge' | 'sitelink' | 'other';
+  statusFilter: 'all' | 'resolved' | 'closed';
   dateRangeDays: number;
   onAccountsChange: (ids: string[]) => void;
   onPortfolioChange: (portfolio: 'all' | 'top_25_edge' | 'top_25_sitelink' | 'top_25_marine') => void;
   onProductChange: (product: 'all' | 'edge' | 'sitelink' | 'other') => void;
+  onStatusChange: (status: 'all' | 'resolved' | 'closed') => void;
   onDateRangeChange: (days: number) => void;
 }
 
@@ -19,10 +21,12 @@ export default function RoadmapFilters({
   selectedAccountIds,
   portfolioFilter,
   productFilter,
+  statusFilter,
   dateRangeDays,
   onAccountsChange,
   onPortfolioChange,
   onProductChange,
+  onStatusChange,
   onDateRangeChange
 }: RoadmapFiltersProps) {
 
@@ -102,6 +106,22 @@ export default function RoadmapFilters({
             <option value="edge">EDGE</option>
             <option value="sitelink">SiteLink</option>
             <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label htmlFor="status-filter" className="text-sm font-medium text-gray-700 min-w-max">
+            Status:
+          </label>
+          <select
+            id="status-filter"
+            value={statusFilter}
+            onChange={(e) => onStatusChange(e.target.value as 'all' | 'resolved' | 'closed')}
+            className="block px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+          >
+            <option value="all">All Statuses</option>
+            <option value="resolved">Resolved</option>
+            <option value="closed">Closed</option>
           </select>
         </div>
       </div>

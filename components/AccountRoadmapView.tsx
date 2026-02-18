@@ -41,6 +41,7 @@ export default function AccountRoadmapView() {
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
   const [portfolioFilter, setPortfolioFilter] = useState<'all' | 'top_25_edge' | 'top_25_sitelink' | 'top_25_marine'>('all');
   const [productFilter, setProductFilter] = useState<'all' | 'edge' | 'sitelink' | 'other'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'resolved' | 'closed'>('all');
   const [dateRangeDays, setDateRangeDays] = useState(30);
 
   const supabase = createClientComponentClient();
@@ -53,7 +54,7 @@ export default function AccountRoadmapView() {
   // Refetch when filters change
   useEffect(() => {
     fetchAccountRoadmap();
-  }, [selectedAccountIds, portfolioFilter, productFilter, dateRangeDays]);
+  }, [selectedAccountIds, portfolioFilter, productFilter, statusFilter, dateRangeDays]);
 
   async function fetchAllAccountsForFilter() {
     try {
@@ -86,6 +87,9 @@ export default function AccountRoadmapView() {
       if (productFilter !== 'all') {
         params.set('product', productFilter);
       }
+      if (statusFilter !== 'all') {
+        params.set('status', statusFilter);
+      }
       params.set('dateRangeDays', dateRangeDays.toString());
 
       const response = await fetch(`/api/jira/roadmap-by-account?${params.toString()}`);
@@ -104,6 +108,7 @@ export default function AccountRoadmapView() {
     setSelectedAccountIds([]);
     setPortfolioFilter('all');
     setProductFilter('all');
+    setStatusFilter('all');
     setDateRangeDays(30);
   };
 
@@ -248,10 +253,12 @@ export default function AccountRoadmapView() {
         selectedAccountIds={selectedAccountIds}
         portfolioFilter={portfolioFilter}
         productFilter={productFilter}
+        statusFilter={statusFilter}
         dateRangeDays={dateRangeDays}
         onAccountsChange={setSelectedAccountIds}
         onPortfolioChange={setPortfolioFilter}
         onProductChange={setProductFilter}
+        onStatusChange={setStatusFilter}
         onDateRangeChange={setDateRangeDays}
       />
 
@@ -264,7 +271,7 @@ export default function AccountRoadmapView() {
             {productFilter !== 'all' && ` with ${productFilter.toUpperCase()} products`}
             {selectedAccountIds.length > 0 && ` (${selectedAccountIds.length} selected)`}
           </div>
-          {(selectedAccountIds.length > 0 || portfolioFilter !== 'all' || productFilter !== 'all' || dateRangeDays !== 30) && (
+          {(selectedAccountIds.length > 0 || portfolioFilter !== 'all' || productFilter !== 'all' || statusFilter !== 'all' || dateRangeDays !== 30) && (
             <button
               onClick={clearFilters}
               className="text-sm text-purple-600 hover:text-purple-800 font-medium"

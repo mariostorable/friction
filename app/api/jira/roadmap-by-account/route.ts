@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
     const accountIdsParam = searchParams.get('accountIds');
     const portfolioFilter = searchParams.get('portfolio') || 'all';
     const productFilter = searchParams.get('product') || 'all';
+    const statusFilter = searchParams.get('status') || 'all';
     const dateRangeDays = parseInt(searchParams.get('dateRangeDays') || '30');
 
     // Calculate date threshold for resolved issues
@@ -185,9 +186,18 @@ export async function GET(request: NextRequest) {
         entry.issues.forEach(issue => {
           if (issue.resolution_date) {
             const resolvedDate = new Date(issue.resolution_date);
+            const statusLower = issue.status?.toLowerCase() || '';
+
             // Use dynamic date threshold from query parameter
             if (resolvedDate >= dateThreshold) {
-              resolved.push(issue);
+              // Apply status filter for resolved issues
+              if (statusFilter === 'all') {
+                resolved.push(issue);
+              } else if (statusFilter === 'resolved' && (statusLower.includes('resolved') || statusLower.includes('fixed'))) {
+                resolved.push(issue);
+              } else if (statusFilter === 'closed' && (statusLower.includes('closed') || statusLower.includes('done'))) {
+                resolved.push(issue);
+              }
             }
           } else {
             const statusLower = issue.status?.toLowerCase() || '';
