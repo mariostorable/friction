@@ -15,6 +15,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
+    // Parse query parameters for filtering
+    const searchParams = request.nextUrl.searchParams;
+    const accountIdsParam = searchParams.get('accountIds');
+    const portfolioFilter = searchParams.get('portfolio') || 'all';
+    const productFilter = searchParams.get('product') || 'all';
+    const dateRangeDays = parseInt(searchParams.get('dateRangeDays') || '30');
+
+    // Calculate date threshold for resolved issues
+    const now = new Date();
+    const dateThreshold = new Date(now.getTime() - dateRangeDays * 24 * 60 * 60 * 1000);
+
     // Use service role client for queries that need to bypass RLS for joins
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,12 +38,19 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    // Get portfolio accounts (Top 25 lists) - these are the accounts we track
-    const { data: portfolios } = await supabase
+    // Get portfolio accounts (Top 25 lists) - filtered by portfolio type
+    let portfolioQuery = supabase
       .from('portfolios')
       .select('account_ids')
-      .eq('user_id', user.id)
-      .in('portfolio_type', ['top_25_edge', 'top_25_marine', 'top_25_sitelink']);
+      .eq('user_id', user.id);
+
+    if (portfolioFilter !== 'all') {
+      portfolioQuery = portfolioQuery.eq('portfolio_type', portfolioFilter);
+    } else {
+      portfolioQuery = portfolioQuery.in('portfolio_type', ['top_25_edge', 'top_25_marine', 'top_25_sitelink']);
+    }
+
+    const { data: portfolios } = await portfolioQuery;
 
     if (!portfolios || portfolios.length === 0) {
       return NextResponse.json({ accounts: [] });
@@ -42,22 +60,45 @@ export async function GET(request: NextRequest) {
     const portfolioAccountIds = new Set<string>();
     portfolios.forEach(p => p.account_ids.forEach((id: string) => portfolioAccountIds.add(id)));
 
-    const accountIds = Array.from(portfolioAccountIds);
+    let accountIds = Array.from(portfolioAccountIds);
+
+    // If specific accounts selected, use those instead of portfolio accounts
+    if (accountIdsParam) {
+      const selectedIds = accountIdsParam.split(',').filter(id => id.length > 0);
+      if (selectedIds.length > 0) {
+        accountIds = selectedIds;
+      }
+    }
 
     if (accountIds.length === 0) {
       return NextResponse.json({ accounts: [] });
     }
 
-    // Get account details
+    // Get account details with products field for filtering
     const { data: accounts } = await supabase
       .from('accounts')
-      .select('id, name')
+      .select('id, name, products')
       .in('id', accountIds)
       .eq('status', 'active');
 
-    if (!accounts || accounts.length === 0) {
+    // Filter accounts by product if specified
+    let filteredAccounts = accounts;
+    if (productFilter !== 'all' && accounts) {
+      filteredAccounts = accounts.filter(account => {
+        const products = (account.products || '').toLowerCase();
+        if (productFilter === 'edge') return products.includes('edge');
+        if (productFilter === 'sitelink') return products.includes('sitelink');
+        if (productFilter === 'other') return !products.includes('edge') && !products.includes('sitelink');
+        return true;
+      });
+    }
+
+    if (!filteredAccounts || filteredAccounts.length === 0) {
       return NextResponse.json({ accounts: [] });
     }
+
+    // Extract account IDs from filtered accounts
+    const filteredAccountIds = filteredAccounts.map(a => a.id);
 
     // Get all Jira issues linked to these accounts via account_jira_links
     const { data: accountJiraLinks } = await supabase
@@ -75,7 +116,7 @@ export async function GET(request: NextRequest) {
           issue_url
         )
       `)
-      .in('account_id', accountIds)
+      .in('account_id', filteredAccountIds)
       .eq('user_id', user.id);
 
     if (!accountJiraLinks || accountJiraLinks.length === 0) {
@@ -105,8 +146,8 @@ export async function GET(request: NextRequest) {
       issues: any[];
     }> = {};
 
-    // Initialize accounts
-    accounts.forEach(account => {
+    // Initialize accounts (use filtered accounts)
+    filteredAccounts.forEach(account => {
       accountIssues[account.id] = {
         account,
         issues: []
@@ -126,9 +167,6 @@ export async function GET(request: NextRequest) {
     });
 
     // Categorize issues and calculate counts for each account
-    const now = new Date();
-    const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-
     const accountSummaries = Object.values(accountIssues)
       .filter(entry => entry.issues.length > 0) // Only accounts with issues
       .map(entry => {
@@ -139,7 +177,8 @@ export async function GET(request: NextRequest) {
         entry.issues.forEach(issue => {
           if (issue.resolution_date) {
             const resolvedDate = new Date(issue.resolution_date);
-            if (resolvedDate >= fourteenDaysAgo) {
+            // Use dynamic date threshold from query parameter
+            if (resolvedDate >= dateThreshold) {
               resolved.push(issue);
             }
           } else {

@@ -29,7 +29,9 @@
       "Bash(else echo \"No .env.local file\")",
       "Bash(fi)",
       "Bash(ls:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(git -C /Users/mario/friction-intelligence log --all --reverse --format=\"%H %s\")",
+      "Bash(git -C /Users/mario/friction-intelligence show b9c8021:supabase/migrations/)"
     ]
   }
 }

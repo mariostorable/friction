@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { CheckCircle2, Loader2, ExternalLink, Clock, Zap, ChevronDown, ChevronRight } from 'lucide-react';
+import RoadmapFilters from './RoadmapFilters';
 
 interface JiraIssue {
   id: string;
@@ -31,17 +32,62 @@ interface AccountSummary {
 export default function AccountRoadmapView() {
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState<AccountSummary[]>([]);
+  const [allAccounts, setAllAccounts] = useState<Array<{ id: string; name: string; products: string }>>([]);
   const [expandedAccount, setExpandedAccount] = useState<string | null>(null);
   const [expandedStatus, setExpandedStatus] = useState<'resolved' | 'in_progress' | 'open'>('in_progress');
+
+  // Filter state
+  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+  const [portfolioFilter, setPortfolioFilter] = useState<'all' | 'top_25_edge' | 'top_25_sitelink' | 'top_25_marine'>('all');
+  const [productFilter, setProductFilter] = useState<'all' | 'edge' | 'sitelink' | 'other'>('all');
+  const [dateRangeDays, setDateRangeDays] = useState(30);
+
   const supabase = createClientComponentClient();
 
   useEffect(() => {
+    fetchAllAccountsForFilter();
     fetchAccountRoadmap();
   }, []);
 
+  // Refetch when filters change
+  useEffect(() => {
+    fetchAccountRoadmap();
+  }, [selectedAccountIds, portfolioFilter, productFilter, dateRangeDays]);
+
+  async function fetchAllAccountsForFilter() {
+    try {
+      const { data } = await supabase
+        .from('accounts')
+        .select('id, name, products')
+        .eq('status', 'active')
+        .order('name');
+
+      if (data) {
+        setAllAccounts(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch accounts for filter:', error);
+    }
+  }
+
   async function fetchAccountRoadmap() {
     try {
-      const response = await fetch('/api/jira/roadmap-by-account');
+      setLoading(true);
+
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (selectedAccountIds.length > 0) {
+        params.set('accountIds', selectedAccountIds.join(','));
+      }
+      if (portfolioFilter !== 'all') {
+        params.set('portfolio', portfolioFilter);
+      }
+      if (productFilter !== 'all') {
+        params.set('product', productFilter);
+      }
+      params.set('dateRangeDays', dateRangeDays.toString());
+
+      const response = await fetch(`/api/jira/roadmap-by-account?${params.toString()}`);
       if (response.ok) {
         const result = await response.json();
         setAccounts(result.accounts || []);
@@ -53,6 +99,13 @@ export default function AccountRoadmapView() {
     }
   }
 
+  const clearFilters = () => {
+    setSelectedAccountIds([]);
+    setPortfolioFilter('all');
+    setProductFilter('all');
+    setDateRangeDays(30);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -62,10 +115,24 @@ export default function AccountRoadmapView() {
   }
 
   if (accounts.length === 0) {
+    const hasFiltersApplied = selectedAccountIds.length > 0 || portfolioFilter !== 'all' || productFilter !== 'all';
+
     return (
       <div className="text-center py-12">
-        <p className="text-gray-600 mb-2">No Jira tickets linked to accounts yet</p>
-        <p className="text-sm text-gray-500">Sync Jira to see tickets organized by account</p>
+        <p className="text-gray-600 mb-2">
+          {hasFiltersApplied ? 'No accounts match your filters' : 'No Jira tickets linked to accounts yet'}
+        </p>
+        <p className="text-sm text-gray-500">
+          {hasFiltersApplied ? 'Try adjusting your filters to see more results' : 'Sync Jira to see tickets organized by account'}
+        </p>
+        {hasFiltersApplied && (
+          <button
+            onClick={clearFilters}
+            className="mt-4 px-4 py-2 text-sm font-medium text-purple-700 bg-purple-50 border border-purple-300 rounded-lg hover:bg-purple-100"
+          >
+            Clear Filters
+          </button>
+        )}
       </div>
     );
   }
@@ -119,6 +186,39 @@ export default function AccountRoadmapView() {
           Jira tickets addressing friction for your top accounts
         </p>
       </div>
+
+      {/* Filters */}
+      <RoadmapFilters
+        accounts={allAccounts}
+        selectedAccountIds={selectedAccountIds}
+        portfolioFilter={portfolioFilter}
+        productFilter={productFilter}
+        dateRangeDays={dateRangeDays}
+        onAccountsChange={setSelectedAccountIds}
+        onPortfolioChange={setPortfolioFilter}
+        onProductChange={setProductFilter}
+        onDateRangeChange={setDateRangeDays}
+      />
+
+      {/* Filter Summary */}
+      {!loading && (
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-gray-600">
+            Showing {accounts.length} account{accounts.length !== 1 ? 's' : ''}
+            {portfolioFilter !== 'all' && ` from ${portfolioFilter.replace(/_/g, ' ')}`}
+            {productFilter !== 'all' && ` with ${productFilter.toUpperCase()} products`}
+            {selectedAccountIds.length > 0 && ` (${selectedAccountIds.length} selected)`}
+          </div>
+          {(selectedAccountIds.length > 0 || portfolioFilter !== 'all' || productFilter !== 'all' || dateRangeDays !== 30) && (
+            <button
+              onClick={clearFilters}
+              className="text-sm text-purple-600 hover:text-purple-800 font-medium"
+            >
+              Clear Filters
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Account List */}
       <div className="space-y-3">
@@ -226,7 +326,9 @@ export default function AccountRoadmapView() {
 
                     {/* Empty state for each tab */}
                     {expandedStatus === 'resolved' && account.resolved.length === 0 && (
-                      <p className="text-sm text-gray-500 text-center py-4">No resolved tickets in the last 14 days</p>
+                      <p className="text-sm text-gray-500 text-center py-4">
+                        No resolved tickets in the last {dateRangeDays} {dateRangeDays === 1 ? 'day' : 'days'}
+                      </p>
                     )}
                     {expandedStatus === 'in_progress' && account.in_progress.length === 0 && (
                       <p className="text-sm text-gray-500 text-center py-4">No tickets in progress</p>
