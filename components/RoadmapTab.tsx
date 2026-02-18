@@ -19,14 +19,14 @@ interface JiraTicket {
 }
 
 interface RoadmapData {
-  resolved: JiraTicket[];
-  in_progress: JiraTicket[];
-  open: JiraTicket[];
+  resolved: Record<string, JiraTicket[]>;
+  in_progress: Record<string, JiraTicket[]>;
+  open: Record<string, JiraTicket[]>;
 }
 
 export default function RoadmapTab() {
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<RoadmapData>({ resolved: [], in_progress: [], open: [] });
+  const [data, setData] = useState<RoadmapData>({ resolved: {}, in_progress: {}, open: {} });
   const [activeStatus, setActiveStatus] = useState<'resolved' | 'in_progress' | 'open'>('in_progress');
   const supabase = createClientComponentClient();
 
@@ -64,8 +64,10 @@ export default function RoadmapTab() {
     return 'text-gray-600 bg-gray-50';
   };
 
-  const renderTickets = (tickets: JiraTicket[]) => {
-    if (tickets.length === 0) {
+  const renderGroupedTickets = (ticketsByTheme: Record<string, JiraTicket[]>) => {
+    const themes = Object.keys(ticketsByTheme).sort();
+
+    if (themes.length === 0) {
       return (
         <div className="text-center py-8 text-gray-500">
           No tickets in this category
@@ -74,94 +76,105 @@ export default function RoadmapTab() {
     }
 
     return (
-      <div className="space-y-4">
-        {tickets.map((ticket) => (
-          <div key={ticket.jira_key} className="bg-white border border-gray-200 rounded-lg p-4 hover:border-purple-300 transition-colors">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                {/* Header */}
-                <div className="flex items-center gap-3 mb-2">
-                  <a
-                    href={ticket.issue_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-700 font-semibold hover:text-purple-900 flex items-center gap-1"
-                  >
-                    {ticket.jira_key}
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${getPriorityColor(ticket.priority)}`}>
-                    {ticket.priority}
-                  </span>
-                  <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
-                    {ticket.status}
-                  </span>
+      <div className="space-y-6">
+        {themes.map(theme => {
+          const tickets = ticketsByTheme[theme];
+          const totalAccounts = new Set(tickets.flatMap(t => t.account_names)).size;
+
+          return (
+            <div key={theme} className="border border-gray-200 rounded-lg overflow-hidden">
+              {/* Theme Header */}
+              <div className="bg-purple-50 border-b border-purple-200 px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-purple-900">
+                    {theme.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  </h3>
+                  <div className="flex items-center gap-4 text-sm text-purple-700">
+                    <span>{tickets.length} ticket{tickets.length !== 1 ? 's' : ''}</span>
+                    <span>•</span>
+                    <span>{totalAccounts} account{totalAccounts !== 1 ? 's' : ''}</span>
+                  </div>
                 </div>
-
-                {/* Summary */}
-                <h3 className="text-sm font-medium text-gray-900 mb-2">
-                  {ticket.summary}
-                </h3>
-
-                {/* AI Summary */}
-                {ticket.ai_summary && (
-                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                    {ticket.ai_summary}
-                  </p>
-                )}
-
-                {/* Themes */}
-                {ticket.theme_keys.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    <span className="text-xs text-gray-500 mr-1">Themes:</span>
-                    {ticket.theme_keys.slice(0, 3).map((theme) => (
-                      <span key={theme} className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded">
-                        {theme.replace(/_/g, ' ')}
-                      </span>
-                    ))}
-                    {ticket.theme_keys.length > 3 && (
-                      <span className="text-xs text-gray-500">+{ticket.theme_keys.length - 3} more</span>
-                    )}
-                  </div>
-                )}
-
-                {/* Accounts */}
-                {ticket.account_names.length > 0 && (
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <span className="flex items-center gap-1">
-                      <AlertCircle className="w-4 h-4" />
-                      Affects {ticket.affected_account_count} account{ticket.affected_account_count !== 1 ? 's' : ''}:
-                    </span>
-                    <span className="font-medium">
-                      {ticket.account_names.slice(0, 2).join(', ')}
-                      {ticket.account_names.length > 2 && ` +${ticket.account_names.length - 2} more`}
-                    </span>
-                  </div>
-                )}
               </div>
 
-              {/* Date info */}
-              <div className="text-right text-sm text-gray-500 flex-shrink-0">
-                {ticket.resolution_date && (
-                  <div className="flex items-center gap-1 text-green-600">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>
-                      {new Date(ticket.resolution_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </span>
+              {/* Tickets in this theme */}
+              <div className="p-4 space-y-3 bg-white">
+                {tickets.map((ticket) => (
+                  <div key={ticket.jira_key} className="border border-gray-200 rounded-lg p-3 hover:border-purple-300 transition-colors">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        {/* Header */}
+                        <div className="flex items-center gap-3 mb-2">
+                          <a
+                            href={ticket.issue_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-purple-700 font-semibold hover:text-purple-900 flex items-center gap-1"
+                          >
+                            {ticket.jira_key}
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${getPriorityColor(ticket.priority)}`}>
+                            {ticket.priority}
+                          </span>
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                            {ticket.status}
+                          </span>
+                        </div>
+
+                        {/* Summary */}
+                        <h4 className="text-sm font-medium text-gray-900 mb-2">
+                          {ticket.summary}
+                        </h4>
+
+                        {/* AI Summary */}
+                        {ticket.ai_summary && (
+                          <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+                            {ticket.ai_summary}
+                          </p>
+                        )}
+
+                        {/* Accounts */}
+                        {ticket.account_names.length > 0 && (
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <span className="flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3" />
+                              Affects:
+                            </span>
+                            <span className="font-medium">
+                              {ticket.account_names.slice(0, 2).join(', ')}
+                              {ticket.account_names.length > 2 && ` +${ticket.account_names.length - 2} more`}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Date info */}
+                      <div className="text-right text-sm text-gray-500 flex-shrink-0">
+                        {ticket.resolution_date && (
+                          <div className="flex items-center gap-1 text-green-600">
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>
+                              {new Date(ticket.resolution_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </span>
+                          </div>
+                        )}
+                        {!ticket.resolution_date && (
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            <span>
+                              Updated {new Date(ticket.updated_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                )}
-                {!ticket.resolution_date && (
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    <span>
-                      Updated {new Date(ticket.updated_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </span>
-                  </div>
-                )}
+                ))}
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   };
@@ -189,7 +202,7 @@ export default function RoadmapTab() {
           >
             <span className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4" />
-              Resolved ({data.resolved.length})
+              Resolved ({Object.values(data.resolved).flat().length})
             </span>
           </button>
           <button
@@ -202,7 +215,7 @@ export default function RoadmapTab() {
           >
             <span className="flex items-center gap-2">
               <Zap className="w-4 h-4" />
-              In Progress ({data.in_progress.length})
+              In Progress ({Object.values(data.in_progress).flat().length})
             </span>
           </button>
           <button
@@ -215,17 +228,17 @@ export default function RoadmapTab() {
           >
             <span className="flex items-center gap-2">
               <Clock className="w-4 h-4" />
-              On Radar ({data.open.length})
+              On Radar ({Object.values(data.open).flat().length})
             </span>
           </button>
         </div>
       </div>
 
-      {/* Ticket List */}
+      {/* Ticket List grouped by Theme */}
       <div>
-        {activeStatus === 'resolved' && renderTickets(data.resolved)}
-        {activeStatus === 'in_progress' && renderTickets(data.in_progress)}
-        {activeStatus === 'open' && renderTickets(data.open)}
+        {activeStatus === 'resolved' && renderGroupedTickets(data.resolved)}
+        {activeStatus === 'in_progress' && renderGroupedTickets(data.in_progress)}
+        {activeStatus === 'open' && renderGroupedTickets(data.open)}
       </div>
     </div>
   );
