@@ -442,40 +442,35 @@ export async function POST(request: NextRequest) {
         if (clientNames.length > 0) {
           console.log(`${issue.jira_key} has Client(s) field (${clientNames.length}): ${clientNames.join(', ')}`);
 
+          // Determine product from Jira project key (e.g., "EDGE" from "EDGE-4731")
+          const projectCode = issue.jira_key.split('-')[0].toUpperCase();
+          const isEdgeTicket = projectCode === 'EDGE';
+          const isSiteLinkTicket = projectCode === 'SLINK' || projectCode === 'SL';
+
           // Match each client name against accounts
           for (const clientName of clientNames) {
             const clientNameLower = clientName.toLowerCase();
 
-            // Try exact matches first
-            let matchingAccounts = accounts?.filter(acc => {
+            // ONLY do exact match - no fuzzy matching to prevent false positives
+            const matchingAccounts = accounts?.filter(acc => {
               const accNameLower = acc.name.toLowerCase();
-              return accNameLower === clientNameLower;
-            });
 
-            // If no exact match, try partial matching with significant words (>3 chars)
-            if (!matchingAccounts || matchingAccounts.length === 0) {
-              const clientWords = clientNameLower
-                .split(/[\s-]+/) // Split by space or hyphen
-                .filter((word: string) => word.length > 3); // Only significant words
+              // Must match name exactly
+              if (accNameLower !== clientNameLower) return false;
 
-              matchingAccounts = accounts?.filter(acc => {
-                const accNameLower = acc.name.toLowerCase();
-
-                // Match if ALL significant words from client name appear in account name
-                return clientWords.length > 0 && clientWords.every((word: string) => accNameLower.includes(word));
-              });
-
-              // If still no match, try reverse: does account name appear in client name?
-              if (!matchingAccounts || matchingAccounts.length === 0) {
-                matchingAccounts = accounts?.filter(acc => {
-                  const accWords = acc.name.toLowerCase()
-                    .split(/[\s-]+/)
-                    .filter((word: string) => word.length > 3);
-
-                  return accWords.length > 0 && accWords.every((word: string) => clientNameLower.includes(word));
-                });
+              // Product validation: EDGE tickets should only link to EDGE accounts
+              const accountProducts = (acc.products || '').toLowerCase();
+              if (isEdgeTicket && !accountProducts.includes('edge')) {
+                console.log(`  ✗ Product mismatch: ${projectCode} ticket cannot link to ${acc.name} (products: ${acc.products})`);
+                return false;
               }
-            }
+              if (isSiteLinkTicket && !accountProducts.includes('sitelink')) {
+                console.log(`  ✗ Product mismatch: ${projectCode} ticket cannot link to ${acc.name} (products: ${acc.products})`);
+                return false;
+              }
+
+              return true;
+            });
 
             if (matchingAccounts && matchingAccounts.length > 0) {
               for (const account of matchingAccounts) {
@@ -486,10 +481,10 @@ export async function POST(request: NextRequest) {
                   match_type: 'client_field',
                   match_confidence: 0.95 // Very high confidence - explicit metadata
                 });
-                console.log(`  ✓ Matched "${clientName}" → ${account.name}`);
+                console.log(`  ✓ Matched "${clientName}" → ${account.name} (${projectCode} ticket)`);
               }
             } else {
-              console.log(`  ✗ No account match for client "${clientName}"`);
+              console.log(`  ✗ No exact account match for client "${clientName}" (${projectCode} ticket)`);
             }
           }
         }
