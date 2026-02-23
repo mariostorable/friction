@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
     const portfolioFilter = searchParams.get('portfolio') || 'all';
     const productFilter = searchParams.get('product') || 'all';
     const statusFilter = searchParams.get('status') || 'all';
+    const priorityFilter = searchParams.get('priority') || 'all';
     const dateRangeDays = parseInt(searchParams.get('dateRangeDays') || '30');
 
     // Calculate date threshold for resolved issues
@@ -184,6 +185,16 @@ export async function GET(request: NextRequest) {
         const open: any[] = [];
 
         entry.issues.forEach(issue => {
+          // Apply priority filter
+          const priorityLower = issue.priority?.toLowerCase() || '';
+          const matchesPriority = priorityFilter === 'all' ||
+            (priorityFilter === 'highest' && (priorityLower.includes('highest') || priorityLower.includes('critical'))) ||
+            (priorityFilter === 'high' && priorityLower.includes('high') && !priorityLower.includes('highest')) ||
+            (priorityFilter === 'medium' && priorityLower.includes('medium')) ||
+            (priorityFilter === 'low' && priorityLower.includes('low'));
+
+          if (!matchesPriority) return; // Skip if doesn't match priority filter
+
           if (issue.resolution_date) {
             const resolvedDate = new Date(issue.resolution_date);
             const statusLower = issue.status?.toLowerCase() || '';
@@ -209,6 +220,21 @@ export async function GET(request: NextRequest) {
           }
         });
 
+        // Calculate "new this week" - tickets updated in last 7 days
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const resolved_new = resolved.filter(issue => {
+          const updatedDate = new Date(issue.updated_date || issue.resolution_date);
+          return updatedDate >= sevenDaysAgo;
+        });
+        const in_progress_new = in_progress.filter(issue => {
+          const updatedDate = new Date(issue.updated_date);
+          return updatedDate >= sevenDaysAgo;
+        });
+        const open_new = open.filter(issue => {
+          const updatedDate = new Date(issue.updated_date);
+          return updatedDate >= sevenDaysAgo;
+        });
+
         return {
           account_id: entry.account.id,
           account_name: entry.account.name,
@@ -216,6 +242,9 @@ export async function GET(request: NextRequest) {
           resolved_count: resolved.length,
           in_progress_count: in_progress.length,
           open_count: open.length,
+          resolved_new_count: resolved_new.length,
+          in_progress_new_count: in_progress_new.length,
+          open_new_count: open_new.length,
           resolved,
           in_progress,
           open

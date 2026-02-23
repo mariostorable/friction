@@ -24,6 +24,9 @@ interface AccountSummary {
   resolved_count: number;
   in_progress_count: number;
   open_count: number;
+  resolved_new_count: number;
+  in_progress_new_count: number;
+  open_new_count: number;
   resolved: JiraIssue[];
   in_progress: JiraIssue[];
   open: JiraIssue[];
@@ -42,6 +45,7 @@ export default function AccountRoadmapView() {
   const [portfolioFilter, setPortfolioFilter] = useState<'all' | 'top_25_edge' | 'top_25_sitelink' | 'top_25_marine'>('all');
   const [productFilter, setProductFilter] = useState<'all' | 'edge' | 'sitelink' | 'other'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'resolved' | 'closed'>('all');
+  const [priorityFilter, setPriorityFilter] = useState<'all' | 'highest' | 'high' | 'medium' | 'low'>('all');
   const [dateRangeDays, setDateRangeDays] = useState(30);
 
   const supabase = createClientComponentClient();
@@ -54,7 +58,7 @@ export default function AccountRoadmapView() {
   // Refetch when filters change
   useEffect(() => {
     fetchAccountRoadmap();
-  }, [selectedAccountIds, portfolioFilter, productFilter, statusFilter, dateRangeDays]);
+  }, [selectedAccountIds, portfolioFilter, productFilter, statusFilter, priorityFilter, dateRangeDays]);
 
   async function fetchAllAccountsForFilter() {
     try {
@@ -90,6 +94,9 @@ export default function AccountRoadmapView() {
       if (statusFilter !== 'all') {
         params.set('status', statusFilter);
       }
+      if (priorityFilter !== 'all') {
+        params.set('priority', priorityFilter);
+      }
       params.set('dateRangeDays', dateRangeDays.toString());
 
       const response = await fetch(`/api/jira/roadmap-by-account?${params.toString()}`);
@@ -109,6 +116,7 @@ export default function AccountRoadmapView() {
     setPortfolioFilter('all');
     setProductFilter('all');
     setStatusFilter('all');
+    setPriorityFilter('all');
     setDateRangeDays(30);
   };
 
@@ -254,11 +262,13 @@ export default function AccountRoadmapView() {
         portfolioFilter={portfolioFilter}
         productFilter={productFilter}
         statusFilter={statusFilter}
+        priorityFilter={priorityFilter}
         dateRangeDays={dateRangeDays}
         onAccountsChange={setSelectedAccountIds}
         onPortfolioChange={setPortfolioFilter}
         onProductChange={setProductFilter}
         onStatusChange={setStatusFilter}
+        onPriorityChange={setPriorityFilter}
         onDateRangeChange={setDateRangeDays}
       />
 
@@ -271,7 +281,7 @@ export default function AccountRoadmapView() {
             {productFilter !== 'all' && ` with ${productFilter.toUpperCase()} products`}
             {selectedAccountIds.length > 0 && ` (${selectedAccountIds.length} selected)`}
           </div>
-          {(selectedAccountIds.length > 0 || portfolioFilter !== 'all' || productFilter !== 'all' || statusFilter !== 'all' || dateRangeDays !== 30) && (
+          {(selectedAccountIds.length > 0 || portfolioFilter !== 'all' || productFilter !== 'all' || statusFilter !== 'all' || priorityFilter !== 'all' || dateRangeDays !== 30) && (
             <button
               onClick={clearFilters}
               className="text-sm text-purple-600 hover:text-purple-800 font-medium"
@@ -312,18 +322,27 @@ export default function AccountRoadmapView() {
                     <div className="flex items-center gap-1 px-2 py-1 bg-green-50 rounded">
                       <CheckCircle2 className="w-4 h-4 text-green-600" />
                       <span className="text-sm font-medium text-green-700">{account.resolved_count}</span>
+                      {account.resolved_new_count > 0 && (
+                        <span className="text-xs text-green-600 ml-0.5">🔥{account.resolved_new_count}</span>
+                      )}
                     </div>
                   )}
                   {account.in_progress_count > 0 && (
                     <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 rounded">
                       <Zap className="w-4 h-4 text-blue-600" />
                       <span className="text-sm font-medium text-blue-700">{account.in_progress_count}</span>
+                      {account.in_progress_new_count > 0 && (
+                        <span className="text-xs text-blue-600 ml-0.5">🔥{account.in_progress_new_count}</span>
+                      )}
                     </div>
                   )}
                   {account.open_count > 0 && (
                     <div className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded">
                       <Clock className="w-4 h-4 text-gray-600" />
                       <span className="text-sm font-medium text-gray-700">{account.open_count}</span>
+                      {account.open_new_count > 0 && (
+                        <span className="text-xs text-gray-600 ml-0.5">🔥{account.open_new_count}</span>
+                      )}
                     </div>
                   )}
                 </div>

@@ -8,11 +8,13 @@ interface RoadmapFiltersProps {
   portfolioFilter: 'all' | 'top_25_edge' | 'top_25_sitelink' | 'top_25_marine';
   productFilter: 'all' | 'edge' | 'sitelink' | 'other';
   statusFilter: 'all' | 'resolved' | 'closed';
+  priorityFilter: 'all' | 'highest' | 'high' | 'medium' | 'low';
   dateRangeDays: number;
   onAccountsChange: (ids: string[]) => void;
   onPortfolioChange: (portfolio: 'all' | 'top_25_edge' | 'top_25_sitelink' | 'top_25_marine') => void;
   onProductChange: (product: 'all' | 'edge' | 'sitelink' | 'other') => void;
   onStatusChange: (status: 'all' | 'resolved' | 'closed') => void;
+  onPriorityChange: (priority: 'all' | 'highest' | 'high' | 'medium' | 'low') => void;
   onDateRangeChange: (days: number) => void;
 }
 
@@ -22,11 +24,13 @@ export default function RoadmapFilters({
   portfolioFilter,
   productFilter,
   statusFilter,
+  priorityFilter,
   dateRangeDays,
   onAccountsChange,
   onPortfolioChange,
   onProductChange,
   onStatusChange,
+  onPriorityChange,
   onDateRangeChange
 }: RoadmapFiltersProps) {
 
@@ -41,6 +45,15 @@ export default function RoadmapFilters({
 
   const getDateRangeButtonClass = (days: number) => {
     const isActive = dateRangeDays === days;
+    return `px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+      isActive
+        ? 'bg-purple-600 text-white'
+        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+    }`;
+  };
+
+  const getPriorityButtonClass = (value: string) => {
+    const isActive = priorityFilter === value;
     return `px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
       isActive
         ? 'bg-purple-600 text-white'
@@ -77,6 +90,43 @@ export default function RoadmapFilters({
             className={getPortfolioButtonClass('top_25_marine')}
           >
             Top 25 Marine
+          </button>
+        </div>
+      </div>
+
+      {/* Priority Quick Filters */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <label className="text-sm font-medium text-gray-700 min-w-max">Priority:</label>
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => onPriorityChange('all')}
+            className={getPriorityButtonClass('all')}
+          >
+            All
+          </button>
+          <button
+            onClick={() => onPriorityChange('highest')}
+            className={getPriorityButtonClass('highest')}
+          >
+            Highest
+          </button>
+          <button
+            onClick={() => onPriorityChange('high')}
+            className={getPriorityButtonClass('high')}
+          >
+            High
+          </button>
+          <button
+            onClick={() => onPriorityChange('medium')}
+            className={getPriorityButtonClass('medium')}
+          >
+            Medium
+          </button>
+          <button
+            onClick={() => onPriorityChange('low')}
+            className={getPriorityButtonClass('low')}
+          >
+            Low
           </button>
         </div>
       </div>
