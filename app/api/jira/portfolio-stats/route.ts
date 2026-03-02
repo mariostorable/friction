@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     if (!allThemes || allThemes.length === 0) {
       return NextResponse.json({
-        portfolio: { resolved_7d: 0, resolved_90d: 0, in_progress: 0, open: 0 },
+        portfolio: { resolved_60d: 0, resolved_120d: 0, in_progress: 0, open: 0 },
         topThemes: [],
         accountsByIssue: [],
         accountTicketCounts: {}
@@ -82,11 +82,11 @@ export async function GET(request: NextRequest) {
 
     // Aggregate portfolio-level stats
     const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+    const oneHundredTwentyDaysAgo = new Date(now.getTime() - 120 * 24 * 60 * 60 * 1000);
 
-    let resolved_7d = 0;
-    let resolved_90d = 0;
+    let resolved_60d = 0;
+    let resolved_120d = 0;
     let in_progress = 0;
     let open_count = 0;
 
@@ -103,8 +103,8 @@ export async function GET(request: NextRequest) {
 
       if (issue.resolution_date) {
         const resolvedDate = new Date(issue.resolution_date);
-        if (resolvedDate >= sevenDaysAgo) resolved_7d++;
-        if (resolvedDate >= ninetyDaysAgo) resolved_90d++;
+        if (resolvedDate >= sixtyDaysAgo) resolved_60d++;
+        if (resolvedDate >= oneHundredTwentyDaysAgo) resolved_120d++;
       } else {
         const statusLower = issue.status?.toLowerCase() || '';
         if (statusLower.includes('progress') || statusLower.includes('development') || statusLower.includes('review')) {
@@ -203,11 +203,11 @@ export async function GET(request: NextRequest) {
       .in('account_id', accountIds)
       .eq('user_id', user.id);
 
-    const accountTicketCounts: Record<string, { resolved_90d: number; in_progress: number; open: number }> = {};
+    const accountTicketCounts: Record<string, { resolved_120d: number; in_progress: number; open: number }> = {};
 
     // Initialize all accounts with zero counts
     accountIds.forEach(accountId => {
-      accountTicketCounts[accountId] = { resolved_90d: 0, in_progress: 0, open: 0 };
+      accountTicketCounts[accountId] = { resolved_120d: 0, in_progress: 0, open: 0 };
     });
 
     // Group links by account and deduplicate tickets by ID
@@ -231,8 +231,8 @@ export async function GET(request: NextRequest) {
       ticketsMap.forEach((ticket) => {
         if (ticket.resolution_date) {
           const resolvedDate = new Date(ticket.resolution_date);
-          if (resolvedDate >= ninetyDaysAgo) {
-            accountTicketCounts[accountId].resolved_90d++;
+          if (resolvedDate >= oneHundredTwentyDaysAgo) {
+            accountTicketCounts[accountId].resolved_120d++;
           }
         } else {
           const statusLower = ticket.status?.toLowerCase() || '';
@@ -247,8 +247,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       portfolio: {
-        resolved_7d,
-        resolved_90d,
+        resolved_60d,
+        resolved_120d,
         in_progress,
         open: open_count
       },

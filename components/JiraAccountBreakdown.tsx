@@ -8,7 +8,7 @@ interface AccountTicketData {
   accountId: string;
   accountName: string;
   arr: number;
-  resolved_30d: number;
+  resolved_60d: number;
   in_progress: number;
   open: number;
   total: number;
@@ -132,13 +132,13 @@ export default function JiraAccountBreakdown({ businessUnit = 'all' }: JiraAccou
                 <div className="flex-1 flex items-center gap-2">
                   {/* Bar segments */}
                   <div className="flex-1 flex items-center h-8 bg-gray-100 rounded-lg overflow-hidden">
-                    {account.resolved_30d > 0 && (
+                    {account.resolved_60d > 0 && (
                       <div
                         className="h-full bg-green-500 flex items-center justify-center text-xs font-medium text-white"
-                        style={{ width: `${(account.resolved_30d / maxTotal) * 100}%` }}
-                        title={`${account.resolved_30d} resolved (30d)`}
+                        style={{ width: `${(account.resolved_60d / maxTotal) * 100}%` }}
+                        title={`${account.resolved_60d} resolved (60d)`}
                       >
-                        {account.resolved_30d}
+                        {account.resolved_60d}
                       </div>
                     )}
                     {account.in_progress > 0 && (

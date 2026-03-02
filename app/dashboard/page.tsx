@@ -39,7 +39,7 @@ export default function Dashboard() {
   const [checkingConnection, setCheckingConnection] = useState(true);
   const [hoveredColumn, setHoveredColumn] = useState<string | null>(null);
   const [hoveredCaseIcon, setHoveredCaseIcon] = useState<string | null>(null);
-  const [jiraTicketCounts, setJiraTicketCounts] = useState<Record<string, { resolved_90d: number; in_progress: number; open: number }>>({});
+  const [jiraTicketCounts, setJiraTicketCounts] = useState<Record<string, { resolved_120d: number; in_progress: number; open: number }>>({});
   const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<{ title: string; message: string; details?: string } | null>(null);
@@ -1221,8 +1221,8 @@ export default function Dashboard() {
                         <td className="px-2 py-2 whitespace-nowrap text-xs">
                           {jiraTicketCounts[account.id] ? (
                             <div className="flex items-center gap-1">
-                              <span className="text-green-700 font-medium" title="Resolved (90 days)">
-                                {jiraTicketCounts[account.id].resolved_90d}
+                              <span className="text-green-700 font-medium" title="Resolved (120 days)">
+                                {jiraTicketCounts[account.id].resolved_120d}
                               </span>
                               <span className="text-gray-300">/</span>
                               <span className="text-blue-700 font-medium" title="In Progress">

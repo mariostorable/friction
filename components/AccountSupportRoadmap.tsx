@@ -35,8 +35,8 @@ interface JiraStatusData {
   shouldPrioritize: ThemeToPrioritize[];
   comingSoon: JiraIssue[];
   summary: {
-    resolved_30d: number;
-    resolved_90d: number;
+    resolved_60d: number;
+    resolved_120d: number;
     open_count: number;
     in_progress: number;
     needs_ticket: number;
@@ -160,9 +160,9 @@ export default function AccountSupportRoadmap({ accountId }: { accountId: string
         >
           <div className="flex items-center gap-2 mb-1">
             <CheckCircle2 className="w-4 h-4 text-green-600" />
-            <span className="text-xs font-medium text-green-700">Resolved (30d)</span>
+            <span className="text-xs font-medium text-green-700">Resolved (60d)</span>
           </div>
-          <div className="text-2xl font-bold text-green-900">{data.summary.resolved_30d}</div>
+          <div className="text-2xl font-bold text-green-900">{data.summary.resolved_60d}</div>
           <div className="text-xs text-green-600 mt-1">Click to view →</div>
         </button>
 
