@@ -12,6 +12,20 @@ interface VisitBriefingProps {
   snapshot: AccountSnapshot | null;
 }
 
+interface JiraDiscussionItem {
+  jira_key: string;
+  summary: string;
+  talk_track: string;
+  resolved_days_ago?: number;
+  status?: string;
+}
+
+interface JiraDiscussionGap {
+  theme: string;
+  case_count: number;
+  talk_track: string;
+}
+
 interface BriefingData {
   account_name: string;
   visit_date: string;
@@ -27,6 +41,12 @@ interface BriefingData {
   }>;
   talking_points: string[];
   wins: string[];
+  jira_discussion_items?: {
+    resolved_wins: JiraDiscussionItem[];
+    coming_soon: JiraDiscussionItem[];
+    still_open: JiraDiscussionItem[];
+    gaps: JiraDiscussionGap[];
+  };
   detailed_analysis?: any;
 }
 
@@ -489,6 +509,133 @@ export default function VisitBriefing({ account, frictionCards, snapshot }: Visi
                       </li>
                     ))}
                   </ul>
+                </div>
+              )}
+
+              {briefing.jira_discussion_items && (
+                (briefing.jira_discussion_items.resolved_wins?.length > 0 ||
+                 briefing.jira_discussion_items.coming_soon?.length > 0 ||
+                 briefing.jira_discussion_items.still_open?.length > 0 ||
+                 briefing.jira_discussion_items.gaps?.length > 0)
+              ) && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">🗺️ Roadmap Discussion Guide</h3>
+                  <div className="space-y-3">
+
+                    {briefing.jira_discussion_items!.resolved_wins?.length > 0 && (
+                      <div className="border border-green-200 rounded-lg overflow-hidden">
+                        <div className="bg-green-50 px-4 py-2 border-b border-green-200">
+                          <p className="text-sm font-semibold text-green-800">✅ Wins to Lead With — Already Fixed</p>
+                          <p className="text-xs text-green-600 mt-0.5">Use these to show you delivered on their pain</p>
+                        </div>
+                        <div className="divide-y divide-green-100">
+                          {briefing.jira_discussion_items!.resolved_wins.map((item, idx) => (
+                            <div key={idx} className="px-4 py-3">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <a
+                                      href={`https://storable.atlassian.net/browse/${item.jira_key}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs font-mono font-semibold text-green-700 hover:underline"
+                                    >
+                                      {item.jira_key}
+                                    </a>
+                                    {item.resolved_days_ago !== undefined && (
+                                      <span className="text-xs text-gray-500">{item.resolved_days_ago}d ago</span>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-gray-800 mt-0.5">{item.summary}</p>
+                                  <p className="text-xs text-green-700 mt-1 italic">"{item.talk_track}"</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {briefing.jira_discussion_items!.coming_soon?.length > 0 && (
+                      <div className="border border-blue-200 rounded-lg overflow-hidden">
+                        <div className="bg-blue-50 px-4 py-2 border-b border-blue-200">
+                          <p className="text-sm font-semibold text-blue-800">🔨 Coming Soon — In Development</p>
+                          <p className="text-xs text-blue-600 mt-0.5">Share these as proof you're actively working on their issues</p>
+                        </div>
+                        <div className="divide-y divide-blue-100">
+                          {briefing.jira_discussion_items!.coming_soon.map((item, idx) => (
+                            <div key={idx} className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <a
+                                  href={`https://storable.atlassian.net/browse/${item.jira_key}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs font-mono font-semibold text-blue-700 hover:underline"
+                                >
+                                  {item.jira_key}
+                                </a>
+                                {item.status && (
+                                  <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">{item.status}</span>
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-800 mt-0.5">{item.summary}</p>
+                              <p className="text-xs text-blue-700 mt-1 italic">"{item.talk_track}"</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {briefing.jira_discussion_items!.still_open?.length > 0 && (
+                      <div className="border border-yellow-200 rounded-lg overflow-hidden">
+                        <div className="bg-yellow-50 px-4 py-2 border-b border-yellow-200">
+                          <p className="text-sm font-semibold text-yellow-800">⏳ Still Open — Check In on These</p>
+                          <p className="text-xs text-yellow-700 mt-0.5">Acknowledge these are on the radar, get their feedback on priority</p>
+                        </div>
+                        <div className="divide-y divide-yellow-100">
+                          {briefing.jira_discussion_items!.still_open.map((item, idx) => (
+                            <div key={idx} className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <a
+                                  href={`https://storable.atlassian.net/browse/${item.jira_key}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs font-mono font-semibold text-yellow-800 hover:underline"
+                                >
+                                  {item.jira_key}
+                                </a>
+                              </div>
+                              <p className="text-sm text-gray-800 mt-0.5">{item.summary}</p>
+                              <p className="text-xs text-yellow-700 mt-1 italic">"{item.talk_track}"</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {briefing.jira_discussion_items!.gaps?.length > 0 && (
+                      <div className="border border-red-200 rounded-lg overflow-hidden">
+                        <div className="bg-red-50 px-4 py-2 border-b border-red-200">
+                          <p className="text-sm font-semibold text-red-800">🚨 Gaps — No Ticket Yet</p>
+                          <p className="text-xs text-red-600 mt-0.5">Commit to taking these back to the product team</p>
+                        </div>
+                        <div className="divide-y divide-red-100">
+                          {briefing.jira_discussion_items!.gaps.map((item, idx) => (
+                            <div key={idx} className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-red-700 capitalize">
+                                  {item.theme.replace(/_/g, ' ')}
+                                </span>
+                                <span className="text-xs text-gray-500">{item.case_count} case{item.case_count !== 1 ? 's' : ''}</span>
+                              </div>
+                              <p className="text-xs text-red-700 mt-1 italic">"{item.talk_track}"</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
                 </div>
               )}
 

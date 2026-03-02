@@ -167,12 +167,17 @@ ${recentlyResolved?.slice(0, 3).map((issue: any) =>
 ).join('\n') || 'None recently'}
 
 COMING SOON (In Development):
-${comingSoon?.slice(0, 3).map((issue: any) =>
+${comingSoon?.slice(0, 5).map((issue: any) =>
   `- ${issue.jira_key}: ${issue.summary} (Status: ${issue.status})`
 ).join('\n') || 'None'}
 
-SHOULD PRIORITIZE (High friction, no ticket):
-${shouldPrioritize?.slice(0, 3).map((theme: any) =>
+STILL OPEN (On Radar - not yet resolved):
+${jiraStatus?.onRadar?.slice(0, 5).map((issue: any) =>
+  `- ${issue.jira_key}: ${issue.summary} (Priority: ${issue.priority || 'Unknown'})`
+).join('\n') || 'None'}
+
+SHOULD PRIORITIZE (High friction, no ticket yet):
+${shouldPrioritize?.slice(0, 5).map((theme: any) =>
   `- ${theme.theme_key}: ${theme.case_count} cases, impact score ${Math.round(theme.weight)}`
 ).join('\n') || 'All covered'}`;
   }
@@ -270,7 +275,47 @@ Generate a JSON object for a QUICK customer visit briefing (2-3 minute read):
     "Positive trend in Vitally health/NPS or declining OFI score",
     "Specific case resolution or improved response time"
     // 2-3 wins - prioritize recently resolved Jira tickets that fix their issues
-  ]
+  ],
+  "jira_discussion_items": {
+    "resolved_wins": [
+      // Tickets RESOLVED for this account - lead with these as proof of responsiveness
+      // Pull from QUICK WINS TO REFERENCE section above
+      {
+        "jira_key": "EDGE-1234",
+        "summary": "Brief description of what was fixed",
+        "talk_track": "One sentence on how to position this fix to the customer",
+        "resolved_days_ago": 14
+      }
+    ],
+    "coming_soon": [
+      // IN DEVELOPMENT tickets relevant to this account's friction themes
+      // Pull from COMING SOON section above
+      {
+        "jira_key": "EDGE-5678",
+        "summary": "Brief description of what's being built",
+        "status": "In Progress",
+        "talk_track": "One sentence on how to position this upcoming fix to the customer"
+      }
+    ],
+    "still_open": [
+      // ON RADAR / open tickets tied to their friction - check in on these
+      // Use onRadar tickets from the Jira data
+      {
+        "jira_key": "EDGE-9012",
+        "summary": "Brief description of open issue",
+        "talk_track": "Acknowledge this is still open, explain priority/timeline if known"
+      }
+    ],
+    "gaps": [
+      // High-friction themes with NO Jira ticket yet - raise with product team
+      // Pull from SHOULD PRIORITIZE section above
+      {
+        "theme": "Theme name",
+        "case_count": 3,
+        "talk_track": "Frame this as something you'll personally take back to the product team"
+      }
+    ]
+  }
 }
 
 Be specific with dates, numbers, and concrete details. Focus on what's most actionable for the visit.`;
