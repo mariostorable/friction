@@ -96,8 +96,8 @@ export async function GET(
         shouldPrioritize,
         comingSoon: [],
         summary: {
-          resolved_30d: 0,
-          resolved_90d: 0,
+          resolved_60d: 0,
+          resolved_120d: 0,
           open_count: 0,
           in_progress: 0,
           needs_ticket: shouldPrioritize.length
@@ -137,9 +137,9 @@ export async function GET(
 
     // 3. Categorize issues
     const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+    const oneHundredTwentyDaysAgo = new Date(now.getTime() - 120 * 24 * 60 * 60 * 1000);
 
     const recentlyResolved: any[] = [];
     const onRadar: any[] = [];
@@ -163,17 +163,17 @@ export async function GET(
       if (issue.resolution_date) {
         const resolvedDate = new Date(issue.resolution_date);
 
-        if (resolvedDate >= sevenDaysAgo) {
-          issueData.resolved_days_ago = Math.floor((now.getTime() - resolvedDate.getTime()) / (24 * 60 * 60 * 1000));
-          issueData.time_period = '7d';
-          recentlyResolved.push(issueData);
-        } else if (resolvedDate >= thirtyDaysAgo) {
+        if (resolvedDate >= thirtyDaysAgo) {
           issueData.resolved_days_ago = Math.floor((now.getTime() - resolvedDate.getTime()) / (24 * 60 * 60 * 1000));
           issueData.time_period = '30d';
           recentlyResolved.push(issueData);
-        } else if (resolvedDate >= ninetyDaysAgo) {
+        } else if (resolvedDate >= sixtyDaysAgo) {
           issueData.resolved_days_ago = Math.floor((now.getTime() - resolvedDate.getTime()) / (24 * 60 * 60 * 1000));
-          issueData.time_period = '90d';
+          issueData.time_period = '60d';
+          recentlyResolved.push(issueData);
+        } else if (resolvedDate >= oneHundredTwentyDaysAgo) {
+          issueData.resolved_days_ago = Math.floor((now.getTime() - resolvedDate.getTime()) / (24 * 60 * 60 * 1000));
+          issueData.time_period = '120d';
           recentlyResolved.push(issueData);
         }
       } else {
@@ -209,7 +209,7 @@ export async function GET(
     recentlyResolved.sort((a, b) => {
       // First by time period, then by theme weight
       if (a.time_period !== b.time_period) {
-        const order = { '7d': 0, '30d': 1, '90d': 2 };
+        const order = { '30d': 0, '60d': 1, '120d': 2 };
         return order[a.time_period as keyof typeof order] - order[b.time_period as keyof typeof order];
       }
       return b.theme_weight - a.theme_weight;
@@ -225,8 +225,8 @@ export async function GET(
       comingSoon: comingSoon.slice(0, 10),
       themeStats: themeWeights,
       summary: {
-        resolved_30d: recentlyResolved.filter(i => i.time_period === '30d' || i.time_period === '7d').length,
-        resolved_90d: recentlyResolved.length,
+        resolved_60d: recentlyResolved.filter(i => i.time_period === '30d' || i.time_period === '60d').length,
+        resolved_120d: recentlyResolved.length,
         open_count: onRadar.length + comingSoon.length,
         in_progress: comingSoon.length,
         needs_ticket: themesWithoutTickets.length
