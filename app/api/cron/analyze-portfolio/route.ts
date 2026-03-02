@@ -34,6 +34,12 @@ async function callAnthropicWithRetry(url: string, options: RequestInit, maxRetr
 export async function GET(request: NextRequest) {
   console.log('=== Analyze Portfolio Endpoint Called ===');
 
+  // ?recalculate=true skips the "already analyzed today" check to force re-scoring
+  const recalculate = request.nextUrl.searchParams.get('recalculate') === 'true';
+  if (recalculate) {
+    console.log('RECALCULATE mode: will overwrite existing snapshots from today');
+  }
+
   // TEMPORARILY DISABLED: Verify cron secret
   const authHeader = request.headers.get('authorization');
   console.log('Auth header present:', !!authHeader);
@@ -112,15 +118,23 @@ export async function GET(request: NextRequest) {
             .maybeSingle();
 
           if (existingSnapshot) {
-            console.log(`Skipping ${account.name} - already analyzed today (OFI: ${existingSnapshot.ofi_score})`);
-            results.push({
-              accountId,
-              account: account.name,
-              status: 'skipped',
-              ofi: existingSnapshot.ofi_score,
-              reason: 'Already analyzed today'
-            });
-            continue;
+            if (!recalculate) {
+              console.log(`Skipping ${account.name} - already analyzed today (OFI: ${existingSnapshot.ofi_score})`);
+              results.push({
+                accountId,
+                account: account.name,
+                status: 'skipped',
+                ofi: existingSnapshot.ofi_score,
+                reason: 'Already analyzed today'
+              });
+              continue;
+            }
+            // In recalculate mode: delete today's snapshot so we can replace it
+            console.log(`Recalculate mode: deleting existing snapshot for ${account.name} (OFI: ${existingSnapshot.ofi_score})`);
+            await supabase
+              .from('account_snapshots')
+              .delete()
+              .eq('id', existingSnapshot.id);
           }
 
           // Stop after analyzing MAX_ANALYSES_PER_RUN accounts to avoid timeout
@@ -242,11 +256,13 @@ export async function GET(request: NextRequest) {
           console.log(`Account has ${existingCaseIds.size} existing analyzed cases`);
 
           if (!casesData.records || casesData.records.length === 0) {
-            // Get previous snapshot to calculate trend (even for zero cases)
+            // Get yesterday's snapshot for trend comparison
+            const todayDateStr = new Date().toISOString().split('T')[0];
             const { data: previousSnapshot } = await supabase
               .from('account_snapshots')
               .select('ofi_score')
               .eq('account_id', accountId)
+              .lt('snapshot_date', todayDateStr)
               .order('snapshot_date', { ascending: false })
               .limit(1)
               .maybeSingle();
@@ -256,9 +272,9 @@ export async function GET(request: NextRequest) {
 
             if (previousSnapshot && previousSnapshot.ofi_score !== null) {
               trendVsPriorPeriod = 0 - previousSnapshot.ofi_score;
-              if (trendVsPriorPeriod < -5) {
+              if (trendVsPriorPeriod < -3) {
                 trendDirection = 'improving'; // Was higher, now 0 = improving
-              } else if (Math.abs(trendVsPriorPeriod) <= 5) {
+              } else if (Math.abs(trendVsPriorPeriod) <= 3) {
                 trendDirection = 'stable';
               }
             }
@@ -300,22 +316,26 @@ export async function GET(request: NextRequest) {
           console.log(`${newCases.length} new cases to analyze (${existingCaseIds.size} already analyzed)`);
 
           if (newCases.length === 0) {
-            // No new cases, but recalculate OFI from existing cards
+            // No new cases, but recalculate OFI from existing cards (90-day window)
             console.log(`No new cases for ${account.name}, recalculating OFI from existing cards...`);
 
-            // Get ALL friction cards for this account
+            const ninetyDaysAgoStr = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+            // Get friction cards from last 90 days only (windowed so scores can decrease)
             const { data: existingCards } = await supabase
               .from('friction_cards')
               .select('*')
               .eq('account_id', accountId)
-              .eq('is_friction', true);
+              .eq('is_friction', true)
+              .gte('created_at', ninetyDaysAgoStr);
 
             if (!existingCards || existingCards.length === 0) {
               // No cards at all, create OFI 0 snapshot
+              const todayDateStr2 = new Date().toISOString().split('T')[0];
               const { data: previousSnapshot } = await supabase
                 .from('account_snapshots')
                 .select('ofi_score')
                 .eq('account_id', accountId)
+                .lt('snapshot_date', todayDateStr2)
                 .order('snapshot_date', { ascending: false })
                 .limit(1)
                 .maybeSingle();
@@ -325,9 +345,9 @@ export async function GET(request: NextRequest) {
 
               if (previousSnapshot && previousSnapshot.ofi_score !== null) {
                 trendVsPriorPeriod = 0 - previousSnapshot.ofi_score;
-                if (trendVsPriorPeriod < -5) {
+                if (trendVsPriorPeriod < -3) {
                   trendDirection = 'improving';
-                } else if (Math.abs(trendVsPriorPeriod) <= 5) {
+                } else if (Math.abs(trendVsPriorPeriod) <= 3) {
                   trendDirection = 'stable';
                 }
               }
@@ -358,15 +378,15 @@ export async function GET(request: NextRequest) {
               continue;
             }
 
-            // Calculate OFI from existing cards
+            // Calculate OFI from 90-day windowed cards - gentler weights for better distribution
             const highSeverityCount = existingCards.filter(c => c.severity >= 4).length;
-            const severityWeights: any = { 1: 1, 2: 2, 3: 4, 4: 8, 5: 16 };
+            const severityWeights: any = { 1: 1, 2: 2, 3: 3, 4: 5, 5: 8 };
             const weightedScore = existingCards.reduce((sum, card) => sum + (severityWeights[card.severity] || 1), 0);
             const totalCases = casesData.records.length || 1;
             const frictionDensity = (existingCards.length / totalCases) * 100;
-            const baseScore = Math.log10(weightedScore + 1) * 20;
-            const densityMultiplier = Math.min(2, Math.max(0.5, frictionDensity / 5));
-            const highSeverityBoost = Math.min(20, highSeverityCount * 2);
+            const baseScore = Math.log10(weightedScore + 1) * 15;
+            const densityMultiplier = Math.min(1.5, Math.max(0.5, frictionDensity / 5));
+            const highSeverityBoost = Math.min(15, highSeverityCount * 1.5);
             let ofiScore = Math.round(baseScore * densityMultiplier + highSeverityBoost);
             ofiScore = Math.min(100, Math.max(0, ofiScore));
 
@@ -388,11 +408,13 @@ export async function GET(request: NextRequest) {
               .sort((a, b) => b.count - a.count)
               .slice(0, 5);
 
-            // Get previous snapshot for trend
+            // Get yesterday's snapshot for trend comparison
+            const todayStr = new Date().toISOString().split('T')[0];
             const { data: previousSnapshot } = await supabase
               .from('account_snapshots')
               .select('ofi_score')
               .eq('account_id', accountId)
+              .lt('snapshot_date', todayStr)
               .order('snapshot_date', { ascending: false })
               .limit(1)
               .maybeSingle();
@@ -402,9 +424,9 @@ export async function GET(request: NextRequest) {
 
             if (previousSnapshot && previousSnapshot.ofi_score !== null) {
               trendVsPriorPeriod = ofiScore - previousSnapshot.ofi_score;
-              if (trendVsPriorPeriod > 5) {
+              if (trendVsPriorPeriod > 3) {
                 trendDirection = 'worsening';
-              } else if (trendVsPriorPeriod < -5) {
+              } else if (trendVsPriorPeriod < -3) {
                 trendDirection = 'improving';
               }
             }
@@ -566,44 +588,46 @@ Return ONLY the JSON object, nothing else.`;
             }
           }
 
-          // Get ALL friction cards for this account (old + new) to calculate OFI
+          // Get friction cards from last 90 days only (time-windowed so scores can decrease)
+          const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
           const { data: allFrictionCards } = await supabase
             .from('friction_cards')
             .select('*')
             .eq('account_id', accountId)
-            .eq('is_friction', true);
+            .eq('is_friction', true)
+            .gte('created_at', ninetyDaysAgo);
 
           if (!allFrictionCards || allFrictionCards.length === 0) {
             console.log(`No friction cards found for ${account.name} after analysis`);
             continue;
           }
 
-          console.log(`Calculating OFI from ${allFrictionCards.length} total friction cards (${frictionCards.length} new + ${allFrictionCards.length - frictionCards.length} existing)`);
+          console.log(`Calculating OFI from ${allFrictionCards.length} friction cards in last 90 days (${frictionCards.length} new)`);
 
-          // Calculate OFI with improved algorithm (matches /api/calculate-ofi)
+          // Calculate OFI - gentler weights so scores are better distributed
           const highSeverityCount = allFrictionCards.filter(c => c.severity >= 4).length;
-          const severityWeights: any = { 1: 1, 2: 2, 3: 4, 4: 8, 5: 16 };
+          const severityWeights: any = { 1: 1, 2: 2, 3: 3, 4: 5, 5: 8 };
           const weightedScore = allFrictionCards.reduce((sum, card) => sum + (severityWeights[card.severity] || 1), 0);
 
           // Normalize by case volume to get friction density
           const totalCases = casesData.records.length || 1;
           const frictionDensity = (allFrictionCards.length / totalCases) * 100;
 
-            // Base score from weighted severity (logarithmic scale)
-            const baseScore = Math.log10(weightedScore + 1) * 20;
+          // Base score (logarithmic scale - coefficient 15 gives better distribution than 20)
+          const baseScore = Math.log10(weightedScore + 1) * 15;
 
-            // Friction density multiplier (0.5x to 2x)
-            const densityMultiplier = Math.min(2, Math.max(0.5, frictionDensity / 5));
+          // Friction density multiplier (0.5x to 1.5x - less aggressive than before)
+          const densityMultiplier = Math.min(1.5, Math.max(0.5, frictionDensity / 5));
 
-            // High severity boost
-            const highSeverityBoost = Math.min(20, highSeverityCount * 2);
+          // High severity boost (1.5 pts each, capped at +15)
+          const highSeverityBoost = Math.min(15, highSeverityCount * 1.5);
 
           // Final OFI Score
           let ofiScore = Math.round(baseScore * densityMultiplier + highSeverityBoost);
           ofiScore = Math.min(100, Math.max(0, ofiScore));
 
           console.log(`OFI Calculation for ${account.name}:`, {
-            totalFrictionCards: allFrictionCards.length,
+            frictionCards90d: allFrictionCards.length,
             newCards: frictionCards.length,
             highSeverityCount,
             totalCases,
@@ -615,7 +639,7 @@ Return ONLY the JSON object, nothing else.`;
             finalOfiScore: ofiScore
           });
 
-          // Calculate top themes from ALL friction cards
+          // Calculate top themes from windowed friction cards
           const themeMap = new Map<string, { count: number, totalSeverity: number }>();
           allFrictionCards.forEach(card => {
             const existing = themeMap.get(card.theme_key) || { count: 0, totalSeverity: 0 };
@@ -633,11 +657,12 @@ Return ONLY the JSON object, nothing else.`;
             .sort((a, b) => b.count - a.count)
             .slice(0, 5); // Top 5 themes
 
-          // Get previous snapshot to calculate trend
+          // Get yesterday's snapshot for trend comparison (not today's - we're creating that now)
           const { data: previousSnapshot } = await supabase
             .from('account_snapshots')
             .select('ofi_score, snapshot_date')
             .eq('account_id', accountId)
+            .lt('snapshot_date', today)
             .order('snapshot_date', { ascending: false })
             .limit(1)
             .maybeSingle();
@@ -648,10 +673,10 @@ Return ONLY the JSON object, nothing else.`;
           if (previousSnapshot && previousSnapshot.ofi_score !== null) {
             trendVsPriorPeriod = ofiScore - previousSnapshot.ofi_score;
 
-            // Determine trend direction (threshold: ±5 points)
-            if (trendVsPriorPeriod > 5) {
+            // Determine trend direction (threshold: ±3 points - lower threshold catches more movement)
+            if (trendVsPriorPeriod > 3) {
               trendDirection = 'worsening'; // Score going up = more friction = worse
-            } else if (trendVsPriorPeriod < -5) {
+            } else if (trendVsPriorPeriod < -3) {
               trendDirection = 'improving'; // Score going down = less friction = better
             } else {
               trendDirection = 'stable';
