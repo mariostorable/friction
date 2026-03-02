@@ -402,13 +402,26 @@ export async function POST(request: NextRequest) {
     const actualThemes = Array.from(new Set(frictionCardsWithCases?.map((c: any) => c.theme_key) || []));
     console.log(`Found ${actualThemes.length} actual friction themes`);
 
+    // Step 3: Load client name aliases table for Strategy 2 (client_field)
+    const { data: clientAliasRows } = await supabaseAdmin
+      .from('client_name_aliases')
+      .select('jira_short_name, sf_account_name')
+      .not('sf_account_name', 'is', null); // Only rows with a known mapping
+
+    // Build lookup: lowercase short name → sf_account_name
+    const clientAliasMap = new Map<string, string>();
+    clientAliasRows?.forEach((row: any) => {
+      clientAliasMap.set(row.jira_short_name.toLowerCase(), row.sf_account_name);
+    });
+    console.log(`Loaded ${clientAliasMap.size} client name aliases`);
+
     // Batch link creation for better performance
     const themeLinksToCreate: any[] = [];
     const accountLinksToCreate: any[] = [];
     let directLinksCount = 0;
     let keywordLinksCount = 0;
 
-    // Get all Top 25 accounts for name matching
+    // Get all active accounts for alias-based name lookups
     const { data: accounts } = await supabaseAdmin
       .from('accounts')
       .select('id, name, products')
@@ -422,65 +435,62 @@ export async function POST(request: NextRequest) {
       const customFields = issue.metadata?.custom_fields || {};
       const salesforceCaseIds: string[] = [];
 
-      // STRATEGY 1.5 (VERY HIGH CONFIDENCE): Client field matching
-      // Extract customfield_12184 which contains semicolon or comma-separated client names
+      // STRATEGY 2 (FALLBACK): Client field matching via alias table
+      // Only used when no salesforce_case link exists (checked later via hasDirectLink flag).
+      // Extract customfield_12184 which contains semicolon-delimited short names like "10 Federal;Spartan"
       const clientFieldValue = customFields['customfield_12184'];
+      const clientFieldLinks: any[] = [];
       if (clientFieldValue && typeof clientFieldValue === 'string') {
-        // Parse semicolon or comma-separated client names (handle both formats)
         const clientNames = clientFieldValue
-          .split(/[;,]/) // Split by semicolon OR comma
-          .map(name => name.trim())
-          .filter(name => name.length > 0);
+          .split(/[;,]/)
+          .map((name: string) => name.trim())
+          .filter((name: string) => name.length > 0);
 
         if (clientNames.length > 0) {
           console.log(`${issue.jira_key} has Client(s) field (${clientNames.length}): ${clientNames.join(', ')}`);
 
-          // Determine product from Jira project key (e.g., "EDGE" from "EDGE-4731")
+          // Determine product from Jira project key for validation
           const projectCode = issue.jira_key.split('-')[0].toUpperCase();
           const isEdgeTicket = projectCode === 'EDGE';
           const isSiteLinkTicket = projectCode === 'SLINK' || projectCode === 'SL';
 
-          // Match each client name against accounts
           for (const clientName of clientNames) {
-            const clientNameLower = clientName.toLowerCase();
-
-            // Contains match: short names like "10 Federal" should match "10 Federal Storage - CORP."
-            // Require the short name to be at least 5 chars to avoid generic words matching everything
-            const matchingAccounts = clientNameLower.length < 5 ? [] : accounts?.filter(acc => {
-              const accNameLower = acc.name.toLowerCase();
-
-              // Account name must contain the client short name, or vice versa (for abbreviated names)
-              const nameMatches = accNameLower.includes(clientNameLower) || clientNameLower.includes(accNameLower.split(' ')[0]);
-              if (!nameMatches) return false;
-
-              // Product validation: prevents cross-product false positives
-              const accountProducts = (acc.products || '').toLowerCase();
-              if (isEdgeTicket && !accountProducts.includes('edge')) {
-                console.log(`  ✗ Product mismatch: ${projectCode} ticket cannot link to ${acc.name} (products: ${acc.products})`);
-                return false;
-              }
-              if (isSiteLinkTicket && !accountProducts.includes('sitelink')) {
-                console.log(`  ✗ Product mismatch: ${projectCode} ticket cannot link to ${acc.name} (products: ${acc.products})`);
-                return false;
-              }
-
-              return true;
-            }) || [];
-
-            if (matchingAccounts && matchingAccounts.length > 0) {
-              for (const account of matchingAccounts) {
-                accountLinksToCreate.push({
-                  user_id: userId,
-                  account_id: account.id,
-                  jira_issue_id: issue.id,
-                  match_type: 'client_field',
-                  match_confidence: 0.95 // Very high confidence - explicit metadata
-                });
-                console.log(`  ✓ Matched "${clientName}" → ${account.name} (${projectCode} ticket)`);
-              }
-            } else {
-              console.log(`  ✗ No exact account match for client "${clientName}" (${projectCode} ticket)`);
+            // Use alias table lookup — exact match only (no fuzzy text scanning)
+            const sfAccountName = clientAliasMap.get(clientName.toLowerCase());
+            if (!sfAccountName) {
+              console.log(`  ✗ "${clientName}" not in alias table or is flagged ambiguous — skipping`);
+              continue;
             }
+
+            // Find the account with this exact SF name
+            const matchingAccount = accounts?.find(acc =>
+              acc.name.toLowerCase() === sfAccountName.toLowerCase()
+            );
+
+            if (!matchingAccount) {
+              console.log(`  ✗ "${clientName}" → "${sfAccountName}" not found in active accounts`);
+              continue;
+            }
+
+            // Product validation: prevents cross-product false positives
+            const accountProducts = (matchingAccount.products || '').toLowerCase();
+            if (isEdgeTicket && !accountProducts.includes('edge')) {
+              console.log(`  ✗ Product mismatch: ${projectCode} ticket → ${matchingAccount.name} (products: ${matchingAccount.products})`);
+              continue;
+            }
+            if (isSiteLinkTicket && !accountProducts.includes('sitelink')) {
+              console.log(`  ✗ Product mismatch: ${projectCode} ticket → ${matchingAccount.name} (products: ${matchingAccount.products})`);
+              continue;
+            }
+
+            clientFieldLinks.push({
+              user_id: userId,
+              account_id: matchingAccount.id,
+              jira_issue_id: issue.id,
+              match_type: 'client_field',
+              match_confidence: 0.85
+            });
+            console.log(`  ✓ Alias matched "${clientName}" → ${matchingAccount.name}`);
           }
         }
       }
@@ -514,22 +524,19 @@ export async function POST(request: NextRequest) {
       salesforceCaseIds.length = 0;
       salesforceCaseIds.push(...uniqueCaseIds);
 
-      // If we found Case IDs, create DIRECT links for ALL of them
+      // STRATEGY 1: Direct links via Salesforce Case IDs (confidence 1.0)
+      let hasDirectLink = false;
       if (salesforceCaseIds.length > 0) {
-        let hasDirectLink = false;
         const allThemes = new Set<string>();
         const allAccountIds = new Set<string>();
 
-        // Process each Case ID
         for (const caseId of salesforceCaseIds) {
-          // Check if this case exists in our database (regardless of friction status)
           const accountId = caseIdToAccountId.get(caseId);
 
           if (accountId) {
             hasDirectLink = true;
             allAccountIds.add(accountId);
 
-            // Always create account link
             accountLinksToCreate.push({
               user_id: userId,
               account_id: accountId,
@@ -538,11 +545,9 @@ export async function POST(request: NextRequest) {
               match_confidence: 1.0
             });
 
-            // If this case also has friction themes, create theme links
+            // Also create theme links if this case has friction themes
             if (caseIdToThemes.has(caseId)) {
-              const themes = Array.from(caseIdToThemes.get(caseId)!);
-
-              themes.forEach(themeKey => {
+              Array.from(caseIdToThemes.get(caseId)!).forEach(themeKey => {
                 allThemes.add(themeKey);
                 themeLinksToCreate.push({
                   user_id: userId,
@@ -559,20 +564,18 @@ export async function POST(request: NextRequest) {
         if (hasDirectLink) {
           directLinksCount++;
           console.log(`Direct link: ${issue.jira_key} → Cases [${salesforceCaseIds.join(', ')}] → ${allAccountIds.size} accounts, ${allThemes.size} themes`);
-          continue; // Skip keyword matching - we have direct links!
         }
       }
 
-      // STRATEGY 2 (FALLBACK): Keyword matching (less accurate but better than nothing)
-      const keywordThemeLinks = getThemeLinksFromActualThemes(userId, issue, actualThemes);
-      themeLinksToCreate.push(...keywordThemeLinks);
-      if (keywordThemeLinks.length > 0) {
-        keywordLinksCount++;
+      // STRATEGY 2: Client field alias lookup — ONLY when no case link found
+      if (!hasDirectLink && clientFieldLinks.length > 0) {
+        accountLinksToCreate.push(...clientFieldLinks);
+        keywordLinksCount += clientFieldLinks.length;
       }
 
-      // Get account links for this issue (name matching)
-      const accountLinks = getAccountLinks(userId, issue, accounts || []);
-      accountLinksToCreate.push(...accountLinks);
+      // Theme keyword matching (for "By Theme" view) — always run regardless of account links
+      const keywordThemeLinks = getThemeLinksFromActualThemes(userId, issue, actualThemes);
+      themeLinksToCreate.push(...keywordThemeLinks);
     }
 
     console.log(`Link strategies: ${directLinksCount} direct (via Case ID), ${keywordLinksCount} keyword-based`);
@@ -820,69 +823,8 @@ function getThemeLinksFromActualThemes(userId: string, issue: any, actualThemes:
   return links;
 }
 
-// Helper: Get account links for batch processing (doesn't do DB operations)
-function getAccountLinks(userId: string, issue: any, accounts: any[]): any[] {
-  const links: any[] = [];
-  const searchText = `${issue.summary} ${issue.description || ''}`.toLowerCase();
-
-  for (const account of accounts) {
-    const accountName = account.name.toLowerCase();
-    if (searchText.includes(accountName)) {
-      links.push({
-        user_id: userId,
-        account_id: account.id,
-        jira_issue_id: issue.id,
-        match_type: 'account_name',
-        match_confidence: 0.9
-      });
-    }
-  }
-
-  return links;
-}
-
-// Helper: Link Jira issue to accounts by name matching
-async function linkIssueToAccounts(
-  supabase: any,
-  userId: string,
-  issue: any,
-  accounts: Array<{ id: string; name: string }>
-): Promise<string[]> {
-  const linkedAccounts: string[] = [];
-  const searchText = `${issue.summary} ${issue.description || ''}`.toLowerCase();
-
-  for (const account of accounts) {
-    // Check if account name appears in the ticket
-    // Try both full name and variations (e.g., "William Warren" matches "Warren")
-    const nameParts = account.name.toLowerCase().split(/[\s-,]+/);
-    const matchesName = nameParts.some(part =>
-      part.length > 3 && searchText.includes(part)
-    );
-
-    if (matchesName) {
-      try {
-        await supabase
-          .from('account_jira_links')
-          .upsert({
-            user_id: userId,
-            account_id: account.id,
-            jira_issue_id: issue.id,
-            match_type: 'account_name',
-            match_confidence: 0.9,
-          }, {
-            onConflict: 'account_id,jira_issue_id',
-            ignoreDuplicates: true
-          });
-        linkedAccounts.push(account.id);
-        console.log(`Linked ${issue.jira_key} to account ${account.name}`);
-      } catch (error) {
-        console.error(`Failed to link to account ${account.name}:`, error);
-      }
-    }
-  }
-
-  return linkedAccounts;
-}
+// NOTE: account_name and theme_association strategies removed.
+// Only salesforce_case (confidence 1.0) and client_field via alias table (confidence 0.85) are valid.
 
 // Helper: Create theme-jira link
 async function createThemeLink(

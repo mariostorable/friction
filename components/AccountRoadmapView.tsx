@@ -47,6 +47,7 @@ export default function AccountRoadmapView() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'resolved' | 'closed'>('all');
   const [priorityFilter, setPriorityFilter] = useState<'all' | 'highest' | 'high' | 'medium' | 'low'>('all');
   const [dateRangeDays, setDateRangeDays] = useState(30);
+  const [showOpsTickets, setShowOpsTickets] = useState(false);
 
   const supabase = createClientComponentClient();
 
@@ -58,7 +59,7 @@ export default function AccountRoadmapView() {
   // Refetch when filters change
   useEffect(() => {
     fetchAccountRoadmap();
-  }, [selectedAccountIds, portfolioFilter, productFilter, statusFilter, priorityFilter, dateRangeDays]);
+  }, [selectedAccountIds, portfolioFilter, productFilter, statusFilter, priorityFilter, dateRangeDays, showOpsTickets]);
 
   async function fetchAllAccountsForFilter() {
     try {
@@ -98,6 +99,9 @@ export default function AccountRoadmapView() {
         params.set('priority', priorityFilter);
       }
       params.set('dateRangeDays', dateRangeDays.toString());
+      if (showOpsTickets) {
+        params.set('showOpsTickets', 'true');
+      }
 
       const response = await fetch(`/api/jira/roadmap-by-account?${params.toString()}`);
       if (response.ok) {
@@ -118,6 +122,7 @@ export default function AccountRoadmapView() {
     setStatusFilter('all');
     setPriorityFilter('all');
     setDateRangeDays(30);
+    setShowOpsTickets(false);
   };
 
   if (loading) {
@@ -271,6 +276,19 @@ export default function AccountRoadmapView() {
         onPriorityChange={setPriorityFilter}
         onDateRangeChange={setDateRangeDays}
       />
+
+      {/* Ops Tickets Toggle */}
+      <div className="flex items-center gap-2 text-sm text-gray-600">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={showOpsTickets}
+            onChange={e => setShowOpsTickets(e.target.checked)}
+            className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+          />
+          Show Operational Work, Data Fix &amp; Vendor tickets
+        </label>
+      </div>
 
       {/* Filter Summary */}
       {!loading && (

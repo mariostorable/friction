@@ -60,7 +60,10 @@ export async function GET(request: NextRequest) {
 
     const themeKeys = Object.keys(themeWeights);
 
-    // Get all Jira issues linked to these themes
+    // Internal/ops issue types excluded from CS-facing views
+    const OPS_ISSUE_TYPES = ['Operational Work', 'Data Fix', 'Vendor'];
+
+    // Get all Jira issues linked to these themes (theme view uses theme_jira_links - correct)
     const { data: jiraLinks } = await supabase
       .from('theme_jira_links')
       .select(`
@@ -71,7 +74,9 @@ export async function GET(request: NextRequest) {
           jira_key,
           summary,
           status,
+          issue_type,
           priority,
+          resolution,
           resolution_date,
           updated_date,
           issue_url
@@ -84,6 +89,7 @@ export async function GET(request: NextRequest) {
     const now = new Date();
     const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
     const oneHundredTwentyDaysAgo = new Date(now.getTime() - 120 * 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     let resolved_60d = 0;
     let resolved_120d = 0;
@@ -92,26 +98,39 @@ export async function GET(request: NextRequest) {
 
     const issuesByTheme: Record<string, any[]> = {};
 
+    // Status categorization helpers
+    const IN_PROGRESS_STATUSES = [
+      'in progress', 'dev testing', 'deployed to staging',
+      'selected for deployment', 'staging testing',
+      'in product refinement', 'requirements review'
+    ];
+
     jiraLinks?.forEach((link: any) => {
       const issue = link.jira_issues;
       const themeKey = link.theme_key;
+
+      // Skip ops issue types
+      if (OPS_ISSUE_TYPES.includes(issue.issue_type)) return;
 
       if (!issuesByTheme[themeKey]) {
         issuesByTheme[themeKey] = [];
       }
       issuesByTheme[themeKey].push(issue);
 
-      if (issue.resolution_date) {
+      const statusLower = issue.status?.toLowerCase() || '';
+      const resolutionLower = issue.resolution?.toLowerCase() || '';
+      const isResolved =
+        statusLower === 'closed' &&
+        (resolutionLower === 'done' || resolutionLower === 'duplicate' || resolutionLower === 'cannot reproduce');
+
+      if (isResolved && issue.resolution_date) {
         const resolvedDate = new Date(issue.resolution_date);
         if (resolvedDate >= sixtyDaysAgo) resolved_60d++;
         if (resolvedDate >= oneHundredTwentyDaysAgo) resolved_120d++;
-      } else {
-        const statusLower = issue.status?.toLowerCase() || '';
-        if (statusLower.includes('progress') || statusLower.includes('development') || statusLower.includes('review')) {
-          in_progress++;
-        } else {
-          open_count++;
-        }
+      } else if (IN_PROGRESS_STATUSES.some(s => statusLower.includes(s))) {
+        in_progress++;
+      } else if (!isResolved) {
+        open_count++;
       }
     });
 
@@ -194,14 +213,19 @@ export async function GET(request: NextRequest) {
       .from('account_jira_links')
       .select(`
         account_id,
+        match_type,
         jira_issues!inner(
           id,
           status,
-          resolution_date
+          issue_type,
+          resolution,
+          resolution_date,
+          updated_date
         )
       `)
       .in('account_id', accountIds)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .in('match_type', ['salesforce_case', 'client_field']);
 
     const accountTicketCounts: Record<string, { resolved_120d: number; in_progress: number; open: number }> = {};
 
@@ -216,6 +240,9 @@ export async function GET(request: NextRequest) {
       const accountId = link.account_id;
       const ticket = link.jira_issues;
 
+      // Skip ops issue types
+      if (OPS_ISSUE_TYPES.includes(ticket.issue_type)) return;
+
       if (!accountTickets[accountId]) {
         accountTickets[accountId] = new Map();
       }
@@ -229,18 +256,21 @@ export async function GET(request: NextRequest) {
     // Count deduplicated tickets per account
     Object.entries(accountTickets).forEach(([accountId, ticketsMap]) => {
       ticketsMap.forEach((ticket) => {
-        if (ticket.resolution_date) {
+        const statusLower = ticket.status?.toLowerCase() || '';
+        const resolutionLower = ticket.resolution?.toLowerCase() || '';
+        const isResolved =
+          statusLower === 'closed' &&
+          (resolutionLower === 'done' || resolutionLower === 'duplicate' || resolutionLower === 'cannot reproduce');
+
+        if (isResolved && ticket.resolution_date) {
           const resolvedDate = new Date(ticket.resolution_date);
           if (resolvedDate >= oneHundredTwentyDaysAgo) {
             accountTicketCounts[accountId].resolved_120d++;
           }
-        } else {
-          const statusLower = ticket.status?.toLowerCase() || '';
-          if (statusLower.includes('progress') || statusLower.includes('development') || statusLower.includes('review')) {
-            accountTicketCounts[accountId].in_progress++;
-          } else {
-            accountTicketCounts[accountId].open++;
-          }
+        } else if (!isResolved && IN_PROGRESS_STATUSES.some((s: string) => statusLower.includes(s))) {
+          accountTicketCounts[accountId].in_progress++;
+        } else if (!isResolved) {
+          accountTicketCounts[accountId].open++;
         }
       });
     });

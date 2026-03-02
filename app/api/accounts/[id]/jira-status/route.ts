@@ -53,7 +53,11 @@ export async function GET(
 
     const accountThemeKeys = Object.keys(themeWeights);
 
+    // Internal/ops issue types excluded from CS-facing views
+    const OPS_ISSUE_TYPES = ['Operational Work', 'Data Fix', 'Vendor'];
+
     // 2. Get all Jira issues linked to this account via account_jira_links table
+    // Only valid strategies: salesforce_case and client_field
     const { data: accountJiraLinks } = await supabase
       .from('account_jira_links')
       .select(`
@@ -65,7 +69,9 @@ export async function GET(
           summary,
           description,
           status,
+          issue_type,
           priority,
+          resolution,
           assignee_name,
           resolution_date,
           updated_date,
@@ -75,7 +81,8 @@ export async function GET(
         )
       `)
       .eq('account_id', accountId)
-      .eq('jira_issues.user_id', user.id);
+      .eq('jira_issues.user_id', user.id)
+      .in('match_type', ['salesforce_case', 'client_field']);
 
     if (!accountJiraLinks || accountJiraLinks.length === 0) {
       // No tickets yet - all themes should be prioritized
@@ -123,17 +130,19 @@ export async function GET(
       issueThemes.get(link.jira_issue_id)!.push(link.theme_key);
     });
 
-    // Transform to include theme info
-    const jiraIssues = accountJiraLinks.map((link: any) => {
-      const issue = link.jira_issues;
-      const themes = issueThemes.get(issue.id) || [];
-      return {
-        ...link,
-        theme_key: themes[0] || 'general', // Primary theme
-        all_themes: themes,
-        is_account_specific: link.match_type === 'salesforce_case' || link.match_type === 'account_name'
-      };
-    });
+    // Transform to include theme info, filtering out ops issue types
+    const jiraIssues = accountJiraLinks
+      .filter((link: any) => !OPS_ISSUE_TYPES.includes(link.jira_issues.issue_type))
+      .map((link: any) => {
+        const issue = link.jira_issues;
+        const themes = issueThemes.get(issue.id) || [];
+        return {
+          ...link,
+          theme_key: themes[0] || 'general',
+          all_themes: themes,
+          is_account_specific: link.match_type === 'salesforce_case' || link.match_type === 'client_field'
+        };
+      });
 
     // 3. Categorize issues
     const now = new Date();
@@ -159,32 +168,41 @@ export async function GET(
         match_confidence: link.match_confidence
       };
 
-      // Check if resolved
-      if (issue.resolution_date) {
+      const statusLower = issue.status?.toLowerCase() || '';
+      const resolutionLower = issue.resolution?.toLowerCase() || '';
+
+      // Resolved: status=Closed AND resolution in (Done, Duplicate, Cannot Reproduce)
+      const isResolved =
+        statusLower === 'closed' &&
+        (resolutionLower === 'done' || resolutionLower === 'duplicate' || resolutionLower === 'cannot reproduce');
+
+      // In Progress (Coming Soon): active development statuses
+      const IN_PROGRESS_STATUSES = [
+        'in progress', 'dev testing', 'deployed to staging',
+        'selected for deployment', 'staging testing',
+        'in product refinement', 'requirements review'
+      ];
+      const isInProgress = IN_PROGRESS_STATUSES.some(s => statusLower.includes(s));
+
+      if (isResolved && issue.resolution_date) {
         const resolvedDate = new Date(issue.resolution_date);
+        issueData.resolved_days_ago = Math.floor((now.getTime() - resolvedDate.getTime()) / (24 * 60 * 60 * 1000));
 
         if (resolvedDate >= thirtyDaysAgo) {
-          issueData.resolved_days_ago = Math.floor((now.getTime() - resolvedDate.getTime()) / (24 * 60 * 60 * 1000));
           issueData.time_period = '30d';
           recentlyResolved.push(issueData);
         } else if (resolvedDate >= sixtyDaysAgo) {
-          issueData.resolved_days_ago = Math.floor((now.getTime() - resolvedDate.getTime()) / (24 * 60 * 60 * 1000));
           issueData.time_period = '60d';
           recentlyResolved.push(issueData);
         } else if (resolvedDate >= oneHundredTwentyDaysAgo) {
-          issueData.resolved_days_ago = Math.floor((now.getTime() - resolvedDate.getTime()) / (24 * 60 * 60 * 1000));
           issueData.time_period = '120d';
           recentlyResolved.push(issueData);
         }
-      } else {
-        // Open ticket
-        const statusLower = issue.status?.toLowerCase() || '';
-
-        if (statusLower.includes('progress') || statusLower.includes('development') || statusLower.includes('review')) {
-          comingSoon.push(issueData);
-        } else {
-          onRadar.push(issueData);
-        }
+      } else if (isInProgress) {
+        comingSoon.push(issueData);
+      } else if (!isResolved) {
+        // On Radar: Backlog, New, To Do, etc.
+        onRadar.push(issueData);
       }
     });
 

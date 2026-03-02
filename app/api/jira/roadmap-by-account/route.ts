@@ -102,31 +102,44 @@ export async function GET(request: NextRequest) {
     // Extract account IDs from filtered accounts
     const filteredAccountIds = filteredAccounts.map(a => a.id);
 
+    // Parse showOpsTickets param (default false - hide Operational Work / Data Fix / Vendor)
+    const showOpsTickets = searchParams.get('showOpsTickets') === 'true';
+
+    // Internal/ops issue types excluded from CS-facing roadmap by default
+    const OPS_ISSUE_TYPES = ['Operational Work', 'Data Fix', 'Vendor'];
+
     // Get all Jira issues linked to these accounts via account_jira_links
+    // Only valid link strategies: salesforce_case and client_field
     const { data: accountJiraLinks } = await supabase
       .from('account_jira_links')
       .select(`
         account_id,
+        match_type,
         jira_issues!inner(
           id,
           jira_key,
           summary,
           status,
+          issue_type,
           priority,
+          resolution,
           resolution_date,
           updated_date,
           issue_url
         )
       `)
       .in('account_id', filteredAccountIds)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .in('match_type', ['salesforce_case', 'client_field']);
 
-    // Filter out marine/RV tickets by project code
+    // Filter out marine/RV tickets by project code, and ops issue types
     const marineProjects = ['NBK', 'MREQ', 'MDEV', 'EASY', 'TOPS', 'BZD', 'ESST'];
     const filteredLinks = accountJiraLinks?.filter((link: any) => {
       const issue = link.jira_issues;
       const projectCode = issue.jira_key.split('-')[0].toUpperCase();
-      return !marineProjects.includes(projectCode);
+      if (marineProjects.includes(projectCode)) return false;
+      if (!showOpsTickets && OPS_ISSUE_TYPES.includes(issue.issue_type)) return false;
+      return true;
     }) || [];
 
     if (!filteredLinks || filteredLinks.length === 0) {
@@ -195,28 +208,42 @@ export async function GET(request: NextRequest) {
 
           if (!matchesPriority) return; // Skip if doesn't match priority filter
 
-          if (issue.resolution_date) {
-            const resolvedDate = new Date(issue.resolution_date);
-            const statusLower = issue.status?.toLowerCase() || '';
+          // Status categorization per spec:
+          // Resolved: status Closed AND resolution in (Done, Duplicate, Cannot Reproduce)
+          // In Progress: In Progress, Dev Testing, Deployed to Staging, Selected for Deployment,
+          //              Staging Testing, In Product Refinement, Requirements Review
+          // On Radar: Backlog, Product Backlog, New, To Do (and anything else open)
+          const statusLower = issue.status?.toLowerCase() || '';
+          const resolutionLower = issue.resolution?.toLowerCase() || '';
 
-            // Use dynamic date threshold from query parameter
+          const isResolved =
+            statusLower === 'closed' &&
+            (resolutionLower === 'done' || resolutionLower === 'duplicate' || resolutionLower === 'cannot reproduce');
+
+          const IN_PROGRESS_STATUSES = [
+            'in progress', 'dev testing', 'deployed to staging',
+            'selected for deployment', 'staging testing',
+            'in product refinement', 'requirements review'
+          ];
+          const isInProgress = IN_PROGRESS_STATUSES.some(s => statusLower.includes(s));
+
+          if (isResolved && issue.resolution_date) {
+            const resolvedDate = new Date(issue.resolution_date);
             if (resolvedDate >= dateThreshold) {
-              // Apply status filter for resolved issues
+              // Apply optional status sub-filter
               if (statusFilter === 'all') {
                 resolved.push(issue);
-              } else if (statusFilter === 'resolved' && (statusLower.includes('resolved') || statusLower.includes('fixed'))) {
+              } else if (statusFilter === 'resolved') {
                 resolved.push(issue);
-              } else if (statusFilter === 'closed' && (statusLower.includes('closed') || statusLower.includes('done'))) {
+              } else if (statusFilter === 'closed') {
                 resolved.push(issue);
               }
             }
-          } else {
-            const statusLower = issue.status?.toLowerCase() || '';
-            if (statusLower.includes('progress') || statusLower.includes('development') || statusLower.includes('review')) {
-              in_progress.push(issue);
-            } else {
-              open.push(issue);
-            }
+          } else if (isInProgress) {
+            in_progress.push(issue);
+          } else if (!isResolved) {
+            // On Radar: Backlog, New, To Do, etc.
+            open.push(issue);
           }
         });
 

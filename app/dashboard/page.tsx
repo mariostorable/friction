@@ -1037,7 +1037,7 @@ export default function Dashboard() {
                         </div>
                         {hoveredColumn === 'jira_tickets' && (
                           <div className="absolute left-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 z-50 whitespace-normal normal-case font-normal">
-                            Product roadmap tickets linked to this account's friction themes. Shows resolved (90d) / in progress / open.
+                            Product roadmap tickets linked to this account. Shows resolved (120d) / in progress / open. Excludes Operational Work, Data Fix &amp; Vendor tickets.
                             <div className="absolute -top-1 left-6 w-2 h-2 bg-gray-900 transform rotate-45"></div>
                           </div>
                         )}
