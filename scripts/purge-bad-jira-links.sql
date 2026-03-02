@@ -19,7 +19,7 @@ ORDER BY count DESC;
 
 -- Delete the bad rows:
 DELETE FROM account_jira_links
-WHERE match_type IN ('account_name', 'theme_association');
+WHERE match_type IN ('account_name', 'theme_association', 'theme_and_name');
 
 -- Verify cleanup:
 SELECT match_type, COUNT(*) as count
