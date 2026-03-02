@@ -96,21 +96,26 @@ export function aggregateThemes(accounts: AccountWithMetrics[]): ThemeData[] {
  */
 export function formatThemeName(themeKey: string): string {
   const themeNames: Record<string, string> = {
+    // Current taxonomy (storage-specific)
+    billing_and_payments: 'Billing & Payments',
+    integration_failures: 'Integration Failures',
+    reporting_and_analytics: 'Reporting & Analytics',
+    user_access_and_permissions: 'Access & Permissions',
+    performance_and_reliability: 'Performance & Reliability',
+    api_and_data_issues: 'API & Data Issues',
+    product_feature_gaps: 'Product Feature Gaps',
+    data_migration: 'Data Migration',
+    workflow_automation: 'Workflow Automation',
+    onboarding_and_training: 'Onboarding & Training',
+    // Legacy keys (kept for historical cards)
     billing_confusion: 'Billing & Payments',
-    integration_failures: 'Integration Issues',
     ui_confusion: 'UI/UX Confusion',
     performance_issues: 'Performance Problems',
     missing_features: 'Missing Features',
     training_gaps: 'Training Needs',
-    support_response_time: 'Support Response',
     data_quality: 'Data Quality',
     reporting_issues: 'Reporting Problems',
     access_permissions: 'Access & Permissions',
-    configuration_problems: 'Configuration Issues',
-    notification_issues: 'Notifications',
-    workflow_inefficiency: 'Workflow Issues',
-    mobile_issues: 'Mobile Problems',
-    documentation_gaps: 'Documentation',
     other: 'Other Issues'
   };
 

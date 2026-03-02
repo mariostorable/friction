@@ -85,12 +85,19 @@ export async function GET(request: NextRequest) {
     const MAX_ANALYSES_PER_RUN = 50; // Process up to 50 accounts per run (limited by 5-min timeout)
 
     for (const portfolio of portfolios) {
+      // Skip marine portfolio - Newbook (NBK) is a different vertical (RV/campgrounds)
+      // and its cases don't map to self-storage friction themes
+      if (portfolio.portfolio_type === 'top_25_marine') {
+        console.log(`Skipping marine portfolio - different vertical (Newbook/RV)`);
+        continue;
+      }
+
       for (const accountId of portfolio.account_ids) {
         try {
-          // Get account details (skip cancelled accounts)
+          // Get account details (skip cancelled accounts), include products for context
           const { data: account } = await supabase
             .from('accounts')
-            .select('salesforce_id, name, status')
+            .select('salesforce_id, name, status, products, vertical')
             .eq('id', accountId)
             .single();
 
@@ -511,21 +518,33 @@ export async function GET(request: NextRequest) {
               ? '\n[Case text truncated for analysis]'
               : '';
 
-            const prompt = `Analyze this customer support case and return ONLY valid JSON with no other text, explanation, or markdown formatting.
+            // Include product context so Claude can assess relevance
+            const productContext = account.products ? `Product: ${account.products}` : '';
 
-Required JSON structure:
+            const prompt = `You are analyzing a self-storage software support case for a B2B SaaS company (EDGE or SiteLink products).
+
+Determine if this is SYSTEMIC FRICTION (a recurring problem, product gap, or operational breakdown) or ROUTINE SUPPORT (a one-time how-to question, user error, or normal transactional request).
+
+FRICTION examples: repeated billing errors, integration breaking, missing feature causing workarounds, data corruption, performance degrading over time, workflow that doesn't work as expected.
+ROUTINE examples: "how do I run a report?", password reset, one-off user mistake, training question, simple how-to.
+
+Return ONLY valid JSON, no other text:
 {
-  "summary": "brief summary of the issue",
-  "theme_key": "one of: billing_confusion, integration_failures, ui_confusion, performance_issues, other",
-  "severity": 1-5 (number),
+  "is_friction": true or false,
+  "summary": "one sentence describing the friction pattern (or null if not friction)",
+  "theme_key": "one of: billing_and_payments, integration_failures, reporting_and_analytics, user_access_and_permissions, performance_and_reliability, api_and_data_issues, product_feature_gaps, data_migration, workflow_automation, onboarding_and_training",
+  "severity": 1-5 (1=minor inconvenience, 3=impacts daily operations, 5=business-critical outage),
   "sentiment": "one of: frustrated, confused, neutral",
-  "root_cause": "brief root cause hypothesis"
+  "root_cause": "brief hypothesis about the systemic cause"
 }
 
-Case to analyze:
+If is_friction is false, still return valid JSON but set summary to null, severity to 1, and pick the closest theme_key.
+
+${productContext}
+Case:
 ${truncatedText}${truncationNote}
 
-Return ONLY the JSON object, nothing else.`;
+Return ONLY the JSON object.`;
 
             try {
               // Use retry logic for API calls with 529 handling
@@ -538,7 +557,7 @@ Return ONLY the JSON object, nothing else.`;
                 },
                 body: JSON.stringify({
                   model: 'claude-sonnet-4-20250514',
-                  max_tokens: 300,
+                  max_tokens: 400,
                   messages: [{ role: 'user', content: prompt }],
                 }),
               });
@@ -547,20 +566,26 @@ Return ONLY the JSON object, nothing else.`;
                 const data = await anthropicResponse.json();
                 const text = data.content[0].text.replace(/```json\n?/g, '').replace(/```/g, '').trim();
                 const analysis = JSON.parse(text);
-                
-                frictionCards.push({
-                  user_id: portfolio.user_id,
-                  account_id: accountId,
-                  raw_input_id: input.id,
-                  summary: analysis.summary,
-                  theme_key: analysis.theme_key || 'other',
-                  severity: analysis.severity || 3,
-                  sentiment: analysis.sentiment || 'neutral',
-                  root_cause_hypothesis: analysis.root_cause || 'Unknown',
-                  evidence_snippets: [],
-                  confidence_score: 0.7,
-                  reasoning: 'Cron analysis',
-                });
+
+                // Only create friction cards for actual friction - skip routine support
+                if (analysis.is_friction === true) {
+                  frictionCards.push({
+                    user_id: portfolio.user_id,
+                    account_id: accountId,
+                    raw_input_id: input.id,
+                    is_friction: true,
+                    summary: analysis.summary,
+                    theme_key: analysis.theme_key || 'product_feature_gaps',
+                    severity: analysis.severity || 3,
+                    sentiment: analysis.sentiment || 'neutral',
+                    root_cause_hypothesis: analysis.root_cause || 'Unknown',
+                    evidence_snippets: [],
+                    confidence_score: 0.8,
+                    reasoning: 'Cron analysis',
+                  });
+                }
+                // Note: we still mark the input as processed even for non-friction cases
+                // so we don't re-analyze the same case on the next run
               }
 
               // Small delay between API calls to avoid rate limiting (200ms)
