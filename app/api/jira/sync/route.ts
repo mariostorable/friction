@@ -97,16 +97,14 @@ export async function POST(request: NextRequest) {
     const email = integration.metadata?.email;
     const jiraAuthHeader = `Basic ${Buffer.from(`${email}:${tokens.access_token}`).toString('base64')}`;
 
-    // Fetch recent issues from Jira with pagination
-    // Fetch most recent issues (Pro plan has 60s timeout, can handle more)
-    const MAX_ISSUES_PER_SYNC = 1000; // Process most recent 1000 issues per sync
-    const jql = `updated >= "-180d" ORDER BY updated DESC`; // Most recent first - 6 months of history (quoted for compatibility)
+    // Fetch all issues updated in the last 180 days with pagination
+    const jql = `updated >= "-180d" ORDER BY updated DESC`; // 6 months of history
     const maxResults = 100; // Jira's max per request
     let startAt = 0;
     let allIssues: any[] = [];
     let totalIssues = 0;
 
-    console.log(`Fetching most recent Jira issues with JQL: ${jql} (max ${MAX_ISSUES_PER_SYNC})`);
+    console.log(`Fetching Jira issues with JQL: ${jql}`);
 
     // Paginate through all results
     let hasMorePages = true;
@@ -162,9 +160,9 @@ export async function POST(request: NextRequest) {
         console.log(`Fetched ${allIssues.length} issues so far (got ${fetchedCount} in this batch)`);
       }
 
-      // Continue if we got a full page AND haven't hit our limit
-      hasMorePages = fetchedCount === maxResults && allIssues.length < MAX_ISSUES_PER_SYNC;
-      console.log(`Pagination check: fetchedCount=${fetchedCount}, maxResults=${maxResults}, allIssues.length=${allIssues.length}, MAX=${MAX_ISSUES_PER_SYNC}, hasMorePages=${hasMorePages}`);
+      // Continue until we've fetched all pages
+      hasMorePages = fetchedCount === maxResults;
+      console.log(`Pagination check: fetchedCount=${fetchedCount}, maxResults=${maxResults}, allIssues.length=${allIssues.length}, hasMorePages=${hasMorePages}`);
       startAt += maxResults;
 
       if (!hasMorePages) {
@@ -349,33 +347,28 @@ export async function POST(request: NextRequest) {
 
     console.log(`Stored ${insertedIssues?.length || 0} Jira issues (fetched ${allIssues.length}, deduped to ${uniqueJiraIssues.length})`);
 
-    // EXPANDED STRATEGY: Match against ALL Salesforce cases, not just friction=true
-    // This ensures Jira tickets link even if the case hasn't been analyzed for friction yet
-
-    // Step 1: Get ALL Salesforce cases from friction_cards (includes both friction and non-friction)
+    // Step 1: Build CaseNumber → AccountID map directly from raw_inputs
+    // Query raw_inputs directly (not via friction_cards) to catch ALL synced cases,
+    // not just ones that have been processed into friction_cards
     const { data: allSalesforceCases } = await supabaseAdmin
-      .from('friction_cards')
-      .select(`
-        id,
-        account_id,
-        raw_input:raw_inputs!inner(source_id, source_type)
-      `)
+      .from('raw_inputs')
+      .select('source_id, account_id')
       .eq('user_id', userId)
-      .eq('raw_inputs.source_type', 'salesforce')
-      .not('raw_inputs.source_id', 'is', null);
+      .eq('source_type', 'salesforce')
+      .not('source_id', 'is', null);
 
-    // Build map: Salesforce Case ID → Account ID (for ALL cases, not just friction)
+    // Build map: Salesforce CaseNumber → Account ID
     const caseIdToAccountId = new Map<string, string>();
 
-    allSalesforceCases?.forEach((card: any) => {
-      const caseId = card.raw_input?.source_id;
-      const accountId = card.account_id;
+    allSalesforceCases?.forEach((row: any) => {
+      const caseId = row.source_id;
+      const accountId = row.account_id;
       if (caseId && accountId) {
         caseIdToAccountId.set(caseId, accountId);
       }
     });
 
-    console.log(`Built case mapping: ${caseIdToAccountId.size} total Salesforce Cases (all types)`);
+    console.log(`Built case mapping: ${caseIdToAccountId.size} total Salesforce Cases`);
 
     // Step 2: Get friction cards for theme linking
     const { data: frictionCardsWithCases } = await supabaseAdmin
@@ -451,14 +444,16 @@ export async function POST(request: NextRequest) {
           for (const clientName of clientNames) {
             const clientNameLower = clientName.toLowerCase();
 
-            // ONLY do exact match - no fuzzy matching to prevent false positives
-            const matchingAccounts = accounts?.filter(acc => {
+            // Contains match: short names like "10 Federal" should match "10 Federal Storage - CORP."
+            // Require the short name to be at least 5 chars to avoid generic words matching everything
+            const matchingAccounts = clientNameLower.length < 5 ? [] : accounts?.filter(acc => {
               const accNameLower = acc.name.toLowerCase();
 
-              // Must match name exactly
-              if (accNameLower !== clientNameLower) return false;
+              // Account name must contain the client short name, or vice versa (for abbreviated names)
+              const nameMatches = accNameLower.includes(clientNameLower) || clientNameLower.includes(accNameLower.split(' ')[0]);
+              if (!nameMatches) return false;
 
-              // Product validation: EDGE tickets should only link to EDGE accounts
+              // Product validation: prevents cross-product false positives
               const accountProducts = (acc.products || '').toLowerCase();
               if (isEdgeTicket && !accountProducts.includes('edge')) {
                 console.log(`  ✗ Product mismatch: ${projectCode} ticket cannot link to ${acc.name} (products: ${acc.products})`);
@@ -470,7 +465,7 @@ export async function POST(request: NextRequest) {
               }
 
               return true;
-            });
+            }) || [];
 
             if (matchingAccounts && matchingAccounts.length > 0) {
               for (const account of matchingAccounts) {
@@ -599,114 +594,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // STRATEGY 3: Link accounts via themes (Jira→Theme→Account transitive linking)
-    // UPDATED: Now requires account name to appear in ticket for theme-based linking
-    // This prevents broad many-to-many associations that cause duplicate counts
-    console.log('Creating account links via theme associations (with account name verification)...');
-
-    // Build map: theme_key → Set of account_ids that have friction in that theme
-    const themeToAccounts = new Map<string, Set<string>>();
-    frictionCardsWithCases?.forEach((card: any) => {
-      if (!themeToAccounts.has(card.theme_key)) {
-        themeToAccounts.set(card.theme_key, new Set());
-      }
-      themeToAccounts.get(card.theme_key)!.add(card.account_id);
-    });
-
-    // Build map: account_id → account name for matching
-    const accountIdToName = new Map<string, string>();
-    const accountIdToProducts = new Map<string, string>();
-    accounts?.forEach(acc => {
-      accountIdToName.set(acc.id, acc.name);
-      accountIdToProducts.set(acc.id, acc.products || '');
-    });
-
-    // Build map: jira_issue_id → issue details for text matching
-    const issueDetailsMap = new Map<string, { summary: string; description: string; jira_key: string }>();
-    insertedIssues?.forEach(issue => {
-      issueDetailsMap.set(issue.id, {
-        summary: issue.summary || '',
-        description: issue.description || '',
-        jira_key: issue.jira_key
-      });
-    });
-
-    // For each theme link, create account links ONLY if account name appears in ticket
-    const themeBasedAccountLinks: any[] = [];
-    let filteredOutCount = 0;
-
-    for (const themeLink of themeLinksToCreate) {
-      const accountsForTheme = themeToAccounts.get(themeLink.theme_key);
-      const issueDetails = issueDetailsMap.get(themeLink.jira_issue_id);
-
-      if (accountsForTheme && issueDetails) {
-        const searchText = `${issueDetails.summary} ${issueDetails.description}`.toLowerCase();
-
-        accountsForTheme.forEach(accountId => {
-          const accountName = accountIdToName.get(accountId);
-          if (!accountName) return;
-
-          // Check if account name (or significant parts) appears in ticket
-          const nameParts = accountName.toLowerCase().split(/[\s-,]+/).filter(part => part.length > 3);
-          const hasAccountMatch = nameParts.some(part => searchText.includes(part));
-
-          // Product/vertical filtering: prevent cross-industry and wrong-product linking
-          const jiraProject = issueDetails.jira_key.split('-')[0].toLowerCase();
-          const accountProducts = accountIdToProducts.get(accountId)?.toLowerCase() || '';
-
-          // Marine/RV projects: MREQ, TOPS, BZD (Boatyard), EASY (EasyStart Marine), NBK (NewBook), MDEV (Molo Dev)
-          const isMarineProject = ['mreq', 'tops', 'bzd', 'easy', 'nbk', 'mdev', 'esst'].includes(jiraProject);
-          const isMarineAccount = accountProducts.includes('dockwa') || accountProducts.includes('marina') || accountProducts.includes('molo');
-
-          // Storage projects: EDGE, SL, SLT, PAY, CRM, DATA, BUGS
-          const isStorageProject = ['edge', 'sl', 'slt', 'pay', 'crm', 'data', 'bugs'].includes(jiraProject);
-          const isStorageAccount = accountProducts.includes('edge') || accountProducts.includes('sitelink') || accountProducts.includes('storable');
-
-          // Product-specific matching: EDGE tickets only for EDGE accounts, SL only for SiteLink
-          const isEdgeTicket = jiraProject === 'edge';
-          const isSitelinkTicket = ['sl', 'slt'].includes(jiraProject);
-          const hasEdge = accountProducts.includes('edge');
-          const hasSitelink = accountProducts.includes('sitelink');
-
-          const isWrongProduct = (isEdgeTicket && !hasEdge) || (isSitelinkTicket && !hasSitelink);
-
-          // Skip cross-industry or wrong-product matches for theme_association (low confidence) links
-          const isCrossIndustry = (isMarineProject && isStorageAccount) || (isStorageProject && isMarineAccount);
-          const shouldSkip = isCrossIndustry || isWrongProduct;
-
-          if (hasAccountMatch && !shouldSkip) {
-            // High confidence: both theme AND name match, and correct industry/product
-            themeBasedAccountLinks.push({
-              user_id: userId,
-              account_id: accountId,
-              jira_issue_id: themeLink.jira_issue_id,
-              match_type: 'theme_and_name',
-              match_confidence: 0.85
-            });
-          } else if (hasAccountMatch && shouldSkip) {
-            // Name matches but wrong industry/product - skip to avoid false positive
-            filteredOutCount++;
-          } else if (!shouldSkip) {
-            // Medium confidence: theme matches, account name not in ticket, correct industry/product
-            themeBasedAccountLinks.push({
-              user_id: userId,
-              account_id: accountId,
-              jira_issue_id: themeLink.jira_issue_id,
-              match_type: 'theme_association',
-              match_confidence: 0.6 // Lower confidence without name match
-            });
-          } else {
-            // Skip: wrong industry/product with no name confirmation
-            filteredOutCount++;
-          }
-        });
-      }
-    }
-
-    console.log(`Created ${themeBasedAccountLinks.length} account links via theme associations (${themeBasedAccountLinks.length - filteredOutCount} with name match, ${filteredOutCount} theme-only)`);
-    accountLinksToCreate.push(...themeBasedAccountLinks);
-
-    // Batch insert account links (includes both direct Case ID links AND theme-based links)
+    // Batch insert account links (client_field and salesforce_case strategies only)
     let accountLinksCreated = 0;
     if (accountLinksToCreate.length > 0) {
       const { data: createdAccountLinks, error: accountLinksError } = await supabaseAdmin
