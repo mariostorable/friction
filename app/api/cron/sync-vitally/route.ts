@@ -63,12 +63,12 @@ export async function GET(request: Request) {
         const apiKey = tokenData.access_token;
         const authHeader = `Basic ${Buffer.from(`${apiKey}:`).toString('base64')}`;
 
-        // Fetch up to 100 accounts from Vitally
+        // Fetch up to 2000 facilities from Vitally
         const vitallyAccounts: any[] = [];
         let nextCursor: string | null = null;
         let pageCount = 0;
 
-        while (pageCount < 100 && vitallyAccounts.length < 100) {
+        while (pageCount < 100 && vitallyAccounts.length < 2000) {
           pageCount++;
           const url = nextCursor
             ? `${integration.instance_url}/resources/accounts?limit=100&from=${encodeURIComponent(nextCursor)}`
@@ -92,8 +92,8 @@ export async function GET(request: Request) {
           const pageResults = pageData.results || [];
           vitallyAccounts.push(...pageResults);
 
-          // Stop if we've reached 100 accounts
-          if (vitallyAccounts.length >= 100) {
+          // Stop if we've reached the limit
+          if (vitallyAccounts.length >= 2000) {
             break;
           }
 
