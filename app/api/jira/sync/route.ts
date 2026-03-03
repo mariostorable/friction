@@ -105,42 +105,50 @@ export async function POST(request: NextRequest) {
     let allIssues: any[] = [];
     let totalIssues = 0;
 
+    const fetchPage = async (jql: string, startAt: number): Promise<any> => {
+      const response = await fetch(
+        `${integration.instance_url}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&startAt=${startAt}&maxResults=${maxResults}&fields=*all`,
+        { headers: { 'Authorization': jiraAuthHeader, 'Accept': 'application/json' } }
+      );
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Jira API error (${response.status}) for JQL "${jql}" startAt=${startAt}: ${errorText.substring(0, 300)}`);
+      }
+      const responseText = await response.text();
+      try {
+        return JSON.parse(responseText);
+      } catch (e) {
+        throw new Error(`Jira returned non-JSON for JQL "${jql}" startAt=${startAt}: ${responseText.substring(0, 300)}`);
+      }
+    };
+
     const fetchPaginatedIssues = async (jql: string, cap: number | null): Promise<any[]> => {
-      const issues: any[] = [];
-      let startAt = 0;
-      let hasMore = true;
-      let iteration = 0;
+      // Fetch first page to get total count
+      const firstPage = await fetchPage(jql, 0);
+      const total = firstPage.total || 0;
+      const issues: any[] = [...(firstPage.issues || [])];
 
-      while (hasMore) {
-        iteration++;
-        const response = await fetch(
-          `${integration.instance_url}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&startAt=${startAt}&maxResults=${maxResults}&fields=*all`,
-          { headers: { 'Authorization': jiraAuthHeader, 'Accept': 'application/json' } }
-        );
+      if (total === 0) return issues;
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Jira API error (${response.status}) for JQL "${jql}": ${errorText.substring(0, 300)}`);
-        }
-
-        const responseText = await response.text();
-        let data: any;
-        try {
-          data = JSON.parse(responseText);
-        } catch (e) {
-          throw new Error(`Jira returned non-JSON for JQL "${jql}": ${responseText.substring(0, 300)}`);
-        }
-        const fetched = data.issues?.length || 0;
-        if (fetched > 0) issues.push(...data.issues);
-
-        totalIssues = data.total || totalIssues;
-        hasMore = fetched === maxResults && (cap === null || issues.length < cap);
-        startAt += maxResults;
-
-        console.log(`[${jql.substring(0, 30)}...] iter ${iteration}: fetched ${issues.length} so far`);
+      const limit = cap ? Math.min(total, cap) : total;
+      const remainingStarts: number[] = [];
+      for (let startAt = maxResults; startAt < limit; startAt += maxResults) {
+        remainingStarts.push(startAt);
       }
 
-      return issues;
+      if (remainingStarts.length === 0) return issues;
+
+      // Fetch remaining pages in parallel batches of 5
+      const BATCH_SIZE = 5;
+      for (let i = 0; i < remainingStarts.length; i += BATCH_SIZE) {
+        const batch = remainingStarts.slice(i, i + BATCH_SIZE);
+        const pages = await Promise.all(batch.map(startAt => fetchPage(jql, startAt)));
+        pages.forEach(page => issues.push(...(page.issues || [])));
+        console.log(`[${jql.substring(0, 40)}] fetched ${issues.length}/${limit}`);
+      }
+
+      totalIssues = total;
+      return issues.slice(0, limit);
     };
 
     // Pass 1: EDGE tickets (guaranteed - these have Salesforce case number links)
