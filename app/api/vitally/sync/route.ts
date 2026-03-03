@@ -127,13 +127,25 @@ export async function POST() {
       });
     }
 
-    // Get all existing accounts for this user to match against
+    // Get portfolio accounts only (top 25 edge + sitelink + marine) — avoid noise from all 1000+ accounts
+    const { data: portfolios } = await supabaseAdmin
+      .from('portfolios')
+      .select('account_ids')
+      .eq('user_id', user.id)
+      .in('portfolio_type', ['top_25_edge', 'top_25_sitelink', 'top_25_marine']);
+
+    const portfolioAccountIds = new Set<string>();
+    portfolios?.forEach(p => p.account_ids.forEach((id: string) => portfolioAccountIds.add(id)));
+    console.log(`Restricting Vitally matching to ${portfolioAccountIds.size} portfolio accounts`);
+
+    // Get only portfolio accounts for matching
     const { data: existingAccounts } = await supabaseAdmin
       .from('accounts')
       .select('id, salesforce_id, name')
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .in('id', Array.from(portfolioAccountIds));
 
-    // Create a map for quick lookup by Salesforce ID
+    // Create lookup maps
     const accountsBySalesforceId = new Map();
     const accountsByName = new Map();
     existingAccounts?.forEach(acc => {
@@ -248,6 +260,14 @@ export async function POST() {
         }
         if (!matchedAccount) {
           matchedAccount = accountsByName.get(accountName.toLowerCase().trim());
+        }
+        // Fuzzy fallback: check if Vitally name is contained in SF account name or vice versa
+        if (!matchedAccount && accountName.length >= 5) {
+          const vNameLower = accountName.toLowerCase().trim();
+          matchedAccount = existingAccounts?.find(acc => {
+            const sfNameLower = acc.name.toLowerCase();
+            return sfNameLower.includes(vNameLower) || vNameLower.includes(sfNameLower.split(' - ')[0].trim());
+          }) || null;
         }
 
         if (matchedAccount) {
