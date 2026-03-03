@@ -444,25 +444,17 @@ export async function POST(request: NextRequest) {
           .filter((name: string) => name.length > 0);
 
         if (clientNames.length > 0) {
-          console.log(`${issue.jira_key} has Client(s) field (${clientNames.length}): ${clientNames.join(', ')}`);
-
           for (const clientName of clientNames) {
             // Use alias table lookup — exact match only (no fuzzy text scanning)
             const sfAccountName = clientAliasMap.get(clientName.toLowerCase());
-            if (!sfAccountName) {
-              console.log(`  ✗ "${clientName}" not in alias table or is flagged ambiguous — skipping`);
-              continue;
-            }
+            if (!sfAccountName) continue;
 
             // Find all accounts with this exact SF name (duplicates exist for CORP parents)
             const matchingAccounts = accounts?.filter(acc =>
               acc.name.toLowerCase() === sfAccountName.toLowerCase()
             );
 
-            if (!matchingAccounts || matchingAccounts.length === 0) {
-              console.log(`  ✗ "${clientName}" → "${sfAccountName}" not found in active accounts`);
-              continue;
-            }
+            if (!matchingAccounts || matchingAccounts.length === 0) continue;
 
             // Use first match — alias table is manually curated so no product validation needed
             const bestMatch = matchingAccounts[0];
@@ -474,14 +466,13 @@ export async function POST(request: NextRequest) {
               match_type: 'client_field',
               match_confidence: 0.85
             });
-            console.log(`  ✓ Alias matched "${clientName}" → ${bestMatch.name}`);
           }
         }
       }
 
       // Look for Salesforce Case ID in ALL custom fields by checking the VALUE
       // Don't filter by field name - just scan all field values for case numbers
-      for (const [key, value] of Object.entries(customFields)) {
+      for (const [, value] of Object.entries(customFields)) {
         if (!value) continue;
 
         const fieldValue = value.toString();
@@ -490,16 +481,12 @@ export async function POST(request: NextRequest) {
         const caseMatches = fieldValue.match(/\b\d{8}\b/g);
         if (caseMatches) {
           salesforceCaseIds.push(...caseMatches);
-          console.log(`Found ${caseMatches.length} Salesforce Case Number(s) in ${key}: ${caseMatches.join(', ')}`);
-          // Don't break - keep looking in case multiple fields have case numbers
         }
 
         // Also check for 15/18-char Salesforce IDs (format: 500XXXXXXXXXXXXX)
         const longIdMatch = fieldValue.match(/\b500[a-zA-Z0-9]{12,15}\b/g);
         if (longIdMatch) {
           salesforceCaseIds.push(...longIdMatch);
-          console.log(`Found ${longIdMatch.length} Salesforce Case ID(s) in ${key}: ${longIdMatch.join(', ')}`);
-          // Don't break - keep looking
         }
       }
 
@@ -547,7 +534,6 @@ export async function POST(request: NextRequest) {
 
         if (hasDirectLink) {
           directLinksCount++;
-          console.log(`Direct link: ${issue.jira_key} → Cases [${salesforceCaseIds.join(', ')}] → ${allAccountIds.size} accounts, ${allThemes.size} themes`);
         }
       }
 
