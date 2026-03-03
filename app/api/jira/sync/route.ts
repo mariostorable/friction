@@ -112,7 +112,24 @@ export async function POST(request: NextRequest) {
 
       while (issues.length < cap) {
         pageNum++;
-        const url = `${integration.instance_url}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&startAt=${startAt}&maxResults=${maxResults}&fields=*all`;
+        const fields = [
+          'summary', 'description', 'status', 'issuetype', 'priority',
+          'created', 'updated', 'components', 'fixVersions', 'labels',
+          'customfield_12184', // Client(s) field
+          'customfield_17254', // SF Case Numbers
+          'customfield_10007', // Sprint
+          'customfield_10008', // Epic Link
+          'customfield_12046', // Team
+          'customfield_12114', // Fix Version
+          'customfield_12141', // Product Area
+          'customfield_12145', // Environment
+          'customfield_12186', // CSM
+          'customfield_12976', // Account Manager
+          'customfield_15858', // Customer Priority
+          'customfield_17089', // Customer Impacting
+          'customfield_17453', // AHA Link
+        ].join(',');
+        const url = `${integration.instance_url}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&startAt=${startAt}&maxResults=${maxResults}&fields=${fields}`;
         const response = await fetch(url, {
           headers: { 'Authorization': jiraAuthHeader, 'Accept': 'application/json' }
         });
