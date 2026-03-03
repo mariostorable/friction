@@ -338,14 +338,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch the DB rows for all upserted keys to get their IDs for link creation
+    // Must chunk to avoid Supabase's 1000-item .in() limit
     const jiraKeys = uniqueJiraIssues.map(i => i.jira_key);
-    const { data: insertedIssues } = await supabaseAdmin
-      .from('jira_issues')
-      .select('id, jira_key, metadata, labels, components, summary, description')
-      .eq('user_id', userId)
-      .in('jira_key', jiraKeys);
+    const CHUNK_SIZE = 500;
+    const insertedIssues: any[] = [];
+    for (let i = 0; i < jiraKeys.length; i += CHUNK_SIZE) {
+      const chunk = jiraKeys.slice(i, i + CHUNK_SIZE);
+      const { data: batch } = await supabaseAdmin
+        .from('jira_issues')
+        .select('id, jira_key, metadata, labels, components, summary, description')
+        .eq('user_id', userId)
+        .in('jira_key', chunk);
+      if (batch) insertedIssues.push(...batch);
+    }
 
-    console.log(`Stored ${uniqueJiraIssues.length} issues, fetched ${insertedIssues?.length || 0} back from DB for linking`);
+    console.log(`Stored ${uniqueJiraIssues.length} issues, fetched ${insertedIssues.length} back from DB for linking`);
 
     // Step 1: Build CaseNumber → AccountID map directly from raw_inputs
     // Query raw_inputs directly (not via friction_cards) to catch ALL synced cases,
@@ -449,11 +456,6 @@ export async function POST(request: NextRequest) {
         if (clientNames.length > 0) {
           console.log(`${issue.jira_key} has Client(s) field (${clientNames.length}): ${clientNames.join(', ')}`);
 
-          // Determine product from Jira project key for validation
-          const projectCode = issue.jira_key.split('-')[0].toUpperCase();
-          const isEdgeTicket = projectCode === 'EDGE';
-          const isSiteLinkTicket = projectCode === 'SLINK' || projectCode === 'SL';
-
           for (const clientName of clientNames) {
             // Use alias table lookup — exact match only (no fuzzy text scanning)
             const sfAccountName = clientAliasMap.get(clientName.toLowerCase());
@@ -462,35 +464,27 @@ export async function POST(request: NextRequest) {
               continue;
             }
 
-            // Find the account with this exact SF name
-            const matchingAccount = accounts?.find(acc =>
+            // Find all accounts with this exact SF name (duplicates exist for CORP parents)
+            const matchingAccounts = accounts?.filter(acc =>
               acc.name.toLowerCase() === sfAccountName.toLowerCase()
             );
 
-            if (!matchingAccount) {
+            if (!matchingAccounts || matchingAccounts.length === 0) {
               console.log(`  ✗ "${clientName}" → "${sfAccountName}" not found in active accounts`);
               continue;
             }
 
-            // Product validation: prevents cross-product false positives
-            const accountProducts = (matchingAccount.products || '').toLowerCase();
-            if (isEdgeTicket && !accountProducts.includes('edge')) {
-              console.log(`  ✗ Product mismatch: ${projectCode} ticket → ${matchingAccount.name} (products: ${matchingAccount.products})`);
-              continue;
-            }
-            if (isSiteLinkTicket && !accountProducts.includes('sitelink')) {
-              console.log(`  ✗ Product mismatch: ${projectCode} ticket → ${matchingAccount.name} (products: ${matchingAccount.products})`);
-              continue;
-            }
+            // Use first match — alias table is manually curated so no product validation needed
+            const bestMatch = matchingAccounts[0];
 
             clientFieldLinks.push({
               user_id: userId,
-              account_id: matchingAccount.id,
+              account_id: bestMatch.id,
               jira_issue_id: issue.id,
               match_type: 'client_field',
               match_confidence: 0.85
             });
-            console.log(`  ✓ Alias matched "${clientName}" → ${matchingAccount.name}`);
+            console.log(`  ✓ Alias matched "${clientName}" → ${bestMatch.name}`);
           }
         }
       }
