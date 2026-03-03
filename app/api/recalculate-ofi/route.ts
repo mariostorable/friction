@@ -48,10 +48,10 @@ export async function POST() {
     for (const accountId of Array.from(accountIds)) {
       const userId = userIdByAccount.get(accountId)!;
 
-      // Get friction cards from last 90 days
+      // Get friction cards from last 90 days (include created_at for time-decay)
       const { data: frictionCards } = await supabase
         .from('friction_cards')
-        .select('severity, theme_key, is_friction')
+        .select('severity, theme_key, is_friction, created_at')
         .eq('account_id', accountId)
         .eq('is_friction', true)
         .gte('created_at', ninetyDaysAgo);
@@ -66,11 +66,24 @@ export async function POST() {
 
       const cards = frictionCards || [];
       const totalCases = caseVolume || 1;
+      const now = Date.now();
 
-      // Calculate OFI with new formula
+      // Time-decay factor: cards lose weight as they age over 90 days.
+      // A card created today = 1.0, a card 45 days old = ~0.5, 90 days old = ~0.1
+      // Uses exponential decay: e^(-age_days / 30) so half-life ≈ 21 days
+      const decayWeight = (createdAt: string) => {
+        const ageDays = (now - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24);
+        return Math.exp(-ageDays / 30);
+      };
+
+      // Calculate OFI with time-decay applied to severity weights
       const highSeverityCount = cards.filter(c => c.severity >= 4).length;
       const severityWeights: Record<number, number> = { 1: 1, 2: 2, 3: 3, 4: 5, 5: 8 };
-      const weightedScore = cards.reduce((sum, card) => sum + (severityWeights[card.severity] || 1), 0);
+      const weightedScore = cards.reduce((sum, card) => {
+        const baseSeverity = severityWeights[card.severity] || 1;
+        const decay = decayWeight(card.created_at);
+        return sum + baseSeverity * decay;
+      }, 0);
       const frictionDensity = (cards.length / totalCases) * 100;
       const baseScore = Math.log10(weightedScore + 1) * 15;
       const densityMultiplier = Math.min(1.5, Math.max(0.5, frictionDensity / 5));
@@ -95,12 +108,13 @@ export async function POST() {
         .sort((a, b) => b.count - a.count)
         .slice(0, 5);
 
-      // Get yesterday's snapshot for trend
+      // Get snapshot from ~30 days ago for trend comparison (more meaningful than yesterday)
+      const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       const { data: previousSnapshot } = await supabase
         .from('account_snapshots')
         .select('ofi_score')
         .eq('account_id', accountId)
-        .lt('snapshot_date', today)
+        .lte('snapshot_date', thirtyDaysAgo)
         .order('snapshot_date', { ascending: false })
         .limit(1)
         .maybeSingle();
