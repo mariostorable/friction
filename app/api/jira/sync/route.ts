@@ -547,6 +547,44 @@ export async function POST(request: NextRequest) {
         keywordLinksCount += clientFieldLinks.length;
       }
 
+      // STRATEGY 3: Account name scan — for SiteLink/PAY/BUGS/CRM tickets missing case & client links
+      // These projects don't reliably populate customfield_12184, so scan summary+description for known names
+      const isSiteLinkProject = /^(SL|SLT|PAY|PAYEXT|BUGS|CRM|WA|POL|CPBUG|DATA|DAT|SF|SFT|CAL|DEVOPS|WEB)-/i.test(issue.jira_key || '');
+      if (!hasDirectLink && clientFieldLinks.length === 0 && isSiteLinkProject && clientAliasMap.size > 0) {
+        const searchText = `${issue.summary || ''} ${issue.description || ''}`.toLowerCase();
+        const nameScanLinks: any[] = [];
+        const seenAccountIds = new Set<string>();
+
+        for (const [shortName, sfAccountName] of Array.from(clientAliasMap.entries())) {
+          // Skip very short or generic names that cause false positives
+          if (shortName.length < 4) continue;
+
+          if (searchText.includes(shortName.toLowerCase())) {
+            const matchingAccounts = accounts?.filter(acc =>
+              acc.name.toLowerCase() === sfAccountName.toLowerCase()
+            );
+            if (!matchingAccounts || matchingAccounts.length === 0) continue;
+
+            const bestMatch = matchingAccounts[0];
+            if (!seenAccountIds.has(bestMatch.id)) {
+              seenAccountIds.add(bestMatch.id);
+              nameScanLinks.push({
+                user_id: userId,
+                account_id: bestMatch.id,
+                jira_issue_id: issue.id,
+                match_type: 'account_name',
+                match_confidence: 0.7
+              });
+            }
+          }
+        }
+
+        if (nameScanLinks.length > 0) {
+          accountLinksToCreate.push(...nameScanLinks);
+          keywordLinksCount += nameScanLinks.length;
+        }
+      }
+
       // Theme keyword matching (for "By Theme" view) — always run regardless of account links
       const keywordThemeLinks = getThemeLinksFromActualThemes(userId, issue, actualThemes);
       themeLinksToCreate.push(...keywordThemeLinks);
