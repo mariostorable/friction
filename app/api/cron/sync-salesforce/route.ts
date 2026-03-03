@@ -36,12 +36,12 @@ export async function GET(request: Request) {
       try {
         console.log(`Processing Salesforce sync for user ${integration.user_id}`);
 
-        // Get all portfolios for this user (top 25 storage + marine)
+        // Get all portfolios for this user (top 25 edge + sitelink + marine)
         const { data: portfolios } = await supabaseAdmin
           .from('portfolios')
           .select('account_ids, portfolio_type')
           .eq('user_id', integration.user_id)
-          .in('portfolio_type', ['top_25_edge', 'top_25_marine']);
+          .in('portfolio_type', ['top_25_edge', 'top_25_sitelink', 'top_25_marine']);
 
         if (!portfolios || portfolios.length === 0) {
           console.log(`No portfolios found for user ${integration.user_id}`);
