@@ -120,10 +120,16 @@ export async function POST(request: NextRequest) {
 
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(`Jira API error: ${errorText}`);
+          throw new Error(`Jira API error (${response.status}) for JQL "${jql}": ${errorText.substring(0, 300)}`);
         }
 
-        const data = await response.json();
+        const responseText = await response.text();
+        let data: any;
+        try {
+          data = JSON.parse(responseText);
+        } catch (e) {
+          throw new Error(`Jira returned non-JSON for JQL "${jql}": ${responseText.substring(0, 300)}`);
+        }
         const fetched = data.issues?.length || 0;
         if (fetched > 0) issues.push(...data.issues);
 
@@ -145,10 +151,12 @@ export async function POST(request: NextRequest) {
     );
     console.log(`Pass 1 complete: ${edgeIssues.length} EDGE tickets`);
 
-    // Pass 2: Non-EDGE tickets (capped)
-    console.log('Pass 2: Fetching non-EDGE tickets...');
+    // Pass 2: Storage-relevant non-EDGE projects only (skip marine/RV/internal)
+    // Marine projects (NBK, MREQ, MDEV, EASY, TOPS, BZD, ESST) filtered out - not relevant to storage roadmap
+    const STORAGE_PROJECTS = ['WEB', 'BUGS', 'SL', 'SLT', 'PAY', 'CRM', 'DATA', 'SF', 'STOR', 'SAC', 'CPBUG', 'WA', 'PAYEXT'];
+    console.log('Pass 2: Fetching storage-relevant non-EDGE tickets...');
     const otherIssues = await fetchPaginatedIssues(
-      `project not in (EDGE) AND updated >= "-180d" ORDER BY updated DESC`,
+      `project in (${STORAGE_PROJECTS.join(', ')}) AND updated >= "-180d" ORDER BY updated DESC`,
       OTHER_ISSUES_CAP
     );
     console.log(`Pass 2 complete: ${otherIssues.length} other tickets`);
