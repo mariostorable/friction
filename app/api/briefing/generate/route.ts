@@ -204,6 +204,17 @@ ${shouldPrioritize?.slice(0, 5).map((theme: any) =>
     }
   }
 
+  // Determine product gaps for the prompt
+  const productsRaw = account.products || '';
+  const hasInsurance = /insurance/i.test(productsRaw);
+  const hasAccessControl = /access.?control/i.test(productsRaw);
+  const hasCRM = /crm/i.test(productsRaw);
+  const productGapLines = [
+    !hasInsurance ? '- Insurance: NOT in use — upsell opportunity' : '- Insurance: Active',
+    !hasAccessControl ? '- Access Control: NOT in use — upsell opportunity' : '- Access Control: Active',
+    !hasCRM ? '- CRM: NOT in use — upsell opportunity' : '- CRM: Active',
+  ].join('\n');
+
   return `You are preparing a quick customer visit briefing for a business executive.
 
 ACCOUNT INFORMATION:
@@ -214,6 +225,9 @@ ACCOUNT INFORMATION:
 - Segment: ${account.segment || 'Unknown'}
 - Customer Since: ${account.customer_since || 'Unknown'}
 - OFI Score: ${ofiScore.toFixed(0)} ${trendText} (${trend > 0 ? '+' : ''}${trend.toFixed(0)}%)${vitallySection}
+
+PRODUCT GAP ANALYSIS (for upsell discussion):
+${productGapLines}
 
 IMPORTANT - OFI SCORE INTERPRETATION:
 - The OFI (Operational Friction Index) ranges from 0-100
@@ -249,6 +263,19 @@ Generate a JSON object for a QUICK customer visit briefing (2-3 minute read):
   "segment": "${account.segment || 'Unknown'}",
   "ofi_score": ${ofiScore.toFixed(0)},
   "trend": "${trendText}",
+  "product_intel": {
+    "active_products": [
+      // List of products currently in use, each as a short string e.g. "Software (EDGE)", "Marketplace (SpareFoot)"
+    ],
+    "opportunities": [
+      // Only include products they do NOT currently use, from: Insurance, Access Control, CRM
+      // For each missing product, provide a tailored talk track based on their friction signals and account profile
+      {
+        "product": "Insurance | Access Control | CRM",
+        "talk_track": "One or two sentences on why this product makes sense for them specifically, referencing their size, friction patterns, or business context"
+      }
+    ]
+  },
   "attention_items": [
     // IMPORTANT: For each attention item, extract the case_id and case_date:
     // - case_id: Use the raw_input_id from the friction card data

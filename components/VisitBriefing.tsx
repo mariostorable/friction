@@ -26,6 +26,11 @@ interface JiraDiscussionGap {
   talk_track: string;
 }
 
+interface ProductOpportunity {
+  product: string;
+  talk_track: string;
+}
+
 interface BriefingData {
   account_name: string;
   visit_date: string;
@@ -34,6 +39,10 @@ interface BriefingData {
   segment: string;
   ofi_score: number;
   trend: string;
+  product_intel?: {
+    active_products: string[];
+    opportunities: ProductOpportunity[];
+  };
   attention_items: Array<{
     title: string;
     severity: string;
@@ -173,6 +182,33 @@ export default function VisitBriefing({ account, frictionCards, snapshot }: Visi
     y += 5;
     doc.text(briefing.vertical + ' | ' + briefing.segment, margin, y);
     y += 10;
+
+    // Product Snapshot
+    if (briefing.product_intel) {
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Product Snapshot', margin, y);
+      y += 6;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      if (briefing.product_intel.active_products?.length > 0) {
+        doc.text('Using: ' + briefing.product_intel.active_products.join(', '), margin + 2, y);
+        y += 5;
+      }
+      if (briefing.product_intel.opportunities?.length > 0) {
+        doc.setFont('helvetica', 'bold');
+        doc.text('Opportunities:', margin + 2, y);
+        y += 4;
+        doc.setFont('helvetica', 'normal');
+        briefing.product_intel.opportunities.forEach((opp: ProductOpportunity) => {
+          if (y > 265) { doc.addPage(); y = 20; }
+          const oppLines = doc.splitTextToSize(`• ${opp.product} (not in use): ${opp.talk_track}`, maxWidth - 4);
+          oppLines.forEach((line: string) => { doc.text(line, margin + 4, y); y += 4; });
+          y += 2;
+        });
+      }
+      y += 6;
+    }
 
     // OFI Score
     doc.setFontSize(12);
@@ -463,6 +499,43 @@ export default function VisitBriefing({ account, frictionCards, snapshot }: Visi
                   </div>
                 </div>
               </div>
+
+              {briefing.product_intel && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">📦 Product Snapshot</h3>
+                  <div className="rounded-lg border border-gray-200 overflow-hidden">
+                    {briefing.product_intel.active_products?.length > 0 && (
+                      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Currently Using</p>
+                        <div className="flex flex-wrap gap-2">
+                          {briefing.product_intel.active_products.map((p, i) => (
+                            <span key={i} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">{p}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {briefing.product_intel.opportunities?.length > 0 && (
+                      <div className="divide-y divide-amber-100">
+                        <div className="px-4 py-2 bg-amber-50">
+                          <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Opportunities to Discuss</p>
+                        </div>
+                        {briefing.product_intel.opportunities.map((opp, i) => (
+                          <div key={i} className="px-4 py-3 bg-white">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-semibold rounded">{opp.product}</span>
+                              <span className="text-xs text-gray-400">not in use</span>
+                            </div>
+                            <p className="text-sm text-gray-700 italic">"{opp.talk_track}"</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {(!briefing.product_intel.opportunities || briefing.product_intel.opportunities.length === 0) && (
+                      <div className="px-4 py-3 text-sm text-gray-500">All key products active — no gaps identified.</div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {briefing.attention_items?.length > 0 && (
                 <div>
