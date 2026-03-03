@@ -132,12 +132,17 @@ export async function GET(request: NextRequest) {
       .eq('user_id', user.id)
       .in('match_type', ['salesforce_case', 'client_field']);
 
-    // Filter out marine/RV tickets by project code, and ops issue types
+    // Filter tickets by project type:
+    // - When viewing marine portfolio: only show marine project tickets
+    // - When viewing storage portfolios (or all): exclude marine project tickets
     const marineProjects = ['NBK', 'MREQ', 'MDEV', 'EASY', 'TOPS', 'BZD', 'ESST'];
+    const isMarine = portfolioFilter === 'top_25_marine';
     const filteredLinks = accountJiraLinks?.filter((link: any) => {
       const issue = link.jira_issues;
       const projectCode = issue.jira_key.split('-')[0].toUpperCase();
-      if (marineProjects.includes(projectCode)) return false;
+      const isMarineTicket = marineProjects.includes(projectCode);
+      if (isMarine && !isMarineTicket) return false;  // marine view: only marine tickets
+      if (!isMarine && isMarineTicket) return false;   // storage view: exclude marine tickets
       if (!showOpsTickets && OPS_ISSUE_TYPES.includes(issue.issue_type)) return false;
       return true;
     }) || [];

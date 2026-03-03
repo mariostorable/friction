@@ -7,23 +7,6 @@ import { getDecryptedToken } from '@/lib/encryption';
 export const maxDuration = 300; // Max allowed on Vercel Pro
 export const dynamic = 'force-dynamic';
 
-// Theme keyword mapping for intelligent matching
-const THEME_KEYWORDS: Record<string, string[]> = {
-  'billing_confusion': ['billing', 'invoice', 'payment', 'charge', 'subscription', 'pricing', 'refund', 'credit'],
-  'integration_failures': ['integration', 'api', 'sync', 'connection', 'webhook', 'import', 'export', 'connector'],
-  'ui_confusion': ['ui', 'interface', 'confusing', 'unclear', 'hard to find', 'navigation', 'usability', 'ux'],
-  'performance_issues': ['slow', 'performance', 'loading', 'timeout', 'lag', 'speed', 'hanging', 'freeze'],
-  'missing_features': ['feature request', 'missing', 'add', 'enhancement', 'capability', 'functionality'],
-  'training_gaps': ['training', 'how to', 'tutorial', 'documentation', 'help', 'guide', 'learn'],
-  'support_response_time': ['support', 'response', 'waiting', 'delayed', 'ticket', 'no reply'],
-  'data_quality': ['data', 'incorrect', 'missing', 'wrong', 'inaccurate', 'corrupt', 'inconsistent'],
-  'reporting_issues': ['report', 'dashboard', 'analytics', 'export', 'csv', 'excel', 'chart'],
-  'access_permissions': ['access', 'permission', 'login', 'password', 'locked out', 'authentication', 'authorization'],
-  'configuration_problems': ['configuration', 'settings', 'setup', 'config', 'preferences'],
-  'notification_issues': ['notification', 'email', 'alert', 'reminder', 'message'],
-  'workflow_inefficiency': ['workflow', 'process', 'manual', 'tedious', 'time consuming', 'inefficient'],
-  'mobile_issues': ['mobile', 'app', 'ios', 'android', 'phone', 'tablet', 'responsive'],
-};
 
 export async function POST(request: NextRequest) {
   try {
@@ -98,18 +81,17 @@ export async function POST(request: NextRequest) {
     const jiraAuthHeader = `Basic ${Buffer.from(`${email}:${tokens.access_token}`).toString('base64')}`;
 
     // Fetch all issues across relevant projects within the last 365 days.
-    // No hard caps — pagination stops naturally when all pages are exhausted.
-    // If a Vercel timeout occurs, reduce the date window or add per-project caps.
+    // Per-pass caps prevent Vercel 5-min timeout — raise if needed.
     const maxResults = 100;
     let allIssues: any[] = [];
     let totalIssues = 0;
 
-    const fetchPaginatedIssues = async (jql: string): Promise<any[]> => {
+    const fetchPaginatedIssues = async (jql: string, cap = 2000): Promise<any[]> => {
       const issues: any[] = [];
       let startAt = 0;
       let pageNum = 0;
 
-      while (true) {
+      while (issues.length < cap) {
         pageNum++;
         const fields = [
           'summary', 'description', 'status', 'issuetype', 'priority',
@@ -154,43 +136,56 @@ export async function POST(request: NextRequest) {
         startAt += maxResults;
       }
 
-      return issues;
+      return issues.slice(0, cap);
     };
 
-    // Pass 1: EDGE tickets
+    // Pass 1: EDGE tickets (cap 800)
     console.log('Pass 1: Fetching EDGE tickets...');
     const edgeIssues = await fetchPaginatedIssues(
-      `project = EDGE AND updated >= "-365d" ORDER BY updated DESC`
+      `project = EDGE AND updated >= "-365d" ORDER BY updated DESC`, 800
     );
     console.log(`Pass 1 complete: ${edgeIssues.length} EDGE tickets`);
 
-    // Pass 2: SiteLink tickets
+    // Pass 2: SiteLink tickets (cap 800)
     console.log('Pass 2: Fetching SiteLink tickets...');
     let slIssues: any[] = [];
     try {
       slIssues = await fetchPaginatedIssues(
-        `project = SL AND updated >= "-365d" ORDER BY updated DESC`
+        `project = SL AND updated >= "-365d" ORDER BY updated DESC`, 800
       );
       console.log(`Pass 2 complete: ${slIssues.length} SiteLink tickets`);
     } catch (err) {
       console.error(`Pass 2 (SiteLink) failed (continuing):`, err instanceof Error ? err.message : err);
     }
 
-    // Pass 3: Remaining storage-relevant projects
+    // Pass 3: Marine projects (cap 500)
+    const MARINE_PROJECTS = ['NBK', 'MREQ', 'MDEV', 'EASY', 'TOPS', 'BZD', 'ESST'];
+    const marineJql = MARINE_PROJECTS.map(p => `"${p}"`).join(', ');
+    let marineIssues: any[] = [];
+    try {
+      marineIssues = await fetchPaginatedIssues(
+        `project in (${marineJql}) AND updated >= "-365d" ORDER BY updated DESC`, 500
+      );
+      console.log(`Pass 3 complete: ${marineIssues.length} marine tickets`);
+    } catch (err) {
+      console.error(`Pass 3 (marine) failed (continuing):`, err instanceof Error ? err.message : err);
+    }
+
+    // Pass 4: Remaining storage-relevant projects (cap 500)
     const OTHER_PROJECTS = ['WEB', 'BUGS', 'SLT', 'PAY', 'CRM', 'DATA', 'SF', 'STOR', 'SAC', 'CPBUG', 'WA', 'PAYEXT', 'POL', 'SFT'];
     const projectsJql = OTHER_PROJECTS.map(p => `"${p}"`).join(', ');
     let otherIssues: any[] = [];
     try {
       otherIssues = await fetchPaginatedIssues(
-        `project in (${projectsJql}) AND updated >= "-365d" ORDER BY updated DESC`
+        `project in (${projectsJql}) AND updated >= "-365d" ORDER BY updated DESC`, 500
       );
-      console.log(`Pass 3 complete: ${otherIssues.length} other tickets`);
+      console.log(`Pass 4 complete: ${otherIssues.length} other tickets`);
     } catch (err) {
-      console.error(`Pass 3 failed (continuing with EDGE + SiteLink only):`, err instanceof Error ? err.message : err);
+      console.error(`Pass 4 failed (continuing):`, err instanceof Error ? err.message : err);
     }
 
-    allIssues = [...edgeIssues, ...slIssues, ...otherIssues];
-    console.log(`Total: ${allIssues.length} (${edgeIssues.length} EDGE + ${slIssues.length} SiteLink + ${otherIssues.length} other)`);
+    allIssues = [...edgeIssues, ...slIssues, ...marineIssues, ...otherIssues];
+    console.log(`Total: ${allIssues.length} (${edgeIssues.length} EDGE + ${slIssues.length} SiteLink + ${marineIssues.length} marine + ${otherIssues.length} other)`);
 
     console.log(`\n=== Pagination Complete ===`);
     console.log(`Finished fetching ${allIssues.length} Jira issues (${totalIssues} total available)`);
@@ -619,136 +614,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Helper: Link a Jira issue to friction themes
-async function linkIssueToThemes(supabase: any, userId: string, issue: any): Promise<string[]> {
-  const linkedThemes: string[] = [];
-  const searchText = `${issue.summary} ${issue.description || ''}`.toLowerCase();
-  const componentsText = (issue.components || []).join(' ').toLowerCase();
-
-  // Strategy 1: Label-based matching (highest confidence)
-  for (const label of issue.labels || []) {
-    const labelLower = label.toLowerCase().replace(/[_-\s]/g, '_');
-
-    // Check if label matches a theme key exactly
-    if (THEME_KEYWORDS[labelLower]) {
-      await createThemeLink(supabase, userId, issue.id, labelLower, 'label', 1.0);
-      linkedThemes.push(labelLower);
-    }
-  }
-
-  // Strategy 2: Component-based matching (high confidence)
-  // Components often directly map to product areas
-  if (componentsText) {
-    for (const [themeKey, keywords] of Object.entries(THEME_KEYWORDS)) {
-      if (linkedThemes.includes(themeKey)) continue;
-
-      const componentMatches = keywords.filter(keyword =>
-        componentsText.includes(keyword.toLowerCase())
-      ).length;
-
-      if (componentMatches >= 1) {
-        await createThemeLink(supabase, userId, issue.id, themeKey, 'component', 0.9);
-        linkedThemes.push(themeKey);
-      }
-    }
-  }
-
-  // Strategy 3: Keyword-based matching (medium confidence)
-  for (const [themeKey, keywords] of Object.entries(THEME_KEYWORDS)) {
-    // Skip if already linked via label or component
-    if (linkedThemes.includes(themeKey)) continue;
-
-    // Count keyword matches
-    const matchCount = keywords.filter(keyword =>
-      searchText.includes(keyword.toLowerCase())
-    ).length;
-
-    if (matchCount >= 2) {
-      // At least 2 keywords match → high confidence
-      await createThemeLink(supabase, userId, issue.id, themeKey, 'keyword', 0.8);
-      linkedThemes.push(themeKey);
-    } else if (matchCount === 1) {
-      // 1 keyword match → medium confidence
-      await createThemeLink(supabase, userId, issue.id, themeKey, 'keyword', 0.5);
-      linkedThemes.push(themeKey);
-    }
-  }
-
-  return linkedThemes;
-}
-
-// Helper: Get theme links for batch processing (doesn't do DB operations)
-function getThemeLinks(userId: string, issue: any): any[] {
-  const links: any[] = [];
-  const linkedThemes: string[] = [];
-  const searchText = `${issue.summary} ${issue.description || ''}`.toLowerCase();
-  const componentsText = (issue.components || []).join(' ').toLowerCase();
-
-  // Strategy 1: Label-based matching
-  for (const label of issue.labels || []) {
-    const labelLower = label.toLowerCase().replace(/[_-\s]/g, '_');
-    if (THEME_KEYWORDS[labelLower]) {
-      links.push({
-        user_id: userId,
-        jira_issue_id: issue.id,
-        theme_key: labelLower,
-        match_type: 'label',
-        match_confidence: 1.0
-      });
-      linkedThemes.push(labelLower);
-    }
-  }
-
-  // Strategy 2: Component-based matching
-  if (componentsText) {
-    for (const [themeKey, keywords] of Object.entries(THEME_KEYWORDS)) {
-      if (linkedThemes.includes(themeKey)) continue;
-      const componentMatches = keywords.filter(keyword =>
-        componentsText.includes(keyword.toLowerCase())
-      ).length;
-      if (componentMatches >= 1) {
-        links.push({
-          user_id: userId,
-          jira_issue_id: issue.id,
-          theme_key: themeKey,
-          match_type: 'component',
-          match_confidence: 0.9
-        });
-        linkedThemes.push(themeKey);
-      }
-    }
-  }
-
-  // Strategy 3: Keyword-based matching
-  for (const [themeKey, keywords] of Object.entries(THEME_KEYWORDS)) {
-    if (linkedThemes.includes(themeKey)) continue;
-    const matchCount = keywords.filter(keyword =>
-      searchText.includes(keyword.toLowerCase())
-    ).length;
-    if (matchCount >= 2) {
-      links.push({
-        user_id: userId,
-        jira_issue_id: issue.id,
-        theme_key: themeKey,
-        match_type: 'keyword',
-        match_confidence: 0.8
-      });
-      linkedThemes.push(themeKey);
-    } else if (matchCount === 1) {
-      links.push({
-        user_id: userId,
-        jira_issue_id: issue.id,
-        theme_key: themeKey,
-        match_type: 'keyword',
-        match_confidence: 0.5
-      });
-      linkedThemes.push(themeKey);
-    }
-  }
-
-  return links;
-}
-
 // Helper: Match Jira issues to ACTUAL friction themes (not hardcoded keywords)
 function getThemeLinksFromActualThemes(userId: string, issue: any, actualThemes: string[]): any[] {
   const links: any[] = [];
@@ -801,36 +666,6 @@ function getThemeLinksFromActualThemes(userId: string, issue: any, actualThemes:
   }
 
   return links;
-}
-
-// NOTE: account_name and theme_association strategies removed.
-// Only salesforce_case (confidence 1.0) and client_field via alias table (confidence 0.85) are valid.
-
-// Helper: Create theme-jira link
-async function createThemeLink(
-  supabase: any,
-  userId: string,
-  jiraIssueId: string,
-  themeKey: string,
-  matchType: 'label' | 'keyword' | 'component',
-  confidence: number
-) {
-  try {
-    await supabase
-      .from('theme_jira_links')
-      .upsert({
-        user_id: userId,
-        jira_issue_id: jiraIssueId,
-        theme_key: themeKey,
-        match_type: matchType,
-        match_confidence: confidence,
-      }, {
-        onConflict: 'jira_issue_id,theme_key',
-        ignoreDuplicates: true
-      });
-  } catch (error) {
-    console.error(`Failed to create theme link for ${themeKey}:`, error);
-  }
 }
 
 // Helper: Generate AI-friendly summary using Claude
