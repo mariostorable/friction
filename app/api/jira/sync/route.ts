@@ -98,15 +98,16 @@ export async function POST(request: NextRequest) {
     const jiraAuthHeader = `Basic ${Buffer.from(`${email}:${tokens.access_token}`).toString('base64')}`;
 
     // Fetch all issues updated in the last 180 days with pagination
-    const jql = `updated >= "-180d" ORDER BY updated DESC`; // 6 months of history
+    const jql = `updated >= "-180d" ORDER BY updated DESC`; // 6 months of history, newest first
     const maxResults = 100; // Jira's max per request
+    const MAX_ISSUES_PER_SYNC = 2000; // Cap to stay within Vercel 5-min timeout
     let startAt = 0;
     let allIssues: any[] = [];
     let totalIssues = 0;
 
-    console.log(`Fetching Jira issues with JQL: ${jql}`);
+    console.log(`Fetching Jira issues with JQL: ${jql} (cap: ${MAX_ISSUES_PER_SYNC})`);
 
-    // Paginate through all results
+    // Paginate through results up to cap
     let hasMorePages = true;
     let loopIteration = 0;
     do {
@@ -160,13 +161,13 @@ export async function POST(request: NextRequest) {
         console.log(`Fetched ${allIssues.length} issues so far (got ${fetchedCount} in this batch)`);
       }
 
-      // Continue until we've fetched all pages
-      hasMorePages = fetchedCount === maxResults;
+      // Continue until we've fetched all pages or hit the cap
+      hasMorePages = fetchedCount === maxResults && allIssues.length < MAX_ISSUES_PER_SYNC;
       console.log(`Pagination check: fetchedCount=${fetchedCount}, maxResults=${maxResults}, allIssues.length=${allIssues.length}, hasMorePages=${hasMorePages}`);
       startAt += maxResults;
 
       if (!hasMorePages) {
-        console.log(`Stopping pagination: ${fetchedCount < maxResults ? 'got partial page' : 'reached limit'}`);
+        console.log(`Stopping pagination: ${allIssues.length >= MAX_ISSUES_PER_SYNC ? 'hit cap' : 'got partial page'}`);
       }
 
     } while (hasMorePages);
