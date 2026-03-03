@@ -97,101 +97,74 @@ export async function POST(request: NextRequest) {
     const email = integration.metadata?.email;
     const jiraAuthHeader = `Basic ${Buffer.from(`${email}:${tokens.access_token}`).toString('base64')}`;
 
-    // Fetch issues in two passes to guarantee EDGE tickets (which have Salesforce case links) are included:
-    // Pass 1: All EDGE tickets updated in last 180 days (no cap - ~500 tickets)
-    // Pass 2: Everything else updated in last 180 days (capped at 1500)
-    const maxResults = 100; // Jira's max per request
-    const OTHER_ISSUES_CAP = 1500;
+    // Fetch in two sequential passes:
+    // Pass 1: EDGE tickets (have Salesforce case number links) — up to 600
+    // Pass 2: Storage-relevant projects — up to 1400
+    // Total cap: ~2000, stays within Vercel 5-min timeout
+    const maxResults = 100;
     let allIssues: any[] = [];
     let totalIssues = 0;
 
-    const fetchPage = async (jql: string, startAt: number): Promise<any> => {
-      const response = await fetch(
-        `${integration.instance_url}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&startAt=${startAt}&maxResults=${maxResults}&fields=*all`,
-        { headers: { 'Authorization': jiraAuthHeader, 'Accept': 'application/json' } }
-      );
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Jira API error (${response.status}) for JQL "${jql}" startAt=${startAt}: ${errorText.substring(0, 300)}`);
-      }
-      const responseText = await response.text();
-      try {
-        return JSON.parse(responseText);
-      } catch (e) {
-        throw new Error(`Jira returned non-JSON for JQL "${jql}" startAt=${startAt}: ${responseText.substring(0, 300)}`);
-      }
-    };
+    const fetchPaginatedIssues = async (jql: string, cap: number): Promise<any[]> => {
+      const issues: any[] = [];
+      let startAt = 0;
+      let pageNum = 0;
 
-    const fetchPaginatedIssues = async (jql: string, cap: number | null): Promise<any[]> => {
-      // Fetch first page to get initial batch and total
-      const firstPage = await fetchPage(jql, 0);
-      const total = firstPage.total || firstPage.totalResults || 0;
-      const issues: any[] = [...(firstPage.issues || [])];
-      const firstFetched = firstPage.issues?.length || 0;
+      while (issues.length < cap) {
+        pageNum++;
+        const url = `${integration.instance_url}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&startAt=${startAt}&maxResults=${maxResults}&fields=*all`;
+        const response = await fetch(url, {
+          headers: { 'Authorization': jiraAuthHeader, 'Accept': 'application/json' }
+        });
 
-      console.log(`[${jql.substring(0, 40)}] first page: ${firstFetched} issues, total=${total}`);
-
-      // If first page was partial or empty, no more pages
-      if (firstFetched < maxResults) return issues;
-
-      // If cap already reached, stop
-      if (cap && issues.length >= cap) return issues.slice(0, cap);
-
-      // Determine how many more pages to fetch
-      // Use total if available, otherwise fetch until partial page
-      const limit = cap ?? (total > 0 ? total : Infinity);
-      const remainingStarts: number[] = [];
-      for (let startAt = maxResults; startAt < limit; startAt += maxResults) {
-        remainingStarts.push(startAt);
-        if (cap && remainingStarts.length * maxResults + maxResults >= cap) break;
-      }
-
-      if (remainingStarts.length === 0) return issues;
-
-      // Fetch remaining pages in parallel batches of 2 (avoid overwhelming Jira)
-      const BATCH_SIZE = 2;
-      for (let i = 0; i < remainingStarts.length; i += BATCH_SIZE) {
-        const batch = remainingStarts.slice(i, i + BATCH_SIZE);
-        const pages = await Promise.all(batch.map(s => fetchPage(jql, s)));
-        let gotPartial = false;
-        for (const page of pages) {
-          issues.push(...(page.issues || []));
-          if ((page.issues?.length || 0) < maxResults) gotPartial = true;
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(`Jira API ${response.status} on page ${pageNum}: ${text.substring(0, 200)}`);
         }
-        console.log(`[${jql.substring(0, 40)}] fetched ${issues.length} so far`);
-        if (gotPartial) break; // hit the end
-        if (cap && issues.length >= cap) break;
-        // Small delay between batches to avoid rate limiting
-        await new Promise(r => setTimeout(r, 200));
+
+        let data: any;
+        try {
+          data = await response.json();
+        } catch (e) {
+          throw new Error(`Jira returned invalid JSON on page ${pageNum} (startAt=${startAt})`);
+        }
+
+        const batch: any[] = data.issues || [];
+        issues.push(...batch);
+        totalIssues = data.total || totalIssues;
+        console.log(`[${jql.substring(0, 50)}] page ${pageNum}: +${batch.length} = ${issues.length}`);
+
+        if (batch.length < maxResults) break; // reached last page
+        startAt += maxResults;
       }
 
-      totalIssues = Math.max(totalIssues, total);
-      return cap ? issues.slice(0, cap) : issues;
+      return issues.slice(0, cap);
     };
 
-    // Pass 1: EDGE tickets (guaranteed - these have Salesforce case number links)
+    // Pass 1: EDGE tickets
     console.log('Pass 1: Fetching EDGE tickets...');
     const edgeIssues = await fetchPaginatedIssues(
       `project = EDGE AND updated >= "-180d" ORDER BY updated DESC`,
-      null
+      600
     );
     console.log(`Pass 1 complete: ${edgeIssues.length} EDGE tickets`);
 
-    // Pass 2: Storage-relevant non-EDGE projects (skip marine/RV: NBK, MREQ, MDEV, EASY, TOPS, BZD, ESST)
+    // Pass 2: Storage-relevant projects (skip marine/RV: NBK, MREQ, MDEV, EASY, TOPS, BZD, ESST)
     const STORAGE_PROJECTS = ['WEB', 'BUGS', 'SL', 'SLT', 'PAY', 'CRM', 'DATA', 'SF', 'STOR', 'SAC', 'CPBUG', 'WA', 'PAYEXT', 'POL', 'SFT'];
     const projectsJql = STORAGE_PROJECTS.map(p => `"${p}"`).join(', ');
-    const pass2Jql = `project in (${projectsJql}) AND updated >= "-180d" ORDER BY updated DESC`;
-    console.log(`Pass 2 JQL: ${pass2Jql}`);
     let otherIssues: any[] = [];
     try {
-      otherIssues = await fetchPaginatedIssues(pass2Jql, OTHER_ISSUES_CAP);
+      otherIssues = await fetchPaginatedIssues(
+        `project in (${projectsJql}) AND updated >= "-180d" ORDER BY updated DESC`,
+        1400
+      );
       console.log(`Pass 2 complete: ${otherIssues.length} other tickets`);
     } catch (err) {
       console.error(`Pass 2 failed (continuing with EDGE only):`, err instanceof Error ? err.message : err);
     }
 
     allIssues = [...edgeIssues, ...otherIssues];
-    console.log(`Total fetched: ${allIssues.length} issues (${edgeIssues.length} EDGE + ${otherIssues.length} other)`);
+    console.log(`Total: ${allIssues.length} (${edgeIssues.length} EDGE + ${otherIssues.length} other)`);
 
     console.log(`\n=== Pagination Complete ===`);
     console.log(`Finished fetching ${allIssues.length} Jira issues (${totalIssues} total available)`);
