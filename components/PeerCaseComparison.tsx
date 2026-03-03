@@ -116,7 +116,7 @@ export default function PeerCaseComparison({ currentAccount, peers }: PeerCaseCo
         <p className="text-xs text-gray-600 font-medium mb-2">CASE VOLUME DISTRIBUTION</p>
         <div className="relative h-24 bg-gray-100 rounded-lg p-2">
           {sortedPeers.slice(0, 10).map((peer, idx) => {
-            const maxVolume = sortedPeers[0].caseVolume;
+            const maxVolume = sortedPeers[0]?.caseVolume || 1;
             const heightPercent = (peer.caseVolume / maxVolume) * 100;
             const isCurrentAccount = peer.name === currentAccount.name;
 

@@ -300,7 +300,7 @@ export default function AccountDetailPage() {
               .select(`
                 id,
                 name,
-                vertical,
+                products,
                 current_snapshot:account_snapshots!account_snapshots_account_id_fkey(
                   case_volume,
                   created_at
@@ -318,11 +318,11 @@ export default function AccountDetailPage() {
                       )[0]
                     : peer.current_snapshot;
 
-                  // Extract product from vertical (e.g., "Software (EDGE)" -> "EDGE")
+                  // Extract product from products field (e.g., "Software (EDGE)" -> "EDGE")
                   let product = 'Other';
-                  if (peer.vertical?.includes('EDGE')) {
+                  if (peer.products?.includes('EDGE')) {
                     product = 'EDGE';
-                  } else if (peer.vertical?.includes('SiteLink')) {
+                  } else if (peer.products?.includes('SiteLink')) {
                     product = 'SiteLink';
                   }
 
@@ -1039,8 +1039,8 @@ export default function AccountDetailPage() {
             currentAccount={{
               name: account.name,
               caseVolume: caseVolumeMetrics.current,
-              product: account.vertical?.includes('EDGE') ? 'EDGE' :
-                       account.vertical?.includes('SiteLink') ? 'SiteLink' : 'Other'
+              product: account.products?.includes('EDGE') ? 'EDGE' :
+                       account.products?.includes('SiteLink') ? 'SiteLink' : 'Other'
             }}
             peers={peerAccounts}
           />
