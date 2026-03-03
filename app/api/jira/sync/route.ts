@@ -148,8 +148,8 @@ export async function POST(request: NextRequest) {
 
       if (remainingStarts.length === 0) return issues;
 
-      // Fetch remaining pages in parallel batches of 5
-      const BATCH_SIZE = 5;
+      // Fetch remaining pages in parallel batches of 2 (avoid overwhelming Jira)
+      const BATCH_SIZE = 2;
       for (let i = 0; i < remainingStarts.length; i += BATCH_SIZE) {
         const batch = remainingStarts.slice(i, i + BATCH_SIZE);
         const pages = await Promise.all(batch.map(s => fetchPage(jql, s)));
@@ -161,6 +161,8 @@ export async function POST(request: NextRequest) {
         console.log(`[${jql.substring(0, 40)}] fetched ${issues.length} so far`);
         if (gotPartial) break; // hit the end
         if (cap && issues.length >= cap) break;
+        // Small delay between batches to avoid rate limiting
+        await new Promise(r => setTimeout(r, 200));
       }
 
       totalIssues = Math.max(totalIssues, total);
