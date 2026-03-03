@@ -162,12 +162,15 @@ export async function POST(request: NextRequest) {
     // Pass 2: Storage-relevant non-EDGE projects (skip marine/RV: NBK, MREQ, MDEV, EASY, TOPS, BZD, ESST)
     const STORAGE_PROJECTS = ['WEB', 'BUGS', 'SL', 'SLT', 'PAY', 'CRM', 'DATA', 'SF', 'STOR', 'SAC', 'CPBUG', 'WA', 'PAYEXT', 'POL', 'SFT'];
     const projectsJql = STORAGE_PROJECTS.map(p => `"${p}"`).join(', ');
-    console.log('Pass 2: Fetching storage-relevant non-EDGE tickets...');
-    const otherIssues = await fetchPaginatedIssues(
-      `project in (${projectsJql}) AND updated >= "-180d" ORDER BY updated DESC`,
-      OTHER_ISSUES_CAP
-    );
-    console.log(`Pass 2 complete: ${otherIssues.length} other tickets`);
+    const pass2Jql = `project in (${projectsJql}) AND updated >= "-180d" ORDER BY updated DESC`;
+    console.log(`Pass 2 JQL: ${pass2Jql}`);
+    let otherIssues: any[] = [];
+    try {
+      otherIssues = await fetchPaginatedIssues(pass2Jql, OTHER_ISSUES_CAP);
+      console.log(`Pass 2 complete: ${otherIssues.length} other tickets`);
+    } catch (err) {
+      console.error(`Pass 2 failed (continuing with EDGE only):`, err instanceof Error ? err.message : err);
+    }
 
     allIssues = [...edgeIssues, ...otherIssues];
     console.log(`Total fetched: ${allIssues.length} issues (${edgeIssues.length} EDGE + ${otherIssues.length} other)`);
