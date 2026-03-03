@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
     // Pass 2: Non-EDGE tickets (capped)
     console.log('Pass 2: Fetching non-EDGE tickets...');
     const otherIssues = await fetchPaginatedIssues(
-      `project != EDGE AND updated >= "-180d" ORDER BY updated DESC`,
+      `project not in (EDGE) AND updated >= "-180d" ORDER BY updated DESC`,
       OTHER_ISSUES_CAP
     );
     console.log(`Pass 2 complete: ${otherIssues.length} other tickets`);
