@@ -146,12 +146,12 @@ export async function POST(request: NextRequest) {
     );
     console.log(`Pass 1 complete: ${edgeIssues.length} EDGE tickets`);
 
-    // Pass 2: SiteLink tickets (cap 1500)
+    // Pass 2: SiteLink tickets (cap 1500, 2yr window to capture older customer tickets)
     console.log('Pass 2: Fetching SiteLink tickets...');
     let slIssues: any[] = [];
     try {
       slIssues = await fetchPaginatedIssues(
-        `project = SL AND updated >= "-365d" ORDER BY updated DESC`, 1500
+        `project = SL AND updated >= "-730d" ORDER BY updated DESC`, 1500
       );
       console.log(`Pass 2 complete: ${slIssues.length} SiteLink tickets`);
     } catch (err) {
