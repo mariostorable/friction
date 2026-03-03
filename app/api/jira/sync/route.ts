@@ -433,7 +433,9 @@ export async function POST(request: NextRequest) {
       .from('accounts')
       .select('id, name, products')
       .eq('user_id', userId)
-      .eq('status', 'active');
+      .eq('status', 'active')
+      .limit(5000);
+    console.log(`Loaded ${accounts?.length || 0} active accounts for matching`);
 
     // Collect all links to create (batch processing)
     for (const issue of insertedIssues || []) {
@@ -593,6 +595,7 @@ export async function POST(request: NextRequest) {
 
     // Batch insert account links (client_field and salesforce_case strategies only)
     let accountLinksCreated = 0;
+    console.log(`Attempting to upsert ${accountLinksToCreate.length} account links...`);
     if (accountLinksToCreate.length > 0) {
       const { data: createdAccountLinks, error: accountLinksError } = await supabaseAdmin
         .from('account_jira_links')
