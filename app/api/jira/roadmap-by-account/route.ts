@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
     const OPS_ISSUE_TYPES = ['Operational Work', 'Data Fix', 'Vendor'];
 
     // Get all Jira issues linked to these accounts via account_jira_links
-    // Only valid link strategies: salesforce_case and client_field
+    // Valid link strategies: salesforce_case, client_field, looker_export
     const { data: accountJiraLinks } = await supabase
       .from('account_jira_links')
       .select(`
@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
       `)
       .in('account_id', filteredAccountIds)
       .eq('user_id', user.id)
-      .in('match_type', ['salesforce_case', 'client_field']);
+      .in('match_type', ['salesforce_case', 'client_field', 'looker_export']);
 
     // Filter tickets by project type:
     // - When viewing marine portfolio: only show marine project tickets

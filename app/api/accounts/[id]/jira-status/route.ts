@@ -57,7 +57,7 @@ export async function GET(
     const OPS_ISSUE_TYPES = ['Operational Work', 'Data Fix', 'Vendor'];
 
     // 2. Get all Jira issues linked to this account via account_jira_links table
-    // Only valid strategies: salesforce_case and client_field
+    // Valid strategies: salesforce_case, client_field, looker_export
     const { data: accountJiraLinks } = await supabase
       .from('account_jira_links')
       .select(`
@@ -82,7 +82,7 @@ export async function GET(
       `)
       .eq('account_id', accountId)
       .eq('jira_issues.user_id', user.id)
-      .in('match_type', ['salesforce_case', 'client_field']);
+      .in('match_type', ['salesforce_case', 'client_field', 'looker_export']);
 
     if (!accountJiraLinks || accountJiraLinks.length === 0) {
       // No tickets yet - all themes should be prioritized
@@ -140,7 +140,7 @@ export async function GET(
           ...link,
           theme_key: themes[0] || 'general',
           all_themes: themes,
-          is_account_specific: link.match_type === 'salesforce_case' || link.match_type === 'client_field'
+          is_account_specific: link.match_type === 'salesforce_case' || link.match_type === 'client_field' || link.match_type === 'looker_export'
         };
       });
 

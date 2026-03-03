@@ -225,7 +225,7 @@ export async function GET(request: NextRequest) {
       `)
       .in('account_id', accountIds)
       .eq('user_id', user.id)
-      .in('match_type', ['salesforce_case', 'client_field']);
+      .in('match_type', ['salesforce_case', 'client_field', 'looker_export']);
 
     const accountTicketCounts: Record<string, { resolved_120d: number; in_progress: number; open: number }> = {};
 
