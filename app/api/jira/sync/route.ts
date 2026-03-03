@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
     // Fetch all issues updated in the last 180 days with pagination
     const jql = `updated >= "-180d" ORDER BY updated DESC`; // 6 months of history, newest first
     const maxResults = 100; // Jira's max per request
-    const MAX_ISSUES_PER_SYNC = 2000; // Cap to stay within Vercel 5-min timeout
+    const MAX_ISSUES_PER_SYNC = 3000; // Cap to stay within Vercel 5-min timeout
     let startAt = 0;
     let allIssues: any[] = [];
     let totalIssues = 0;
