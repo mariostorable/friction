@@ -123,17 +123,27 @@ export async function POST(request: NextRequest) {
     };
 
     const fetchPaginatedIssues = async (jql: string, cap: number | null): Promise<any[]> => {
-      // Fetch first page to get total count
+      // Fetch first page to get initial batch and total
       const firstPage = await fetchPage(jql, 0);
-      const total = firstPage.total || 0;
+      const total = firstPage.total || firstPage.totalResults || 0;
       const issues: any[] = [...(firstPage.issues || [])];
+      const firstFetched = firstPage.issues?.length || 0;
 
-      if (total === 0) return issues;
+      console.log(`[${jql.substring(0, 40)}] first page: ${firstFetched} issues, total=${total}`);
 
-      const limit = cap ? Math.min(total, cap) : total;
+      // If first page was partial or empty, no more pages
+      if (firstFetched < maxResults) return issues;
+
+      // If cap already reached, stop
+      if (cap && issues.length >= cap) return issues.slice(0, cap);
+
+      // Determine how many more pages to fetch
+      // Use total if available, otherwise fetch until partial page
+      const limit = cap ?? (total > 0 ? total : Infinity);
       const remainingStarts: number[] = [];
       for (let startAt = maxResults; startAt < limit; startAt += maxResults) {
         remainingStarts.push(startAt);
+        if (cap && remainingStarts.length * maxResults + maxResults >= cap) break;
       }
 
       if (remainingStarts.length === 0) return issues;
@@ -142,13 +152,19 @@ export async function POST(request: NextRequest) {
       const BATCH_SIZE = 5;
       for (let i = 0; i < remainingStarts.length; i += BATCH_SIZE) {
         const batch = remainingStarts.slice(i, i + BATCH_SIZE);
-        const pages = await Promise.all(batch.map(startAt => fetchPage(jql, startAt)));
-        pages.forEach(page => issues.push(...(page.issues || [])));
-        console.log(`[${jql.substring(0, 40)}] fetched ${issues.length}/${limit}`);
+        const pages = await Promise.all(batch.map(s => fetchPage(jql, s)));
+        let gotPartial = false;
+        for (const page of pages) {
+          issues.push(...(page.issues || []));
+          if ((page.issues?.length || 0) < maxResults) gotPartial = true;
+        }
+        console.log(`[${jql.substring(0, 40)}] fetched ${issues.length} so far`);
+        if (gotPartial) break; // hit the end
+        if (cap && issues.length >= cap) break;
       }
 
-      totalIssues = total;
-      return issues.slice(0, limit);
+      totalIssues = Math.max(totalIssues, total);
+      return cap ? issues.slice(0, cap) : issues;
     };
 
     // Pass 1: EDGE tickets (guaranteed - these have Salesforce case number links)
