@@ -276,7 +276,8 @@ export async function POST() {
           // Store matched organization for notes fetching later
           matchedOrganizations.set(orgId, { matchedAccount, accountName, childAccounts });
         } else {
-          console.log(`  ✗ No match found for "${accountName}" (${childAccounts.length} facilities, SF ID: ${salesforceId})`);
+          console.log(`  ✗ No match found for "${accountName}" — skipping`);
+          continue; // Only store records that matched a portfolio account
         }
 
         // Prepare vitally_accounts record (store organization with facilities)
