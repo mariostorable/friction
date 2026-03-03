@@ -321,14 +321,13 @@ export async function POST(request: NextRequest) {
 
     console.log(`Deduped ${jiraIssues.length} to ${uniqueJiraIssues.length} unique issues`);
 
-    // Upsert issues
-    const { data: insertedIssues, error: insertError } = await supabaseAdmin
+    // Upsert issues (no .select() - large payloads cause incomplete returns)
+    const { error: insertError } = await supabaseAdmin
       .from('jira_issues')
       .upsert(uniqueJiraIssues, {
         onConflict: 'user_id,jira_key',
         ignoreDuplicates: false
-      })
-      .select();
+      });
 
     if (insertError) {
       console.error('Insert error:', insertError);
@@ -338,7 +337,15 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    console.log(`Stored ${insertedIssues?.length || 0} Jira issues (fetched ${allIssues.length}, deduped to ${uniqueJiraIssues.length})`);
+    // Fetch the DB rows for all upserted keys to get their IDs for link creation
+    const jiraKeys = uniqueJiraIssues.map(i => i.jira_key);
+    const { data: insertedIssues } = await supabaseAdmin
+      .from('jira_issues')
+      .select('id, jira_key, metadata, labels, components, summary, description')
+      .eq('user_id', userId)
+      .in('jira_key', jiraKeys);
+
+    console.log(`Stored ${uniqueJiraIssues.length} issues, fetched ${insertedIssues?.length || 0} back from DB for linking`);
 
     // Step 1: Build CaseNumber → AccountID map directly from raw_inputs
     // Query raw_inputs directly (not via friction_cards) to catch ALL synced cases,
