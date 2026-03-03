@@ -159,12 +159,12 @@ export async function POST(request: NextRequest) {
     );
     console.log(`Pass 1 complete: ${edgeIssues.length} EDGE tickets`);
 
-    // Pass 2: Storage-relevant non-EDGE projects only (skip marine/RV/internal)
-    // Marine projects (NBK, MREQ, MDEV, EASY, TOPS, BZD, ESST) filtered out - not relevant to storage roadmap
-    const STORAGE_PROJECTS = ['WEB', 'BUGS', 'SL', 'SLT', 'PAY', 'CRM', 'DATA', 'SF', 'STOR', 'SAC', 'CPBUG', 'WA', 'PAYEXT'];
+    // Pass 2: Storage-relevant non-EDGE projects (skip marine/RV: NBK, MREQ, MDEV, EASY, TOPS, BZD, ESST)
+    const STORAGE_PROJECTS = ['WEB', 'BUGS', 'SL', 'SLT', 'PAY', 'CRM', 'DATA', 'SF', 'STOR', 'SAC', 'CPBUG', 'WA', 'PAYEXT', 'POL', 'SFT'];
+    const projectsJql = STORAGE_PROJECTS.map(p => `"${p}"`).join(', ');
     console.log('Pass 2: Fetching storage-relevant non-EDGE tickets...');
     const otherIssues = await fetchPaginatedIssues(
-      `project in (${STORAGE_PROJECTS.join(', ')}) AND updated >= "-180d" ORDER BY updated DESC`,
+      `project in (${projectsJql}) AND updated >= "-180d" ORDER BY updated DESC`,
       OTHER_ISSUES_CAP
     );
     console.log(`Pass 2 complete: ${otherIssues.length} other tickets`);
