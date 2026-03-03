@@ -25,12 +25,16 @@ const VALID_THEMES = [
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
- * POST /api/reclassify-other-themes
- * Finds all friction cards with theme_key = 'other', re-classifies them
- * using Claude, then updates the database records.
+ * POST /api/reclassify-other-themes?limit=100
+ * Finds friction cards with theme_key = 'other', re-classifies them
+ * using Claude Haiku, then updates the database records.
+ * Use limit param to process in chunks (default 100).
  */
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const limit = Math.min(200, parseInt(searchParams.get('limit') || '100', 10));
+
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -40,13 +44,21 @@ export async function POST() {
       return NextResponse.json({ error: 'ANTHROPIC_API_KEY not set' }, { status: 500 });
     }
 
-    // Fetch all friction cards with theme_key = 'other'
+    // Count total remaining before fetching the batch
+    const { count: totalRemaining } = await supabase
+      .from('friction_cards')
+      .select('*', { count: 'exact', head: true })
+      .eq('theme_key', 'other')
+      .eq('is_friction', true);
+
+    // Fetch a batch of friction cards with theme_key = 'other'
     const { data: otherCards, error: fetchError } = await supabase
       .from('friction_cards')
       .select('id, summary, root_cause_hypothesis, evidence_snippets, raw_input_id, account_id')
       .eq('theme_key', 'other')
       .eq('is_friction', true)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(limit);
 
     if (fetchError) {
       return NextResponse.json({ error: fetchError.message }, { status: 500 });
@@ -184,14 +196,17 @@ Respond with ONLY the theme_key string, nothing else. Pick the closest match —
       }
     }
 
-    console.log(`Reclassification complete: ${updated} updated, ${skipped} skipped`);
+    const remainingAfter = (totalRemaining || 0) - updated;
+    console.log(`Reclassification complete: ${updated} updated, ${skipped} skipped, ~${remainingAfter} remaining`);
 
     return NextResponse.json({
       success: true,
-      total: otherCards.length,
+      batch: otherCards.length,
       updated,
       skipped,
-      errors: errors.slice(0, 20), // cap error list
+      remaining: Math.max(0, remainingAfter),
+      done: remainingAfter <= 0,
+      errors: errors.slice(0, 20),
     });
   } catch (error) {
     console.error('Reclassify error:', error);
