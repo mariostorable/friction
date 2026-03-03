@@ -22,18 +22,20 @@ const VALID_THEMES = [
   'documentation_gaps',
 ] as const;
 
+type ValidTheme = typeof VALID_THEMES[number];
+
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
- * POST /api/reclassify-other-themes?limit=100
- * Finds friction cards with theme_key = 'other', re-classifies them
- * using Claude Haiku, then updates the database records.
- * Use limit param to process in chunks (default 100).
+ * POST /api/reclassify-other-themes?limit=200
+ * Classifies friction cards with theme_key='other' in batches of 25 per Claude call.
+ * Much faster than one-at-a-time: 200 cards = ~8 API calls instead of 200.
  */
 export async function POST(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const limit = Math.min(200, parseInt(searchParams.get('limit') || '100', 10));
+    const limit = Math.min(300, parseInt(searchParams.get('limit') || '200', 10));
+    const CLAUDE_BATCH = 25; // cards per single Claude API call
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -44,17 +46,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'ANTHROPIC_API_KEY not set' }, { status: 500 });
     }
 
-    // Count total remaining before fetching the batch
+    // Count total remaining
     const { count: totalRemaining } = await supabase
       .from('friction_cards')
       .select('*', { count: 'exact', head: true })
       .eq('theme_key', 'other')
       .eq('is_friction', true);
 
-    // Fetch a batch of friction cards with theme_key = 'other'
+    if (!totalRemaining || totalRemaining === 0) {
+      return NextResponse.json({ message: 'No "other" cards to reclassify', updated: 0, remaining: 0, done: true });
+    }
+
+    // Fetch a batch of cards
     const { data: otherCards, error: fetchError } = await supabase
       .from('friction_cards')
-      .select('id, summary, root_cause_hypothesis, evidence_snippets, raw_input_id, account_id')
+      .select('id, summary, root_cause_hypothesis, evidence_snippets, raw_input_id')
       .eq('theme_key', 'other')
       .eq('is_friction', true)
       .order('created_at', { ascending: false })
@@ -65,112 +71,101 @@ export async function POST(request: Request) {
     }
 
     if (!otherCards || otherCards.length === 0) {
-      return NextResponse.json({ message: 'No "other" cards to reclassify', updated: 0 });
+      return NextResponse.json({ message: 'No cards found', updated: 0, remaining: 0, done: true });
     }
 
-    console.log(`Found ${otherCards.length} cards with theme_key = 'other'`);
+    console.log(`Processing ${otherCards.length} of ${totalRemaining} remaining 'other' cards...`);
 
-    // Fetch original case text for cards that have a raw_input_id
-    const rawInputIds = otherCards
-      .map(c => c.raw_input_id)
-      .filter(Boolean) as string[];
-
+    // Fetch raw input text in bulk (one query)
+    const rawInputIds = otherCards.map(c => c.raw_input_id).filter(Boolean) as string[];
     const rawInputMap = new Map<string, string>();
     if (rawInputIds.length > 0) {
       const { data: rawInputs } = await supabase
         .from('raw_inputs')
         .select('id, text_content')
         .in('id', rawInputIds);
-
-      rawInputs?.forEach(r => rawInputMap.set(r.id, r.text_content || ''));
+      rawInputs?.forEach(r => rawInputMap.set(r.id, (r.text_content || '').slice(0, 400)));
     }
+
+    // Build context for each card (short snippets to keep batch prompt small)
+    const cardContexts = otherCards.map(card => {
+      const rawText = card.raw_input_id ? rawInputMap.get(card.raw_input_id) : null;
+      const text = rawText || [card.summary, card.root_cause_hypothesis].filter(Boolean).join(' | ');
+      return { id: card.id, text: text.slice(0, 400) };
+    });
 
     let updated = 0;
     let skipped = 0;
-    const errors: string[] = [];
 
-    const BATCH_SIZE = 20;
-    for (let i = 0; i < otherCards.length; i += BATCH_SIZE) {
-      const batch = otherCards.slice(i, i + BATCH_SIZE);
-      console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(otherCards.length / BATCH_SIZE)}...`);
+    // Process in batches of CLAUDE_BATCH per API call
+    for (let i = 0; i < cardContexts.length; i += CLAUDE_BATCH) {
+      const batch = cardContexts.slice(i, i + CLAUDE_BATCH);
 
-      for (const card of batch) {
-        // Build context: use raw case text if available, otherwise fall back to card summary + evidence
-        const rawText = card.raw_input_id ? rawInputMap.get(card.raw_input_id) : null;
-        const context = rawText
-          ? rawText.slice(0, 1500)
-          : [
-              card.summary,
-              card.root_cause_hypothesis,
-              ...(card.evidence_snippets || []),
-            ]
-              .filter(Boolean)
-              .join('\n');
+      const itemsText = batch
+        .map((c, idx) => `${idx + 1}. ${c.text}`)
+        .join('\n\n');
 
-        if (!context.trim()) {
-          skipped++;
+      const prompt = `Classify each customer friction issue below into the best theme.
+
+Themes:
+billing_confusion, integration_failures, ui_confusion, performance_issues, missing_features, training_gaps, support_response_time, data_quality, reporting_issues, access_permissions, configuration_problems, notification_issues, workflow_inefficiency, mobile_issues, documentation_gaps
+
+Issues:
+${itemsText}
+
+Respond with ONLY a JSON array of strings, one theme per issue, in order. Example: ["ui_confusion","billing_confusion","data_quality"]
+No other text.`;
+
+      try {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': process.env.ANTHROPIC_API_KEY!,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 300,
+            messages: [{ role: 'user', content: prompt }],
+          }),
+        });
+
+        if (response.status === 429 || response.status === 529) {
+          console.log('Rate limited, waiting 5s...');
+          await sleep(5000);
+          skipped += batch.length;
           continue;
         }
 
-        const prompt = `You are classifying a customer friction issue into a specific category.
+        if (!response.ok) {
+          console.error(`API error ${response.status} for batch ${i}`);
+          skipped += batch.length;
+          continue;
+        }
 
-Context about the issue:
-${context}
+        const data = await response.json();
+        const rawText = data.content?.[0]?.text?.trim() || '';
 
-Choose the SINGLE most appropriate theme_key from this list:
-- billing_confusion: Invoice, payment, pricing, subscription issues
-- integration_failures: API issues, third-party app connections, data sync problems
-- ui_confusion: Interface unclear, hard to find features, confusing workflow
-- performance_issues: Slow load times, timeouts, system lag
-- missing_features: Requested functionality doesn't exist
-- training_gaps: User doesn't know how to use existing features
-- support_response_time: Complaints about support speed or quality
-- data_quality: Incorrect data, missing data, data inconsistencies
-- reporting_issues: Problems with reports, exports, analytics
-- access_permissions: User access, role permissions, login issues
-- configuration_problems: Settings not working, setup issues
-- notification_issues: Email alerts, in-app notifications problems
-- workflow_inefficiency: Process is too complex or time-consuming
-- mobile_issues: Mobile app or mobile web problems
-- documentation_gaps: Help docs missing, outdated, or unclear
-
-Respond with ONLY the theme_key string, nothing else. Pick the closest match — do not return "other".`;
-
+        // Parse JSON array response
+        const cleaned = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        let themes: string[];
         try {
-          const response = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-api-key': process.env.ANTHROPIC_API_KEY!,
-              'anthropic-version': '2023-06-01',
-            },
-            body: JSON.stringify({
-              model: 'claude-haiku-4-5-20251001',
-              max_tokens: 50,
-              messages: [{ role: 'user', content: prompt }],
-            }),
-          });
+          themes = JSON.parse(cleaned);
+        } catch {
+          console.error(`Failed to parse Claude response: ${rawText}`);
+          skipped += batch.length;
+          continue;
+        }
 
-          if (response.status === 429 || response.status === 529) {
-            console.log(`Rate limited, waiting 5s...`);
-            await sleep(5000);
-            // Skip this card rather than blocking the whole job
-            skipped++;
-            continue;
-          }
+        // Update each card in the batch
+        for (let j = 0; j < batch.length; j++) {
+          const card = batch[j];
+          const rawTheme = (themes[j] || '').trim().toLowerCase();
+          const newTheme = VALID_THEMES.find(t => t === rawTheme) as ValidTheme | undefined;
 
-          if (!response.ok) {
-            errors.push(`Card ${card.id}: API error ${response.status}`);
-            skipped++;
-            continue;
-          }
-
-          const data = await response.json();
-          const rawTheme = data.content?.[0]?.text?.trim().toLowerCase().replace(/[^a-z_]/g, '');
-
-          const newTheme = VALID_THEMES.find(t => t === rawTheme);
           if (!newTheme) {
-            errors.push(`Card ${card.id}: Claude returned invalid theme "${rawTheme}"`);
+            console.warn(`Card ${card.id}: invalid theme "${rawTheme}"`);
             skipped++;
             continue;
           }
@@ -181,32 +176,31 @@ Respond with ONLY the theme_key string, nothing else. Pick the closest match —
             .eq('id', card.id);
 
           if (updateError) {
-            errors.push(`Card ${card.id}: update failed - ${updateError.message}`);
+            console.error(`Card ${card.id} update failed:`, updateError.message);
             skipped++;
           } else {
             updated++;
           }
-
-          // 200ms delay to stay under rate limits (Haiku is fast)
-          await sleep(200);
-        } catch (err) {
-          errors.push(`Card ${card.id}: ${err instanceof Error ? err.message : 'Unknown error'}`);
-          skipped++;
         }
+
+        // Small delay between API calls
+        await sleep(300);
+      } catch (err) {
+        console.error(`Batch ${i} error:`, err);
+        skipped += batch.length;
       }
     }
 
-    const remainingAfter = (totalRemaining || 0) - updated;
-    console.log(`Reclassification complete: ${updated} updated, ${skipped} skipped, ~${remainingAfter} remaining`);
+    const remainingAfter = Math.max(0, (totalRemaining || 0) - updated);
+    console.log(`Done: ${updated} updated, ${skipped} skipped, ~${remainingAfter} remaining`);
 
     return NextResponse.json({
       success: true,
       batch: otherCards.length,
       updated,
       skipped,
-      remaining: Math.max(0, remainingAfter),
+      remaining: remainingAfter,
       done: remainingAfter <= 0,
-      errors: errors.slice(0, 20),
     });
   } catch (error) {
     console.error('Reclassify error:', error);
