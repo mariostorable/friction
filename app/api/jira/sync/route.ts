@@ -97,20 +97,19 @@ export async function POST(request: NextRequest) {
     const email = integration.metadata?.email;
     const jiraAuthHeader = `Basic ${Buffer.from(`${email}:${tokens.access_token}`).toString('base64')}`;
 
-    // Fetch in two sequential passes:
-    // Pass 1: EDGE tickets (have Salesforce case number links) — up to 600
-    // Pass 2: Storage-relevant projects — up to 1400
-    // Total cap: ~2000, stays within Vercel 5-min timeout
+    // Fetch all issues across relevant projects within the last 365 days.
+    // No hard caps — pagination stops naturally when all pages are exhausted.
+    // If a Vercel timeout occurs, reduce the date window or add per-project caps.
     const maxResults = 100;
     let allIssues: any[] = [];
     let totalIssues = 0;
 
-    const fetchPaginatedIssues = async (jql: string, cap: number): Promise<any[]> => {
+    const fetchPaginatedIssues = async (jql: string): Promise<any[]> => {
       const issues: any[] = [];
       let startAt = 0;
       let pageNum = 0;
 
-      while (issues.length < cap) {
+      while (true) {
         pageNum++;
         const fields = [
           'summary', 'description', 'status', 'issuetype', 'priority',
@@ -149,39 +148,49 @@ export async function POST(request: NextRequest) {
         const batch: any[] = data.issues || [];
         issues.push(...batch);
         totalIssues = data.total || totalIssues;
-        console.log(`[${jql.substring(0, 50)}] page ${pageNum}: +${batch.length} = ${issues.length}`);
+        console.log(`[${jql.substring(0, 50)}] page ${pageNum}: +${batch.length} = ${issues.length} / ${data.total}`);
 
         if (batch.length < maxResults) break; // reached last page
         startAt += maxResults;
       }
 
-      return issues.slice(0, cap);
+      return issues;
     };
 
     // Pass 1: EDGE tickets
     console.log('Pass 1: Fetching EDGE tickets...');
     const edgeIssues = await fetchPaginatedIssues(
-      `project = EDGE AND updated >= "-365d" ORDER BY updated DESC`,
-      600
+      `project = EDGE AND updated >= "-365d" ORDER BY updated DESC`
     );
     console.log(`Pass 1 complete: ${edgeIssues.length} EDGE tickets`);
 
-    // Pass 2: Storage-relevant projects (skip marine/RV: NBK, MREQ, MDEV, EASY, TOPS, BZD, ESST)
-    const STORAGE_PROJECTS = ['WEB', 'BUGS', 'SL', 'SLT', 'PAY', 'CRM', 'DATA', 'SF', 'STOR', 'SAC', 'CPBUG', 'WA', 'PAYEXT', 'POL', 'SFT'];
-    const projectsJql = STORAGE_PROJECTS.map(p => `"${p}"`).join(', ');
+    // Pass 2: SiteLink tickets
+    console.log('Pass 2: Fetching SiteLink tickets...');
+    let slIssues: any[] = [];
+    try {
+      slIssues = await fetchPaginatedIssues(
+        `project = SL AND updated >= "-365d" ORDER BY updated DESC`
+      );
+      console.log(`Pass 2 complete: ${slIssues.length} SiteLink tickets`);
+    } catch (err) {
+      console.error(`Pass 2 (SiteLink) failed (continuing):`, err instanceof Error ? err.message : err);
+    }
+
+    // Pass 3: Remaining storage-relevant projects
+    const OTHER_PROJECTS = ['WEB', 'BUGS', 'SLT', 'PAY', 'CRM', 'DATA', 'SF', 'STOR', 'SAC', 'CPBUG', 'WA', 'PAYEXT', 'POL', 'SFT'];
+    const projectsJql = OTHER_PROJECTS.map(p => `"${p}"`).join(', ');
     let otherIssues: any[] = [];
     try {
       otherIssues = await fetchPaginatedIssues(
-        `project in (${projectsJql}) AND updated >= "-365d" ORDER BY updated DESC`,
-        1400
+        `project in (${projectsJql}) AND updated >= "-365d" ORDER BY updated DESC`
       );
-      console.log(`Pass 2 complete: ${otherIssues.length} other tickets`);
+      console.log(`Pass 3 complete: ${otherIssues.length} other tickets`);
     } catch (err) {
-      console.error(`Pass 2 failed (continuing with EDGE only):`, err instanceof Error ? err.message : err);
+      console.error(`Pass 3 failed (continuing with EDGE + SiteLink only):`, err instanceof Error ? err.message : err);
     }
 
-    allIssues = [...edgeIssues, ...otherIssues];
-    console.log(`Total: ${allIssues.length} (${edgeIssues.length} EDGE + ${otherIssues.length} other)`);
+    allIssues = [...edgeIssues, ...slIssues, ...otherIssues];
+    console.log(`Total: ${allIssues.length} (${edgeIssues.length} EDGE + ${slIssues.length} SiteLink + ${otherIssues.length} other)`);
 
     console.log(`\n=== Pagination Complete ===`);
     console.log(`Finished fetching ${allIssues.length} Jira issues (${totalIssues} total available)`);
