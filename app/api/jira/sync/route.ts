@@ -620,9 +620,11 @@ export async function POST(request: NextRequest) {
     let accountLinksCreated = 0;
     console.log(`Attempting to upsert ${accountLinksToCreate.length} account links...`);
     if (accountLinksToCreate.length > 0) {
+      // Use ignoreDuplicates: false so higher-confidence dynamic links (client_field, salesforce_case)
+      // can overwrite lower-confidence static links (looker_export) when the pair already exists.
       const { data: createdAccountLinks, error: accountLinksError } = await supabaseAdmin
         .from('account_jira_links')
-        .upsert(accountLinksToCreate, { onConflict: 'account_id,jira_issue_id', ignoreDuplicates: true })
+        .upsert(accountLinksToCreate, { onConflict: 'account_id,jira_issue_id', ignoreDuplicates: false })
         .select();
 
       if (accountLinksError) {
