@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
     // Pass 1: EDGE tickets
     console.log('Pass 1: Fetching EDGE tickets...');
     const edgeIssues = await fetchPaginatedIssues(
-      `project = EDGE AND updated >= "-180d" ORDER BY updated DESC`,
+      `project = EDGE AND updated >= "-365d" ORDER BY updated DESC`,
       600
     );
     console.log(`Pass 1 complete: ${edgeIssues.length} EDGE tickets`);
@@ -155,7 +155,7 @@ export async function POST(request: NextRequest) {
     let otherIssues: any[] = [];
     try {
       otherIssues = await fetchPaginatedIssues(
-        `project in (${projectsJql}) AND updated >= "-180d" ORDER BY updated DESC`,
+        `project in (${projectsJql}) AND updated >= "-365d" ORDER BY updated DESC`,
         1400
       );
       console.log(`Pass 2 complete: ${otherIssues.length} other tickets`);
