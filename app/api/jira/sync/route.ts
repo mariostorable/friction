@@ -277,7 +277,9 @@ export async function POST(request: NextRequest) {
         jira_id: issue.id,
         jira_key: issue.key,
         summary: issue.fields.summary,
-        description: issue.fields.description || '',
+        description: typeof issue.fields.description === 'object'
+          ? adfToPlainText(issue.fields.description)
+          : (issue.fields.description || ''),
         status: issue.fields.status?.name || 'Unknown',
         issue_type: issue.fields.issuetype?.name || 'Unknown',
         priority: issue.fields.priority?.name || null,
@@ -341,6 +343,7 @@ export async function POST(request: NextRequest) {
         .select('id, jira_key, metadata, labels, components, summary, description')
         .eq('user_id', userId)
         .in('jira_key', chunk);
+      // description may still be ADF JSON for tickets synced before this fix
       if (batch) insertedIssues.push(...batch);
     }
 
@@ -551,7 +554,10 @@ export async function POST(request: NextRequest) {
       // These projects don't reliably populate customfield_12184, so scan summary+description for known names
       const isSiteLinkProject = /^(SL|SLT|PAY|PAYEXT|BUGS|CRM|WA|POL|CPBUG|DATA|DAT|SF|SFT|CAL|DEVOPS|WEB)-/i.test(issue.jira_key || '');
       if (!hasDirectLink && clientFieldLinks.length === 0 && isSiteLinkProject && clientAliasMap.size > 0) {
-        const searchText = `${issue.summary || ''} ${issue.description || ''}`.toLowerCase();
+        const descText = typeof issue.description === 'object'
+          ? adfToPlainText(issue.description)
+          : (issue.description || '');
+        const searchText = `${issue.summary || ''} ${descText}`.toLowerCase();
         const nameScanLinks: any[] = [];
         const seenAccountIds = new Set<string>();
 
@@ -651,6 +657,20 @@ export async function POST(request: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown'
     }, { status: 500 });
   }
+}
+
+// Helper: Flatten Atlassian Document Format (ADF) to plain text
+function adfToPlainText(node: any): string {
+  if (!node) return '';
+  if (typeof node === 'string') return node;
+  if (typeof node !== 'object') return String(node);
+
+  // Text node
+  if (node.type === 'text') return node.text || '';
+
+  // Recurse into content array
+  const children: string[] = (node.content || []).map((child: any) => adfToPlainText(child));
+  return children.join(' ');
 }
 
 // Helper: Match Jira issues to ACTUAL friction themes (not hardcoded keywords)
