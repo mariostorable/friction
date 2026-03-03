@@ -139,19 +139,19 @@ export async function POST(request: NextRequest) {
       return issues.slice(0, cap);
     };
 
-    // Pass 1: EDGE tickets (cap 800)
+    // Pass 1: EDGE tickets (cap 1500)
     console.log('Pass 1: Fetching EDGE tickets...');
     const edgeIssues = await fetchPaginatedIssues(
-      `project = EDGE AND updated >= "-365d" ORDER BY updated DESC`, 800
+      `project = EDGE AND updated >= "-365d" ORDER BY updated DESC`, 1500
     );
     console.log(`Pass 1 complete: ${edgeIssues.length} EDGE tickets`);
 
-    // Pass 2: SiteLink tickets (cap 800)
+    // Pass 2: SiteLink tickets (cap 1500)
     console.log('Pass 2: Fetching SiteLink tickets...');
     let slIssues: any[] = [];
     try {
       slIssues = await fetchPaginatedIssues(
-        `project = SL AND updated >= "-365d" ORDER BY updated DESC`, 800
+        `project = SL AND updated >= "-365d" ORDER BY updated DESC`, 1500
       );
       console.log(`Pass 2 complete: ${slIssues.length} SiteLink tickets`);
     } catch (err) {
@@ -668,53 +668,3 @@ function getThemeLinksFromActualThemes(userId: string, issue: any, actualThemes:
   return links;
 }
 
-// Helper: Generate AI-friendly summary using Claude
-async function generateAISummary(issue: any): Promise<string> {
-  try {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      console.error('ANTHROPIC_API_KEY not configured');
-      return issue.fields.summary;
-    }
-
-    const description = issue.fields.description || 'No description provided';
-    const prompt = `Rewrite this Jira ticket in plain English that a customer success manager would understand:
-
-Title: ${issue.fields.summary}
-Description: ${description}
-Status: ${issue.fields.status?.name || 'Unknown'}
-Priority: ${issue.fields.priority?.name || 'Not set'}
-
-Provide a 1-2 sentence summary focusing on:
-- What customer problem this fixes
-- The business impact
-
-Keep it concise, non-technical, and customer-focused.`;
-
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 200,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Claude API error:', errorText);
-      return issue.fields.summary;
-    }
-
-    const data = await response.json();
-    return data.content[0].text;
-  } catch (error) {
-    console.error('Failed to generate AI summary:', error);
-    return issue.fields.summary;
-  }
-}
