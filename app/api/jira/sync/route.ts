@@ -240,20 +240,6 @@ export async function POST(request: NextRequest) {
 
       // Extract ALL fields including Salesforce fields (not just customfield_*)
       const customFields: Record<string, any> = {};
-      const allFieldKeys = Object.keys(issue.fields || {});
-      const totalCustomFields = allFieldKeys.filter(k => k.startsWith('customfield_')).length;
-
-      // DEBUG: Check for customfield_17254 specifically
-      const field17254 = issue.fields['customfield_17254'];
-      if (field17254 !== undefined) {
-        console.log(`DEBUG ${issue.key}: customfield_17254 EXISTS in raw data`);
-        console.log(`DEBUG ${issue.key}: customfield_17254 type = ${typeof field17254}`);
-        console.log(`DEBUG ${issue.key}: customfield_17254 value = ${JSON.stringify(field17254)?.substring(0, 200)}`);
-        console.log(`DEBUG ${issue.key}: customfield_17254 is null? ${field17254 === null}`);
-        console.log(`DEBUG ${issue.key}: customfield_17254 is empty string? ${field17254 === ''}`);
-      } else {
-        console.log(`DEBUG ${issue.key}: customfield_17254 is UNDEFINED (not present in response)`);
-      }
 
       Object.entries(issue.fields || {}).forEach(([key, value]) => {
         // Capture customfields AND Salesforce fields
@@ -280,21 +266,6 @@ export async function POST(request: NextRequest) {
         }
       });
 
-      // Debug logging for first issue only
-      if (issue.key === allIssues[0].key) {
-        console.log(`DEBUG: Issue ${issue.key} - Found ${totalCustomFields} custom fields in Jira API response`);
-        console.log(`DEBUG: Issue ${issue.key} - Extracted ${Object.keys(customFields).length} custom fields after filtering`);
-        if (Object.keys(customFields).length > 0) {
-          const sampleKeys = Object.keys(customFields).slice(0, 3);
-          console.log(`DEBUG: Sample extracted fields: ${sampleKeys.join(', ')}`);
-          sampleKeys.forEach(key => {
-            const val = customFields[key];
-            console.log(`DEBUG: ${key} = ${typeof val === 'string' ? val.substring(0, 100) : JSON.stringify(val).substring(0, 100)}`);
-          });
-        } else {
-          console.log(`DEBUG: No custom fields extracted - all were null/undefined/empty`);
-        }
-      }
 
       return {
         user_id: userId,
