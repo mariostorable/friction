@@ -556,8 +556,9 @@ export async function POST(request: NextRequest) {
         const seenAccountIds = new Set<string>();
 
         for (const [shortName, sfAccountName] of Array.from(clientAliasMap.entries())) {
-          // Skip very short or generic names that cause false positives
-          if (shortName.length < 4) continue;
+          // Skip very short names that cause false positives (allow 3-char if all caps, e.g. "SAM")
+          if (shortName.length < 3) continue;
+          if (shortName.length === 3 && shortName !== shortName.toUpperCase()) continue;
 
           if (searchText.includes(shortName.toLowerCase())) {
             const matchingAccounts = accounts?.filter(acc =>
