@@ -97,84 +97,66 @@ export async function POST(request: NextRequest) {
     const email = integration.metadata?.email;
     const jiraAuthHeader = `Basic ${Buffer.from(`${email}:${tokens.access_token}`).toString('base64')}`;
 
-    // Fetch all issues updated in the last 180 days with pagination
-    const jql = `updated >= "-180d" ORDER BY updated DESC`; // 6 months of history, newest first
+    // Fetch issues in two passes to guarantee EDGE tickets (which have Salesforce case links) are included:
+    // Pass 1: All EDGE tickets updated in last 180 days (no cap - ~500 tickets)
+    // Pass 2: Everything else updated in last 180 days (capped at 1500)
     const maxResults = 100; // Jira's max per request
-    const MAX_ISSUES_PER_SYNC = 3000; // Cap to stay within Vercel 5-min timeout
-    let startAt = 0;
+    const OTHER_ISSUES_CAP = 1500;
     let allIssues: any[] = [];
     let totalIssues = 0;
 
-    console.log(`Fetching Jira issues with JQL: ${jql} (cap: ${MAX_ISSUES_PER_SYNC})`);
+    const fetchPaginatedIssues = async (jql: string, cap: number | null): Promise<any[]> => {
+      const issues: any[] = [];
+      let startAt = 0;
+      let hasMore = true;
+      let iteration = 0;
 
-    // Paginate through results up to cap
-    let hasMorePages = true;
-    let loopIteration = 0;
-    do {
-      loopIteration++;
-      console.log(`\n=== Pagination Loop Iteration #${loopIteration} ===`);
-      console.log(`Fetching from startAt=${startAt}, maxResults=${maxResults}`);
+      while (hasMore) {
+        iteration++;
+        const response = await fetch(
+          `${integration.instance_url}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&startAt=${startAt}&maxResults=${maxResults}&fields=*all`,
+          { headers: { 'Authorization': jiraAuthHeader, 'Accept': 'application/json' } }
+        );
 
-      const jiraResponse = await fetch(
-        `${integration.instance_url}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&startAt=${startAt}&maxResults=${maxResults}&fields=*all`,
-        {
-          headers: {
-            'Authorization': jiraAuthHeader,
-            'Accept': 'application/json',
-          },
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Jira API error: ${errorText}`);
         }
-      );
 
-      if (!jiraResponse.ok) {
-        const errorText = await jiraResponse.text();
-        console.error('Jira API error:', errorText);
-        return NextResponse.json({
-          error: 'Failed to fetch issues from Jira',
-          details: errorText
-        }, { status: 500 });
+        const data = await response.json();
+        const fetched = data.issues?.length || 0;
+        if (fetched > 0) issues.push(...data.issues);
+
+        totalIssues = data.total || totalIssues;
+        hasMore = fetched === maxResults && (cap === null || issues.length < cap);
+        startAt += maxResults;
+
+        console.log(`[${jql.substring(0, 30)}...] iter ${iteration}: fetched ${issues.length} so far`);
       }
 
-      const jiraData = await jiraResponse.json();
+      return issues;
+    };
 
-      // Debug: Log field names for first issue
-      if (loopIteration === 1 && jiraData.issues?.length > 0) {
-        const firstIssue = jiraData.issues[0];
-        const fieldKeys = Object.keys(firstIssue.fields || {});
-        const customFieldKeys = fieldKeys.filter(k => k.startsWith('customfield_'));
-        console.log(`DEBUG: First issue has ${fieldKeys.length} total fields, ${customFieldKeys.length} custom fields`);
-        console.log(`DEBUG: Custom fields: ${customFieldKeys.slice(0, 10).join(', ')}${customFieldKeys.length > 10 ? '...' : ''}`);
+    // Pass 1: EDGE tickets (guaranteed - these have Salesforce case number links)
+    console.log('Pass 1: Fetching EDGE tickets...');
+    const edgeIssues = await fetchPaginatedIssues(
+      `project = EDGE AND updated >= "-180d" ORDER BY updated DESC`,
+      null
+    );
+    console.log(`Pass 1 complete: ${edgeIssues.length} EDGE tickets`);
 
-        // Log a sample custom field value
-        if (customFieldKeys.length > 0) {
-          const sampleField = customFieldKeys[0];
-          const sampleValue = firstIssue.fields[sampleField];
-          console.log(`DEBUG: Sample custom field ${sampleField}:`, typeof sampleValue === 'object' ? JSON.stringify(sampleValue).substring(0, 200) : sampleValue);
-        }
-      }
+    // Pass 2: Non-EDGE tickets (capped)
+    console.log('Pass 2: Fetching non-EDGE tickets...');
+    const otherIssues = await fetchPaginatedIssues(
+      `project != EDGE AND updated >= "-180d" ORDER BY updated DESC`,
+      OTHER_ISSUES_CAP
+    );
+    console.log(`Pass 2 complete: ${otherIssues.length} other tickets`);
 
-      // Get total count
-      totalIssues = jiraData.total || jiraData.totalResults || jiraData.count || totalIssues;
-
-      const fetchedCount = jiraData.issues?.length || 0;
-      if (fetchedCount > 0) {
-        allIssues = allIssues.concat(jiraData.issues);
-        console.log(`Fetched ${allIssues.length} issues so far (got ${fetchedCount} in this batch)`);
-      }
-
-      // Continue until we've fetched all pages or hit the cap
-      hasMorePages = fetchedCount === maxResults && allIssues.length < MAX_ISSUES_PER_SYNC;
-      console.log(`Pagination check: fetchedCount=${fetchedCount}, maxResults=${maxResults}, allIssues.length=${allIssues.length}, hasMorePages=${hasMorePages}`);
-      startAt += maxResults;
-
-      if (!hasMorePages) {
-        console.log(`Stopping pagination: ${allIssues.length >= MAX_ISSUES_PER_SYNC ? 'hit cap' : 'got partial page'}`);
-      }
-
-    } while (hasMorePages);
+    allIssues = [...edgeIssues, ...otherIssues];
+    console.log(`Total fetched: ${allIssues.length} issues (${edgeIssues.length} EDGE + ${otherIssues.length} other)`);
 
     console.log(`\n=== Pagination Complete ===`);
-    console.log(`Total loop iterations: ${loopIteration}`);
-
     console.log(`Finished fetching ${allIssues.length} Jira issues (${totalIssues} total available)`);
 
     // If we never got a total count, use the actual number we fetched
