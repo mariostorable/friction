@@ -40,7 +40,7 @@ INSERT INTO client_name_aliases (jira_short_name, sf_account_name, notes) VALUES
   ('StorEase',                'StoreEase - CORP',                                    NULL),
   ('StorQuest',               NULL,                                                  'Maps to multiple - needs case to disambiguate'),
   ('Storage King',            'Andover Properties - Storage King USA - CORP.',       NULL),
-  ('StorageMart',             NULL,                                                  'Maps to multiple - needs case to disambiguate'),
+  ('StorageMart',             'SMARTCO Properties, L.P - StorageMart - CORP.',       NULL),
   ('The Lock Up',             'SHS Development Company dba The Lock Up Self Storage - CORP.', NULL),
   ('The Storage Mall',        'The Storage Mall - CORP.',                            NULL),
   ('TnT Management',          'TnT Management - CORP',                               NULL),
