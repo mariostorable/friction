@@ -31,7 +31,7 @@ INSERT INTO client_name_aliases (jira_short_name, sf_account_name, notes) VALUES
   ('Osprey',                  NULL,                                                  'Ambiguous - manual review'),
   ('Otter Storage Management','Otter Storage Management - CORP.',                    NULL),
   ('Prime',                   'Prime Group Holdings, LLC - CORP',                    NULL),
-  ('Public Storage Canada',   'PS Canada Company, ULC - CORP',                       NULL),
+  ('Public Storage Canada',   NULL,                                                  'Not in active accounts - skip'),
   ('RecNation',               'Recreational Realty - CORP',                          NULL),
   ('Right Move Storage',      'Right Move Storage - CORP',                           NULL),
   ('SAM',                     'Storage Asset Management - CORP',                     NULL),
