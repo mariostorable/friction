@@ -47,6 +47,19 @@ export async function POST(request: NextRequest) {
       .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
       .order('created_at', { ascending: false });
 
+    // Get stale high-severity cases: severity 4-5 older than 7 days (unresolved escalations)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: staleEscalations } = await supabase
+      .from('friction_cards')
+      .select('id, summary, theme_key, severity, created_at, root_cause_hypothesis, evidence_snippets')
+      .eq('account_id', account_id)
+      .eq('is_friction', true)
+      .gte('severity', 4)
+      .lte('created_at', sevenDaysAgo)
+      .order('severity', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(10);
+
     // Get raw inputs for context
     const { data: rawInputs } = await supabase
       .from('raw_inputs')
@@ -71,6 +84,18 @@ export async function POST(request: NextRequest) {
       console.log('Could not fetch Jira status for briefing:', error);
     }
 
+    // Compute alert level before passing to Claude
+    const staleList = staleEscalations || [];
+    const hasSev5Stale = staleList.some(c => c.severity === 5);
+    const staleCount = staleList.length;
+    const ofiScore = snapshot?.ofi_score || 0;
+    const alertLevel =
+      hasSev5Stale || staleCount >= 2 || ofiScore >= 70
+        ? 'critical'
+        : staleCount >= 1 || ofiScore >= 40
+          ? 'high'
+          : 'moderate';
+
     // Generate briefing with Claude
     const briefing = await generateBriefingWithClaude({
       account,
@@ -79,6 +104,8 @@ export async function POST(request: NextRequest) {
       rawInputs: rawInputs || [],
       jiraStatus,
       briefingType: briefing_type,
+      staleEscalations: staleList,
+      alertLevel,
     });
 
     return NextResponse.json({ briefing });
@@ -93,11 +120,11 @@ export async function POST(request: NextRequest) {
 }
 
 async function generateBriefingWithClaude(data: any) {
-  const { account, snapshot, frictionCards, rawInputs, jiraStatus, briefingType } = data;
+  const { account, snapshot, frictionCards, rawInputs, jiraStatus, briefingType, staleEscalations, alertLevel } = data;
 
   const prompt = briefingType === 'quick'
-    ? generateQuickBriefingPrompt(account, snapshot, frictionCards, jiraStatus)
-    : generateDeepBriefingPrompt(account, snapshot, frictionCards, rawInputs, jiraStatus);
+    ? generateQuickBriefingPrompt(account, snapshot, frictionCards, jiraStatus, staleEscalations, alertLevel)
+    : generateDeepBriefingPrompt(account, snapshot, frictionCards, rawInputs, jiraStatus, staleEscalations, alertLevel);
 
   // Use different models and token limits based on briefing type
   const model = briefingType === 'quick'
@@ -137,7 +164,7 @@ async function generateBriefingWithClaude(data: any) {
   return JSON.parse(jsonMatch[0]);
 }
 
-function generateQuickBriefingPrompt(account: any, snapshot: any, frictionCards: any[], jiraStatus: any) {
+function generateQuickBriefingPrompt(account: any, snapshot: any, frictionCards: any[], jiraStatus: any, staleEscalations: any[] = [], alertLevel: string = 'moderate') {
   const ofiScore = snapshot?.ofi_score || 0;
   const trend = snapshot?.trend_vs_prior_period || 0;
   const trendText = trend > 15 ? '↑ WORSENING' : trend < -15 ? '↓ IMPROVING' : 'STABLE';
@@ -252,6 +279,17 @@ ${cardsSummary || 'No recent friction signals'}
 HIGH SEVERITY COUNT: ${snapshot?.high_severity_count || 0}${jiraSection}
 TOTAL SIGNALS: ${frictionCards.length}
 
+ALERT LEVEL: ${alertLevel.toUpperCase()}
+${staleEscalations.length > 0 ? `
+⚠️ STALE ESCALATIONS (Severity 4-5, unresolved for 7+ days — these need immediate attention):
+${staleEscalations.map(c => {
+  const daysOld = Math.floor((Date.now() - new Date(c.created_at).getTime()) / (1000 * 60 * 60 * 24));
+  return `- [${daysOld} days old | Sev ${c.severity} | ${c.theme_key}] ${c.summary}`;
+}).join('\n')}
+
+CRITICAL INSTRUCTION: These stale escalations represent cases the customer submitted but has NOT heard back on. They must appear prominently in attention_items with a "stale_escalation: true" flag and the days_open count. This is a churn risk signal.
+` : '- No stale escalations'}
+
 Generate a JSON object for a QUICK customer visit briefing (2-3 minute read):
 
 {
@@ -263,6 +301,7 @@ Generate a JSON object for a QUICK customer visit briefing (2-3 minute read):
   "segment": "${account.segment || 'Unknown'}",
   "ofi_score": ${ofiScore.toFixed(0)},
   "trend": "${trendText}",
+  "alert_level": "${alertLevel}",
   "product_intel": {
     "active_products": [
       // List of products currently in use, each as a short string e.g. "Software (EDGE)", "Marketplace (SpareFoot)"
@@ -287,9 +326,13 @@ Generate a JSON object for a QUICK customer visit briefing (2-3 minute read):
     {
       "title": "Most urgent issue",
       "severity": "critical|high|medium",
-      "details": "2-3 sentence description with specific dates/numbers"
+      "details": "2-3 sentence description with specific dates/numbers",
+      "stale_escalation": false,
+      "days_open": null
+      // stale_escalation: true if this is from the STALE ESCALATIONS list above
+      // days_open: number of days since the case was submitted (for stale escalations)
     },
-    // Include top 3 most critical issues based on severity and recency
+    // Include top 3 most critical issues — stale escalations MUST appear first
   ],
   "talking_points": [
     "Specific action item 1 (acknowledge friction, share roadmap progress)",
@@ -348,8 +391,8 @@ Generate a JSON object for a QUICK customer visit briefing (2-3 minute read):
 Be specific with dates, numbers, and concrete details. Focus on what's most actionable for the visit.`;
 }
 
-function generateDeepBriefingPrompt(account: any, snapshot: any, frictionCards: any[], rawInputs: any[], jiraStatus: any) {
-  const quickPrompt = generateQuickBriefingPrompt(account, snapshot, frictionCards, jiraStatus);
+function generateDeepBriefingPrompt(account: any, snapshot: any, frictionCards: any[], rawInputs: any[], jiraStatus: any, staleEscalations: any[] = [], alertLevel: string = 'moderate') {
+  const quickPrompt = generateQuickBriefingPrompt(account, snapshot, frictionCards, jiraStatus, staleEscalations, alertLevel);
 
   const recentInputsSummary = rawInputs
     .slice(0, 15)
